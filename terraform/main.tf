@@ -4,9 +4,19 @@ terraform {
       source  = "bpg/proxmox"
       version = "0.58.1"
     }
-    ansible = {
-      source  = "ansible/ansible"
-      version = "1.3.0"
-    }
+  }
+}
+
+variable "proxmox_config" {
+  type = map(string)
+}
+
+provider "proxmox" {
+  endpoint  = var.proxmox_config["endpoint"]
+  api_token = var.proxmox_config["api_token"]
+  insecure  = true
+  ssh {
+    agent    = true
+    username = "terraform"
   }
 }
