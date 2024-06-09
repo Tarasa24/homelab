@@ -51,9 +51,10 @@ resource "proxmox_virtual_environment_container" "lxc_templates_docker_template"
 
   provisioner "local-exec" {
     command = <<-EOT
-      ansible-playbook -i ../ansible/inventory.ini \
+      cd ../ansible && \
+      ansible-playbook \
       --extra-vars "vmid=${self.vm_id}" \
-      ../ansible/playbooks/lxc/docker-template-init.yml
+      ./playbooks/lxc/docker-template-init.yml
     EOT
   }
 }
