@@ -1,50 +1,34 @@
 ---
 - name: Configure Alpine Docker template in LXC container
-  hosts: proxmox
+  hosts: lxc_docker_template
   gather_facts: false
   vars:
-    vmid: "{{ vmid }}"
+    ansible_host: "{{ hostvars[inventory_hostname].ansible_host }}"
+    lxc_host: "{{ hostvars[inventory_hostname].lxc_host }}"
+  roles:
+    - role: lxc_python3
 
   tasks:
-    - name: Set motd
-      ansible.builtin.command:
-        lxc-attach -n {{ vmid }} -- sh -c \
-          "echo 'Welcome to the Alpine Docker template' > /etc/motd"
-      register: set_motd
-      changed_when: true
+    - name: Install Docker
+      ansible.builtin.apk:
+        name: docker
+        state: present
+        update_cache: true
 
-    - name: Update the package cache
-      ansible.builtin.command:
-        lxc-attach -n {{ vmid }} -- sh -c "apk update"
-      register: update_cache
-      changed_when: update_cache.stdout.find('skipping') == -1
-
-    - name: Install ssh in the LXC container
-      ansible.builtin.command:
-        lxc-attach -n {{ vmid }} -- sh -c \
-          "apk add openssh &&
-          rc-update add sshd &&
-          rc-service sshd start"
-      register: install_ssh
-      changed_when: install_ssh.stdout.find('ERROR') == -1
-
-    - name: Install Docker in the LXC container
-      ansible.builtin.command:
-        lxc-attach -n {{ vmid }} -- sh -c \
-          "apk add docker &&
-          rc-update add docker &&
-          rc-service docker start"
-      register: install_docker
-      changed_when: install_docker.stdout.find('ERROR') == -1
+    - name: Start Docker
+      ansible.builtin.service:
+        name: docker
+        state: started
+        enabled: true
 
     - name: Stop the container
       ansible.builtin.command:
-        "pct stop {{ vmid }}"
-      register: create_template
-      changed_when: create_template.stdout.find('ERROR') == -1
+        "pct stop {{ lxc_host }}"
+      delegate_to: "{{ ansible_host }}"
+      changed_when: false
 
-    - name: Create a template from the container
+    - name: Create Docker template
       ansible.builtin.command:
-        "pct set {{ vmid }} --template 1"
-      register: create_template
-      changed_when: create_template.stdout.find('ERROR') == -1
+        "pct set {{ lxc_host }} --template 1"
+      delegate_to: "{{ ansible_host }}"
+      changed_when: false

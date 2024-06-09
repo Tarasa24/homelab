@@ -13,7 +13,8 @@ variable "proxmox_config" {
 
 provider "proxmox" {
   endpoint  = var.proxmox_config["endpoint"]
-  api_token = var.proxmox_config["api_token"]
+  username  = var.proxmox_config["username"]
+  password  = var.proxmox_config["password"]
   insecure  = true
   ssh {
     agent    = true

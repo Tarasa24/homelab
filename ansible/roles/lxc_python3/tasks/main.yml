@@ -1,0 +1,32 @@
+---
+- name: Fail if lxc_host or ansible_host is not defined
+  ansible.builtin.fail:
+    msg: "lxc_host or ansible_host is not defined"
+  when: lxc_host == "" or ansible_host == ""
+
+- name: Ensure LXC container is running
+  command: lxc-info --name {{ lxc_host }} | grep -q "RUNNING"
+  register: lxc_info
+  delegate_to: "{{ ansible_host }}"
+
+- name: Start LXC container
+  command: lxc-start --name {{ lxc_host }}
+  when: lxc_info.rc != 0
+  delegate_to: "{{ ansible_host }}"
+
+- name: Wait for LXC container to start
+  command: lxc-info --name {{ lxc_host }} | grep -q "RUNNING"
+  register: lxc_info
+  delegate_to: "{{ ansible_host }}"
+  until: lxc_info.rc == 0
+  retries: 10
+  delay: 5
+
+- name: Check if Python 3 is installed
+  ansible.builtin.command: lxc-attach {{ lxc_host }} -- python3 --version
+  register: python3_version
+  delegate_to: "{{ lxc_host }}"
+  ignore_errors: true
+
+- include_tasks: install_python3.yml
+  when: python3_version.stdout_lines is not search('Python 3')

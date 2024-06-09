@@ -17,9 +17,6 @@ resource "proxmox_virtual_environment_container" "lxc_templates_docker_template"
     }
 
     user_account {
-      keys = [
-        trimspace(tls_private_key.docker_template_key.public_key_openssh)
-      ]
       password = random_password.docker_template_password.result
     }
   }
@@ -53,7 +50,6 @@ resource "proxmox_virtual_environment_container" "lxc_templates_docker_template"
     command = <<-EOT
       cd ../ansible && \
       ansible-playbook \
-      --extra-vars "vmid=${self.vm_id}" \
       ./playbooks/lxc/docker-template-init.yml
     EOT
   }
@@ -84,21 +80,7 @@ resource "random_password" "docker_template_password" {
   special          = true
 }
 
-resource "tls_private_key" "docker_template_key" {
-  algorithm = "RSA"
-  rsa_bits  = 2048
-}
-
 output "docker_template_password" {
   value     = random_password.docker_template_password.result
   sensitive = true
-}
-
-output "docker_template_private_key" {
-  value     = tls_private_key.docker_template_key.private_key_pem
-  sensitive = true
-}
-
-output "docker_template_public_key" {
-  value = tls_private_key.docker_template_key.public_key_openssh
 }
