@@ -48,3 +48,6 @@ terraform.rc
 # Ignore python cache files
 __pycache__/
 *.pyc
+
+# draw.io backup files
+*.drawio.bkp
