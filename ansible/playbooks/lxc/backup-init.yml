@@ -1,0 +1,42 @@
+---
+- name: Configure backup server
+  hosts: lxc_backup
+  gather_facts: false
+
+  roles:
+    - name: lxc_python3
+      lxc_host: "{{ hostvars[inventory_hostname].lxc_host }}"
+    - role: homelab_repo
+      checked_configs:
+        - backup
+
+  tasks:
+    - name: Install ssh
+      ansible.builtin.apk:
+        name: openssh
+        state: present
+
+    - name: Install restic
+      ansible.builtin.apk:
+        name: restic
+        state: present
+
+    - name: Check if resticprofile is installed
+      ansible.builtin.stat:
+        path: /usr/local/bin/resticprofile
+      register: resticprofile_installed
+
+    - name: Install resticprofile
+      block:
+        - name: Curl resticprofile
+          ansible.builtin.get_url:
+            url: https://raw.githubusercontent.com/creativeprojects/resticprofile/master/install.sh
+            dest: /tmp/resticprofile.sh
+            mode: 'u+x'
+
+        - name: Compile resticprofile
+          ansible.builtin.command:
+            cmd: /tmp/resticprofile.sh -b /usr/local/bin
+            creates: /usr/local/bin/resticprofile
+      when: not resticprofile_installed.stat.exists
+            

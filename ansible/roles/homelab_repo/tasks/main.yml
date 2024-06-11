@@ -1,0 +1,40 @@
+---
+- name: Make sure git is installed
+  ansible.builtin.apk:
+    name: git
+    state: present
+
+- name: Remove existing homelab_repo
+  command: rm -rf /etc/homelab_repo
+  ignore_errors: true
+
+- name: Clone homelab_repo
+  command: git clone --no-checkout {{ repo_url }} /etc/homelab_repo
+
+- name: Setup sparse checkout
+  command: git sparse-checkout init --cone
+  args:
+    chdir: /etc/homelab_repo
+
+- name: Set sparse-checkout rules for checked configs
+  command: git sparse-checkout set configs/{{ item }}
+  args:
+    chdir: /etc/homelab_repo
+  loop: "{{ checked_configs }}"
+  when: checked_configs | length > 0
+
+- name: Checkout homelab_repo
+  command: git checkout master
+  args:
+    chdir: /etc/homelab_repo
+
+- name: Pull latest changes
+  command: git pull
+  args:
+    chdir: /etc/homelab_repo
+
+- name: Softlinks checked configs to /config
+  file:
+    src: /etc/homelab_repo/configs
+    dest: /config
+    state: link
