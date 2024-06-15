@@ -1,0 +1,18 @@
+# Start of NAT rules
+*nat
+:POSTROUTING ACCEPT [0:0]
+
+# Masquerade traffic from {{ wireguard_client_ip }} to appear as coming from {{ public_ip }}
+-A POSTROUTING -s {{ wireguard_client_ip }}/32 -o eth0 -j MASQUERADE
+
+# Do not NAT SSH traffic (port 22)
+-A PREROUTING -d {{ public_ip }}/32 -p tcp --dport 22 -j ACCEPT
+
+# Do not NAT Wireguard traffic (port 51820)
+-A PREROUTING -d {{ public_ip }}/32 -p udp --dport 51820 -j ACCEPT
+
+# NAT other incoming traffic to {{ wireguard_client_ip }} via Wireguard
+-A PREROUTING -d {{ public_ip }}/32 -j DNAT --to-destination {{ wireguard_client_ip }}
+
+COMMIT
+# End of NAT rules

@@ -1,0 +1,136 @@
+---
+- name: Configure linode dmz bastion
+  hosts: linode_dmz_bastion
+  gather_facts: false
+  vars:
+    public_ip: "{{ inventory_hostname }}"
+    wireguard_network_cidr: "30"
+    wireguard_server_ip: "10.2.0.1"
+    wireguard_server_port: "51820"
+    wireguard_client_ip: "10.2.0.2"
+    wireguard_server_privatekey: "{{ lookup('file', '../../../secrets/wireguard/server/privatekey') }}"
+    wireguard_client_publickey: "{{ lookup('file', '../../../secrets/wireguard/client/publickey') }}"
+    wireguard_psk: "{{ lookup('file', '../../../secrets/wireguard/presharedkey') }}"
+  tasks:
+    - name: Change hostname
+      ansible.builtin.hostname:
+        name: dmz-bastion
+    - name: Prohobit password authentication for root
+      ansible.builtin.replace:
+        path: /etc/ssh/sshd_config
+        regexp: 'PermitRootLogin (.+)'
+        replace: 'PermitRootLogin prohibit-password'
+      notify: Reload sshd
+
+    - name: Install wireguard and ufw
+      ansible.builtin.package:
+        name:
+          - wireguard
+          - ufw
+        state: present
+
+    - name: Configure wireguard
+      block:
+        - name: Enable ipv4 forwarding
+          ansible.posix.sysctl:
+            name: net.ipv4.ip_forward
+            value: 1
+            state: present
+            reload: true
+        - name: Down the current wg0 interface if it exists
+          ansible.builtin.command: wg-quick down wg0
+          changed_when: false
+          failed_when: false
+
+        - name: Copy wireguard server config
+          ansible.builtin.template:
+            src: ../../../configs/linode/wg0.conf.j2
+            dest: /etc/wireguard/wg0.conf
+            mode: '0600'
+        - name: Up the wg0 interface
+          ansible.builtin.command: wg-quick up wg0
+          changed_when: false
+
+        - name: Make sure wg-quick service is enabled
+          ansible.builtin.systemd:
+            name: wg-quick@wg0
+            enabled: true
+
+    - name: Configure ufw
+      block:
+        - name: Remove all existing ufw rules
+          ansible.builtin.command: ufw --force reset
+          changed_when: false
+
+        - name: Allow ssh connection
+          community.general.ufw:
+            rule: allow
+            port: 22
+            proto: tcp
+            state: enabled
+        - name: Allow wireguard connection
+          community.general.ufw:
+            rule: allow
+            port: 51820
+            proto: udp
+            state: enabled
+
+        - name: Uplaod custom ufw before rules
+          ansible.builtin.template:
+            src: ../../../configs/linode/ufw-before.rules.j2
+            dest: /etc/ufw/custom-before.rules
+            mode: '0600'
+        - name: Remove existing custom ufw before rules (if any)
+          ansible.builtin.replace:
+            path: /etc/ufw/before.rules
+            regexp: '# Start of NAT rules\n(.|\n)+# End of NAT rules'
+            replace: ''
+        - name: Append custom ufw before rules to /etc/ufw/before.rules
+          ansible.builtin.shell: cat /etc/ufw/custom-before.rules >> /etc/ufw/before.rules
+          changed_when: false
+
+        - name: Change DEFAULT_FORWARD_POLICY="DROP" to "ACCEPT" in /etc/default/ufw
+          ansible.builtin.replace:
+            path: /etc/default/ufw
+            regexp: 'DEFAULT_FORWARD_POLICY="DROP"'
+            replace: 'DEFAULT_FORWARD_POLICY="ACCEPT"'
+
+        - name: Allow in on wg0
+          community.general.ufw:
+            rule: allow
+            direction: in
+            interface: wg0
+            state: enabled
+        - name: Allow out on wg0
+          community.general.ufw:
+            rule: allow
+            direction: out
+            interface: wg0
+            state: enabled
+        - name: Allow in on eth0 from any to wireguard_client_ip
+          community.general.ufw:
+            rule: allow
+            direction: in
+            interface: eth0
+            from_ip: any
+            to_ip: "{{ wireguard_client_ip }}"
+            state: enabled
+        - name: Allow out on eth0
+          community.general.ufw:
+            rule: allow
+            direction: out
+            interface: eth0
+            state: enabled
+
+        - name: Reload ufw
+          ansible.builtin.command: ufw reload
+          changed_when: false
+        - name: Make sure ufw service is enabled
+          ansible.builtin.systemd:
+            name: ufw
+            enabled: true
+  handlers:
+    - name: Reload sshd
+      ansible.builtin.systemd:
+        name: sshd
+        state: reloaded

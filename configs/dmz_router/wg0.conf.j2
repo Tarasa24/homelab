@@ -1,0 +1,10 @@
+[Interface]
+Address = {{ wireguard_client_ip }}/32
+PrivateKey = {{ wireguard_client_privatekey }}
+
+[Peer]
+Endpoint = {{ wireguard_server_endpoint_ip }}:{{ wireguard_server_port }}
+PublicKey = {{ wireguard_server_publickey }}
+PreSharedKey = {{ wireguard_psk }}
+AllowedIPs = 0.0.0.0/0
+PersistentKeepAlive = 25

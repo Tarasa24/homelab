@@ -1,0 +1,10 @@
+[Interface]
+Address = {{ wireguard_server_ip }}/{{ wireguard_network_cidr }}
+ListenPort = {{ wireguard_server_port }}
+PrivateKey = {{ wireguard_server_privatekey }}
+
+[Peer]
+PublicKey = {{ wireguard_client_publickey }}
+AllowedIPs = {{ wireguard_client_ip }}/32
+PreSharedKey = {{ wireguard_psk }}
+PersistentKeepAlive = 25

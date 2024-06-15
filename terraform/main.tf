@@ -4,10 +4,6 @@ terraform {
       source  = "bpg/proxmox"
       version = "0.58.1"
     }
-    linode = {
-      source  = "linode/linode"
-      version = "2.22.0"
-    }
   }
 }
 
@@ -24,12 +20,4 @@ provider "proxmox" {
     agent    = true
     username = "terraform"
   }
-}
-
-variable "linode_token" {
-  type = string
-}
-
-provider "linode" {
-  token = var.linode_token
 }
