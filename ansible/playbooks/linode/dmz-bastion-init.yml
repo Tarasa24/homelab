@@ -22,11 +22,10 @@
         replace: 'PermitRootLogin prohibit-password'
       notify: Reload sshd
 
-    - name: Install wireguard and ufw
+    - name: Install wireguard
       ansible.builtin.package:
         name:
           - wireguard
-          - ufw
         state: present
 
     - name: Configure wireguard
@@ -56,65 +55,22 @@
             name: wg-quick@wg0
             enabled: true
 
-    - name: Configure ufw
+    - name: Configure nftables
       block:
-        - name: Remove all existing ufw rules
-          ansible.builtin.command: ufw --force reset
-          changed_when: false
-
-        - name: Allow ssh connection
-          community.general.ufw:
-            rule: allow
-            port: 22
-            proto: tcp
-            state: enabled
-        - name: Allow wireguard connection
-          community.general.ufw:
-            rule: allow
-            port: 51820
-            proto: udp
-            state: enabled
-
-        - name: Upload custom ufw before rules
+        - name: Install nftables
+          ansible.builtin.package:
+            name:
+              - nftables
+            state: present
+        - name: Copy nftables config
           ansible.builtin.template:
-            src: ../../../configs/linode/ufw-before.rules.j2
-            dest: /etc/ufw/custom-before.rules
+            src: ../../../configs/linode/nftables.conf.j2
+            dest: /etc/nftables.conf
             mode: '0600'
-        - name: Remove existing custom ufw before rules (if any)
-          ansible.builtin.replace:
-            path: /etc/ufw/before.rules
-            regexp: '# Start of NAT rules\n(.|\n)+# End of NAT rules'
-            replace: ''
-        - name: Append custom ufw before rules to /etc/ufw/before.rules
-          ansible.builtin.shell: cat /etc/ufw/custom-before.rules >> /etc/ufw/before.rules
-          changed_when: false
-
-        - name: Set allowed incoming ports
-          community.general.ufw:
-            route: true
-            rule: allow
-            interface_in: eth0
-            interface_out: wg0
-            dest: "{{ wireguard_client_ip }}"
-            port: "{{ item.0 }}"
-            proto: "{{ item.1 }}"
-          loop:
-            - [80, "tcp"]
-            - [443, "tcp"]
-        - name: Allow all traffic from wireguard interface
-          community.general.ufw:
-            route: true
-            rule: allow
-            interface_in: wg0
-            interface_out: eth0
-            state: enabled
-        - name: Reload ufw
-          ansible.builtin.command: ufw reload
-          changed_when: false
-        - name: Make sure ufw service is enabled
+        - name: Reload nftables
           ansible.builtin.systemd:
-            name: ufw
-            enabled: true
+            name: nftables
+            state: reloaded
   handlers:
     - name: Reload sshd
       ansible.builtin.systemd:

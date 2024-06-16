@@ -1,0 +1,47 @@
+#!/usr/sbin/nft -f
+
+flush ruleset
+
+# DNAT traffic from the internet to wireguard_client_ip (source ip should remain the same)
+# SNAT traffic coming from wireguard_client_ip to the internet (source ip should be the wireguard server ip)
+# Make sure traffic for ssh port 22 and wireguard port 51820 is allowed in the firewall and remain un-natted
+
+table inet nat {
+    chain prerouting {
+        type nat hook prerouting priority 0; policy accept;
+      
+        # Allow SSH (port 22) without NAT
+        tcp dport 22 return
+
+        # Allow WireGuard (port 51820) without NAT
+        udp dport 51820 return
+
+        # DNAT for all other traffic to wireguard_client_ip
+        ip daddr {{ public_ip }} dnat to {{ wireguard_client_ip }}
+    }
+
+    chain postrouting {
+        type nat hook postrouting priority 100; policy accept;
+
+        # SNAT traffic from wireguard_client_ip to the internet
+        ip saddr {{ wireguard_client_ip }} snat to {{ public_ip }}
+    }
+
+    chain input {
+        type filter hook input priority 0; policy accept;
+
+        # Allow SSH (port 22)
+        tcp dport 22 accept
+
+        # Allow WireGuard (port 51820)
+        udp dport 51820 accept
+    }
+
+    chain forward {
+        type filter hook forward priority 0; policy accept;
+        
+        # Accept forwarded traffic
+        ct state related,established accept
+        ip daddr {{ wireguard_client_ip }} accept
+    }
+}

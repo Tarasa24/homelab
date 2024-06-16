@@ -13,6 +13,8 @@
     wireguard_client_privatekey: "{{ lookup('file', '../../../secrets/wireguard/client/privatekey') }}"
     wireguard_server_publickey: "{{ lookup('file', '../../../secrets/wireguard/server/publickey') }}"
     wireguard_psk: "{{ lookup('file', '../../../secrets/wireguard/presharedkey') }}"
+
+    linode_v4_api_token: "{{ lookup('file', '../../../secrets/linode/acme_api_key') }}"
   roles:
     - role: lxc_python3
 
@@ -56,7 +58,7 @@
           - "iface wg0 inet static"
           - "pre-up wg-quick up /etc/wireguard/wg0.conf"
       - name: Up the wg0 interface
-        ansible.builtin.command: ifup wg0
+        ansible.builtin.command: wg-quick up wg0
     
     - name: Setup DNS and DHCP server
       block:
@@ -79,9 +81,65 @@
           state: started
           enabled: true
 
+    - name: Setup acme.sh
+      block:
+      - name: Install acmes.sh prerequisites
+        ansible.builtin.apk:
+          name:
+            - openssl
+            - curl
+          state: present
+          no_cache: true
+      - name: Check if acme.sh is installed
+        ansible.builtin.stat:
+          path: /root/.acme.sh/acme.sh
+        register: acme_sh_installed
+      - name: Install acme.sh
+        ansible.builtin.shell:
+          cmd: curl https://get.acme.sh | sh -s email=admin@tarasa24.dev
+        when: acme_sh_installed.stat.exists == false
+
+      - name: Issue certificate
+        ansible.builtin.shell:
+          cmd: >
+            [ -f /root/.acme.sh/{{ item.split(',')[0] }}_ecc/{{ item.split(',')[0] }}.cer ] && exit 3 ||
+            LINODE_V4_API_KEY="{{ linode_v4_api_token }}"
+            /root/.acme.sh/acme.sh --issue --dns dns_linode_v4
+            {% for domain in item.split(',') %}
+            -d "{{ domain }}"
+            {% endfor %}
+            --server letsencrypt
+        register: result
+        changed_when: result.rc == 0
+        failed_when: result.rc != 0 and result.rc != 3
+        with_items:
+          - "*.homelab.tarasa24.dev"
+        async: 600
+        poll: 5
+
     - name: Setup nginx
       block:
       - name: Install nginx
         ansible.builtin.package:
           name: nginx
           state: present
+      - name: Create www group
+        ansible.builtin.group:
+          name: www
+          state: present
+      - name: Create www user
+        ansible.builtin.user:
+          name: www
+          group: www
+          state: present
+      - name: Copy nginx config files
+        ansible.builtin.copy:
+          src: ../../../configs/dmz_router/nginx/
+          dest: /etc/nginx/
+          mode: '0644'
+      - name: Start or restart nginx
+        ansible.builtin.service:
+          name: nginx
+          state: started
+          enabled: true
+ 
