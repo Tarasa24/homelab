@@ -1,6 +1,9 @@
 [Interface]
 Address = {{ wireguard_client_ip }}/32
 PrivateKey = {{ wireguard_client_privatekey }}
+# Forward traffic from "dnz" network Interface to "wg0" Interface + masquerade the traffic
+PostUp = iptables -A FORWARD -i dnz -o wg0 -j ACCEPT; iptables -t nat -A POSTROUTING -o wg0 -j MASQUERADE
+PostDown = iptables -D FORWARD -i dnz -o wg0 -j ACCEPT; iptables -t nat -D POSTROUTING -o wg0 -j MASQUERADE
 
 [Peer]
 Endpoint = {{ wireguard_server_endpoint_ip }}:{{ wireguard_server_port }}

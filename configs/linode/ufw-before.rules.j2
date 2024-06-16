@@ -7,7 +7,6 @@
 
 # Do not NAT SSH traffic (port 22)
 -A PREROUTING -d {{ public_ip }}/32 -p tcp --dport 22 -j ACCEPT
-
 # Do not NAT Wireguard traffic (port 51820)
 -A PREROUTING -d {{ public_ip }}/32 -p udp --dport 51820 -j ACCEPT
 

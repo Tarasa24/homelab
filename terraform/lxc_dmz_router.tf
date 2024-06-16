@@ -31,11 +31,13 @@ resource "proxmox_virtual_environment_container" "lxc_dmz_router" {
   unprivileged = true
 
   network_interface {
-    name = "eth0"
+    name     = "eth0"
+    firewall = true
   }
   network_interface {
-    name   = "dmz"
-    bridge = proxmox_virtual_environment_network_linux_bridge.dmz_bridge.name
+    name     = "dmz"
+    bridge   = proxmox_virtual_environment_network_linux_bridge.dmz_bridge.name
+    firewall = true
   }
 
   operating_system {
@@ -93,7 +95,47 @@ resource "proxmox_virtual_environment_network_linux_bridge" "dmz_bridge" {
   comment = "Bridge for the DMZ network"
 
   node_name = "pve"
-  name      = "vmbr2"
+  name      = "vmbr1"
 
   address = "10.1.0.1/24"
+}
+
+resource "proxmox_virtual_environment_firewall_options" "lxc_dmz_router" {
+  depends_on = [
+    proxmox_virtual_environment_container.lxc_dmz_router
+  ]
+
+  node_name    = "pve"
+  container_id = proxmox_virtual_environment_container.lxc_dmz_router.vm_id
+
+  enabled       = true
+  input_policy  = "DROP"
+  output_policy = "DROP"
+}
+
+
+resource "proxmox_virtual_environment_firewall_rules" "lxc_dmz_router" {
+  depends_on = [
+    proxmox_virtual_environment_container.lxc_dmz_router
+  ]
+
+  node_name    = "pve"
+  container_id = proxmox_virtual_environment_container.lxc_dmz_router.vm_id
+
+  rule {
+    type    = "out"
+    action  = "ACCEPT"
+    comment = "Allow output traffic to DMZ"
+    iface   = "net1"
+  }
+
+  rule {
+    type    = "out"
+    action  = "ACCEPT"
+    comment = "Allow output traffic to WAN (Internet) only on port 51820/udp (WireGuard)"
+    iface   = "net0"
+    dport   = 51820
+    proto   = "udp"
+    log     = "notice"
+  }
 }

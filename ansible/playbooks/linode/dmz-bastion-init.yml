@@ -75,7 +75,7 @@
             proto: udp
             state: enabled
 
-        - name: Uplaod custom ufw before rules
+        - name: Upload custom ufw before rules
           ansible.builtin.template:
             src: ../../../configs/linode/ufw-before.rules.j2
             dest: /etc/ufw/custom-before.rules
@@ -89,39 +89,25 @@
           ansible.builtin.shell: cat /etc/ufw/custom-before.rules >> /etc/ufw/before.rules
           changed_when: false
 
-        - name: Change DEFAULT_FORWARD_POLICY="DROP" to "ACCEPT" in /etc/default/ufw
-          ansible.builtin.replace:
-            path: /etc/default/ufw
-            regexp: 'DEFAULT_FORWARD_POLICY="DROP"'
-            replace: 'DEFAULT_FORWARD_POLICY="ACCEPT"'
-
-        - name: Allow in on wg0
+        - name: Set allowed incoming ports
           community.general.ufw:
+            route: true
             rule: allow
-            direction: in
-            interface: wg0
-            state: enabled
-        - name: Allow out on wg0
+            interface_in: eth0
+            interface_out: wg0
+            dest: "{{ wireguard_client_ip }}"
+            port: "{{ item.0 }}"
+            proto: "{{ item.1 }}"
+          loop:
+            - [80, "tcp"]
+            - [443, "tcp"]
+        - name: Allow all traffic from wireguard interface
           community.general.ufw:
+            route: true
             rule: allow
-            direction: out
-            interface: wg0
+            interface_in: wg0
+            interface_out: eth0
             state: enabled
-        - name: Allow in on eth0 from any to wireguard_client_ip
-          community.general.ufw:
-            rule: allow
-            direction: in
-            interface: eth0
-            from_ip: any
-            to_ip: "{{ wireguard_client_ip }}"
-            state: enabled
-        - name: Allow out on eth0
-          community.general.ufw:
-            rule: allow
-            direction: out
-            interface: eth0
-            state: enabled
-
         - name: Reload ufw
           ansible.builtin.command: ufw reload
           changed_when: false
