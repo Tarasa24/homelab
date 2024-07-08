@@ -6,9 +6,6 @@
   roles:
     - name: lxc_python3
       lxc_host: "{{ hostvars[inventory_hostname].lxc_host }}"
-    - role: homelab_repo
-      checked_configs:
-        - backup
 
   tasks:
     - name: Install ssh

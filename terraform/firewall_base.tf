@@ -1,4 +1,17 @@
+resource "proxmox_virtual_environment_firewall_alias" "dmz_network" {
+  name = "dmz_network"
+  cidr = "10.1.0.0/24"
+}
+
 resource "proxmox_virtual_environment_firewall_rules" "cluster_level_firewall_rules" {
+  rule {
+    type    = "in"
+    action  = "ACCEPT"
+    comment = "Allow inter-DMZ traffic"
+    source  = proxmox_virtual_environment_firewall_alias.dmz_network.name
+    dest    = proxmox_virtual_environment_firewall_alias.dmz_network.name
+  }
+
   rule {
     type    = "in"
     action  = "ACCEPT"

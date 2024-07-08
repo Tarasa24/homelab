@@ -137,9 +137,13 @@
           src: ../../../configs/dmz_router/nginx/
           dest: /etc/nginx/
           mode: '0644'
-      - name: Start or restart nginx
+      - name: Stop nginx
+        ansible.builtin.service:
+          name: nginx
+          state: stopped
+          enabled: true
+      - name: Start nginx
         ansible.builtin.service:
           name: nginx
           state: started
           enabled: true
- 

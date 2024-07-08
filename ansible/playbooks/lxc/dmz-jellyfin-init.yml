@@ -1,0 +1,27 @@
+---
+- name: Configure jellyfin container
+  hosts: lxc_dmz_jellyfin
+  gather_facts: false
+  vars:
+    ansible_host: "{{ hostvars[inventory_hostname].ansible_host }}"
+    lxc_host: "{{ hostvars[inventory_hostname].lxc_host }}"
+  roles:
+    - role: lxc_python3
+
+  tasks:
+    - name: Create directories
+      ansible.builtin.file:
+        dest: /etc/jellyfin
+        state: directory
+    - name: Copy docker-compose.yml
+      ansible.builtin.copy:
+        src: ../../../configs/jellyfin/docker-compose.yml
+        dest: /etc/jellyfin/docker-compose.yml
+        owner: root
+        group: root
+        mode: 0644
+
+    - name: Start docker compose service
+      ansible.builtin.command:
+        cmd: "docker compose up -d"
+        chdir: /etc/jellyfin

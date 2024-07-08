@@ -11,7 +11,7 @@
   tasks:
     - name: Install Docker
       ansible.builtin.apk:
-        name: docker
+        name: ['docker', 'docker-compose']
         state: present
         update_cache: true
 
