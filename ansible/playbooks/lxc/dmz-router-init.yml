@@ -102,13 +102,12 @@
       - name: Issue certificate
         ansible.builtin.shell:
           cmd: >
-            [ -f /root/.acme.sh/{{ item.split(',')[0] }}_ecc/{{ item.split(',')[0] }}.cer ] && exit 3 ||
-            LINODE_V4_API_KEY="{{ linode_v4_api_token }}"
-            /root/.acme.sh/acme.sh --issue --dns dns_linode_v4
+            ([ -f /root/.acme.sh/{{ item.split(',')[0] }}_ecc/{{ item.split(',')[0] }}.cer ] && exit 3) ||
+            LINODE_V4_API_KEY="{{ linode_v4_api_token }}" /root/.acme.sh/acme.sh --issue --dns dns_linode_v4
             {% for domain in item.split(',') %}
-            -d "{{ domain }}"
+              -d "{{ domain }}"
             {% endfor %}
-            --server letsencrypt
+            --server letsencrypt && exit 0
         register: result
         changed_when: result.rc == 0
         failed_when: result.rc != 0 and result.rc != 3

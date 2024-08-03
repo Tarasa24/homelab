@@ -96,8 +96,6 @@ resource "proxmox_virtual_environment_network_linux_bridge" "dmz_bridge" {
 
   node_name = "pve"
   name      = "vmbr1"
-
-  address = "10.1.0.1/24"
 }
 
 resource "proxmox_virtual_environment_firewall_options" "lxc_dmz_router" {
