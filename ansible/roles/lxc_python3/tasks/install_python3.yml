@@ -10,7 +10,7 @@
       ansible.builtin.command: lxc-attach {{ lxc_host }} -- apk update
       delegate_to: "{{ ansible_host }}"
     - name: Install python via apk (if is Alpine)
-      ansible.builtin.command: lxc-attach {{ lxc_host }} -- apk add python3
+      ansible.builtin.command: lxc-attach {{ lxc_host }} -- apk add python3 py3-pip
       delegate_to: "{{ ansible_host }}"
   when: os_release.stdout_lines is search("Alpine")
 
@@ -19,6 +19,6 @@
       ansible.builtin.command: lxc-attach {{ lxc_host }} -- apt update
       delegate_to: "{{ ansible_host }}"
     - name: Install python via apt (if is Ubuntu)
-      ansible.builtin.command: lxc-attach {{ lxc_host }} -- apt install -y python3
+      ansible.builtin.command: lxc-attach {{ lxc_host }} -- apt install -y python3 python3-pip
       delegate_to: "{{ ansible_host }}"
   when: os_release.stdout_lines is search("Debian|Ubuntu")

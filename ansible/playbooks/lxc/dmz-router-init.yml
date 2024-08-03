@@ -14,7 +14,10 @@
     wireguard_server_publickey: "{{ lookup('file', '../../../secrets/wireguard/server/publickey') }}"
     wireguard_psk: "{{ lookup('file', '../../../secrets/wireguard/presharedkey') }}"
 
-    linode_v4_api_token: "{{ lookup('file', '../../../secrets/linode/acme_api_key') }}"
+    certificates:
+      - "*.homelab.tarasa24.dev"W
+    certbot_email: "admin@tarasa24.dev"
+    certbot_linode_credentials: "{{ lookup('file', '../../../secrets/linode/certbot_acme_api_creds.ini') }}"
   roles:
     - role: lxc_python3
 
@@ -81,40 +84,33 @@
           state: started
           enabled: true
 
-    - name: Setup acme.sh
+    - name: Generate SSL certificates
       block:
-      - name: Install acmes.sh prerequisites
-        ansible.builtin.apk:
-          name:
-            - openssl
-            - curl
+      - name: Install Certbot
+        ansible.builtin.package:
+          name: certbot
           state: present
-          no_cache: true
-      - name: Check if acme.sh is installed
-        ansible.builtin.stat:
-          path: /root/.acme.sh/acme.sh
-        register: acme_sh_installed
-      - name: Install acme.sh
-        ansible.builtin.shell:
-          cmd: curl https://get.acme.sh | sh -s email=admin@tarasa24.dev
-        when: acme_sh_installed.stat.exists == false
-
-      - name: Issue certificate
-        ansible.builtin.shell:
-          cmd: >
-            ([ -f /root/.acme.sh/{{ item.split(',')[0] }}_ecc/{{ item.split(',')[0] }}.cer ] && exit 3) ||
-            LINODE_V4_API_KEY="{{ linode_v4_api_token }}" /root/.acme.sh/acme.sh --issue --dns dns_linode_v4
-            {% for domain in item.split(',') %}
-              -d "{{ domain }}"
-            {% endfor %}
-            --server letsencrypt && exit 0
-        register: result
-        changed_when: result.rc == 0
-        failed_when: result.rc != 0 and result.rc != 3
-        with_items:
-          - "*.homelab.tarasa24.dev"
-        async: 600
-        poll: 5
+      - name: Install Certbot DNS plugin for Linode
+        ansible.builtin.pip:
+          name: certbot-dns-linode
+          state: present
+      - name: Create Certbot folder - /etc/letsencrypt
+        file:
+          path: /etc/letsencrypt
+          state: directory
+          owner: root
+          group: root
+          mode: 0700
+      - name: Create Linode API key file
+        ansible.builtin.copy:
+          content: "{{ certbot_linode_credentials }}"
+          dest: /etc/letsencrypt/linode.ini
+          mode: '0600'
+      - name: Certbot - Generate SSL certificates
+        ansible.builtin.command: certbot certonly --dns-linode --dns-linode-credentials /etc/letsencrypt/linode.ini --dns-linode-propagation-seconds 60 --email {{ certbot_email }} --agree-tos --no-eff-email --cert-name {{ item }} -d {{ item }}
+        args:
+          creates: "/etc/letsencrypt/renewal/{{ item }}.conf"
+        with_items: "{{ certificates }}"
 
     - name: Setup nginx
       block:
