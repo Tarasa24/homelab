@@ -1,0 +1,20 @@
+---
+- name: Configure Alpine Docker template in LXC container
+  hosts: lxc_nixos_template
+  gather_facts: false
+  vars:
+    ansible_host: "{{ hostvars[inventory_hostname].ansible_host }}"
+    lxc_host: "{{ hostvars[inventory_hostname].lxc_host }}"
+
+  tasks:
+    - name: Stop the container
+      ansible.builtin.command:
+        "pct stop {{ lxc_host }}"
+      delegate_to: "{{ ansible_host }}"
+      changed_when: false
+
+    - name: Create Docker template
+      ansible.builtin.command:
+        "pct set {{ lxc_host }} --template 1"
+      delegate_to: "{{ ansible_host }}"
+      changed_when: false
