@@ -13,7 +13,7 @@
       delegate_to: "{{ ansible_host }}"
       changed_when: false
 
-    - name: Create Docker template
+    - name: Create template
       ansible.builtin.command:
         "pct set {{ lxc_host }} --template 1"
       delegate_to: "{{ ansible_host }}"
