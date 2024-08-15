@@ -15,7 +15,7 @@
     wireguard_psk: "{{ lookup('file', '../../../secrets/wireguard/presharedkey') }}"
 
     certificates:
-      - "*.homelab.tarasa24.dev"W
+      - "*.homelab.tarasa24.dev"
     certbot_email: "admin@tarasa24.dev"
     certbot_linode_credentials: "{{ lookup('file', '../../../secrets/linode/certbot_acme_api_creds.ini') }}"
   roles:
@@ -24,121 +24,121 @@
   tasks:
     - name: Setup wireguard tunnel
       block:
-      - name: Install wireguard
-        ansible.builtin.apk:
-          name:
-            - wireguard-tools-wg-quick
-            - iptables
-          state: present
-          no_cache: true
+        - name: Install wireguard
+          ansible.builtin.apk:
+            name:
+              - wireguard-tools-wg-quick
+              - iptables
+            state: present
+            no_cache: true
 
-      - name: Enable ipv4 forwarding
-        ansible.posix.sysctl:
-          name: net.ipv4.ip_forward
-          value: 1
-          state: present
-          reload: true
-      - name: Down the current wg0 interface if it exists
-        ansible.builtin.command: wg-quick down wg0
-        changed_when: false
-        failed_when: false
-      - name: Create /etc/wireguard directory
-        ansible.builtin.file:
-          path: /etc/wireguard
-          state: directory
-      - name: Copy wireguard client config
-        ansible.builtin.template:
-          src: ../../../configs/dmz_router/wg0.conf.j2
-          dest: /etc/wireguard/wg0.conf
-          mode: '0600'
+        - name: Enable ipv4 forwarding
+          ansible.posix.sysctl:
+            name: net.ipv4.ip_forward
+            value: 1
+            state: present
+            reload: true
+        - name: Down the current wg0 interface if it exists
+          ansible.builtin.command: wg-quick down wg0
+          changed_when: false
+          failed_when: false
+        - name: Create /etc/wireguard directory
+          ansible.builtin.file:
+            path: /etc/wireguard
+            state: directory
+        - name: Copy wireguard client config
+          ansible.builtin.template:
+            src: ../../../configs/dmz_router/wg0.conf.j2
+            dest: /etc/wireguard/wg0.conf
+            mode: "0600"
 
-      - name: Add wg0 as network interface
-        ansible.builtin.lineinfile:
-          path: /etc/network/interfaces
-          line: "{{ item }}"
-        with_items:
-          - "auto wg0"
-          - "iface wg0 inet static"
-          - "pre-up wg-quick up /etc/wireguard/wg0.conf"
-      - name: Up the wg0 interface
-        ansible.builtin.command: wg-quick up wg0
-    
+        - name: Add wg0 as network interface
+          ansible.builtin.lineinfile:
+            path: /etc/network/interfaces
+            line: "{{ item }}"
+          with_items:
+            - "auto wg0"
+            - "iface wg0 inet static"
+            - "pre-up wg-quick up /etc/wireguard/wg0.conf"
+        - name: Up the wg0 interface
+          ansible.builtin.command: wg-quick up wg0
+
     - name: Setup DNS and DHCP server
       block:
-      - name: Install dnsmasq
-        ansible.builtin.package:
-          name: dnsmasq
-          state: present
-      - name: Create /etc/dnsmasq.d directory
-        ansible.builtin.file:
-          path: /etc/dnsmasq.d
-          state: directory
-      - name: Copy dnsmasq config file
-        ansible.builtin.copy:
-          src: ../../../configs/dmz_router/dnsmasq.conf
-          dest: /etc/dnsmasq.d/dmz.conf
-          mode: '0644'
-      - name: Start dnsmasq
-        ansible.builtin.service:
-          name: dnsmasq
-          state: started
-          enabled: true
+        - name: Install dnsmasq
+          ansible.builtin.package:
+            name: dnsmasq
+            state: present
+        - name: Create /etc/dnsmasq.d directory
+          ansible.builtin.file:
+            path: /etc/dnsmasq.d
+            state: directory
+        - name: Copy dnsmasq config file
+          ansible.builtin.copy:
+            src: ../../../configs/dmz_router/dnsmasq.conf
+            dest: /etc/dnsmasq.d/dmz.conf
+            mode: "0644"
+        - name: Start dnsmasq
+          ansible.builtin.service:
+            name: dnsmasq
+            state: started
+            enabled: true
 
     - name: Generate SSL certificates
       block:
-      - name: Install Certbot
-        ansible.builtin.package:
-          name: certbot
-          state: present
-      - name: Install Certbot DNS plugin for Linode
-        ansible.builtin.pip:
-          name: certbot-dns-linode
-          state: present
-      - name: Create Certbot folder - /etc/letsencrypt
-        file:
-          path: /etc/letsencrypt
-          state: directory
-          owner: root
-          group: root
-          mode: 0700
-      - name: Create Linode API key file
-        ansible.builtin.copy:
-          content: "{{ certbot_linode_credentials }}"
-          dest: /etc/letsencrypt/linode.ini
-          mode: '0600'
-      - name: Certbot - Generate SSL certificates
-        ansible.builtin.command: certbot certonly --dns-linode --dns-linode-credentials /etc/letsencrypt/linode.ini --dns-linode-propagation-seconds 60 --email {{ certbot_email }} --agree-tos --no-eff-email --cert-name {{ item }} -d {{ item }}
-        args:
-          creates: "/etc/letsencrypt/renewal/{{ item }}.conf"
-        with_items: "{{ certificates }}"
+        - name: Install Certbot
+          ansible.builtin.package:
+            name: certbot
+            state: present
+        - name: Install Certbot DNS plugin for Linode
+          ansible.builtin.pip:
+            name: certbot-dns-linode
+            state: present
+        - name: Create Certbot folder - /etc/letsencrypt
+          file:
+            path: /etc/letsencrypt
+            state: directory
+            owner: root
+            group: root
+            mode: 0700
+        - name: Create Linode API key file
+          ansible.builtin.copy:
+            content: "{{ certbot_linode_credentials }}"
+            dest: /etc/letsencrypt/linode.ini
+            mode: "0600"
+        - name: Certbot - Generate SSL certificates
+          ansible.builtin.command: certbot certonly --dns-linode --dns-linode-credentials /etc/letsencrypt/linode.ini --dns-linode-propagation-seconds 60 --email {{ certbot_email }} --agree-tos --no-eff-email --cert-name {{ item }} -d {{ item }}
+          args:
+            creates: "/etc/letsencrypt/renewal/{{ item }}.conf"
+          with_items: "{{ certificates }}"
 
     - name: Setup nginx
       block:
-      - name: Install nginx
-        ansible.builtin.package:
-          name: nginx
-          state: present
-      - name: Create www group
-        ansible.builtin.group:
-          name: www
-          state: present
-      - name: Create www user
-        ansible.builtin.user:
-          name: www
-          group: www
-          state: present
-      - name: Copy nginx config files
-        ansible.builtin.copy:
-          src: ../../../configs/dmz_router/nginx/
-          dest: /etc/nginx/
-          mode: '0644'
-      - name: Stop nginx
-        ansible.builtin.service:
-          name: nginx
-          state: stopped
-          enabled: true
-      - name: Start nginx
-        ansible.builtin.service:
-          name: nginx
-          state: started
-          enabled: true
+        - name: Install nginx
+          ansible.builtin.package:
+            name: nginx
+            state: present
+        - name: Create www group
+          ansible.builtin.group:
+            name: www
+            state: present
+        - name: Create www user
+          ansible.builtin.user:
+            name: www
+            group: www
+            state: present
+        - name: Copy nginx config files
+          ansible.builtin.copy:
+            src: ../../../configs/dmz_router/nginx/
+            dest: /etc/nginx/
+            mode: "0644"
+        - name: Stop nginx
+          ansible.builtin.service:
+            name: nginx
+            state: stopped
+            enabled: true
+        - name: Start nginx
+          ansible.builtin.service:
+            name: nginx
+            state: started
+            enabled: true
