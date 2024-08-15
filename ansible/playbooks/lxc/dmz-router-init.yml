@@ -107,7 +107,7 @@
             dest: /etc/letsencrypt/linode.ini
             mode: "0600"
         - name: Certbot - Generate SSL certificates
-          ansible.builtin.command: certbot certonly --dns-linode --dns-linode-credentials /etc/letsencrypt/linode.ini --dns-linode-propagation-seconds 60 --email {{ certbot_email }} --agree-tos --no-eff-email --cert-name {{ item }} -d {{ item }}
+          ansible.builtin.command: certbot certonly --dns-linode --dns-linode-credentials /etc/letsencrypt/linode.ini --dns-linode-propagation-seconds 60 --email {{ certbot_email }} --agree-tos --no-eff-email --cert-name {{ item }} -d {{ item }} --test-cert
           args:
             creates: "/etc/letsencrypt/renewal/{{ item }}.conf"
           with_items: "{{ certificates }}"
