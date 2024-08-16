@@ -1,5 +1,5 @@
 resource "proxmox_virtual_environment_container" "lxc_backup" {
-  description = "Container running various backup services (restic)"
+  description = "Container running various backup services (borg, restic)"
 
   node_name = "pve"
   vm_id     = 1003
@@ -18,7 +18,7 @@ resource "proxmox_virtual_environment_container" "lxc_backup" {
     }
 
     user_account {
-      password = random_password.lxv_backup_password.result
+      password = random_password.lxc_backup_password.result
     }
   }
 
@@ -34,6 +34,11 @@ resource "proxmox_virtual_environment_container" "lxc_backup" {
   disk {
     datastore_id = "local-lvm"
     size         = 5
+  }
+
+  mount_point {
+    volume = "/mnt/usb-ssd/backup"
+    path   = "/backup"
   }
 
   provisioner "local-exec" {
@@ -57,7 +62,7 @@ variable "lxc_backup_ip" {
   }
 }
 
-resource "random_password" "lxv_backup_password" {
+resource "random_password" "lxc_backup_password" {
   length  = 16
   special = true
 }

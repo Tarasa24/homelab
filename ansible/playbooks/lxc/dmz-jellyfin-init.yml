@@ -9,6 +9,34 @@
     - role: lxc_python3
 
   tasks:
+    - name: Import ssh private key
+      ansible.builtin.copy:
+        src: ../../../secrets/backup/ssh/jellyfin
+        dest: /root/.ssh/jellyfin
+        mode: 0600
+
+    - name: Create /etc/borgmatic directory
+      ansible.builtin.file:
+        dest: /etc/borgmatic
+        state: directory
+    - name: Copy over borgmatic configuration
+      ansible.builtin.copy:
+        src: ../../../configs/backup/borg/jellyfin.yaml
+        dest: /etc/borgmatic/config.yaml
+        mode: 0644
+
+    - name: Import data from backup
+      ansible.builtin.command:
+        cmd: "borgmatic extract --archive latest"
+
+    - name: Setup cron job for borgmatic
+      ansible.builtin.cron:
+        name: "Backup jellyfin config"
+        job: "borgmatic --verbosity 0"
+        minute: "0"
+        hour: "2"
+        state: present
+
     - name: Create directories
       ansible.builtin.file:
         dest: /etc/jellyfin

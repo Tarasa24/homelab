@@ -96,6 +96,7 @@ resource "proxmox_virtual_environment_network_linux_bridge" "dmz_bridge" {
 
   node_name = "pve"
   name      = "vmbr1"
+  mtu       = 1450
 }
 
 resource "proxmox_virtual_environment_firewall_options" "lxc_dmz_router" {
@@ -135,5 +136,12 @@ resource "proxmox_virtual_environment_firewall_rules" "lxc_dmz_router" {
     dport   = 51820
     proto   = "udp"
     log     = "notice"
+  }
+
+  rule {
+    type    = "in"
+    action  = "ACCEPT"
+    comment = "Allow input traffic from DMZ"
+    iface   = "net1"
   }
 }

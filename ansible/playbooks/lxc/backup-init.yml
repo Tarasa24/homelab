@@ -3,15 +3,40 @@
   hosts: lxc_backup
   gather_facts: false
 
+  vars:
+    ansible_host: "{{ hostvars[inventory_hostname].ansible_host }}"
+    lxc_host: "{{ hostvars[inventory_hostname].lxc_host }}"
+    auth_users:
+      - host: jellyfin
+        key: "{{ lookup('file', '../../../secrets/backup/ssh/jellyfin.pub') }}"
+    repositories_dir: /backup/repos
   roles:
-    - name: lxc_python3
-      lxc_host: "{{ hostvars[inventory_hostname].lxc_host }}"
+    - role: lxc_python3
 
   tasks:
     - name: Install ssh
       ansible.builtin.apk:
         name: openssh
         state: present
+    - name: Start sshd
+      ansible.builtin.service:
+        name: sshd
+        state: started
+        enabled: true
+    - name: Set PubKeyAuthentication
+      ansible.builtin.lineinfile:
+        path: /etc/ssh/sshd_config
+        line: "PubKeyAuthentication yes"
+        state: present
+    - name: Set PasswordAuthentication
+      ansible.builtin.lineinfile:
+        path: /etc/ssh/sshd_config
+        line: "PasswordAuthentication no"
+        state: present
+    - name: Restart sshd
+      ansible.builtin.service:
+        name: sshd
+        state: restarted
 
     - name: Install restic
       ansible.builtin.apk:
@@ -37,3 +62,63 @@
             creates: /usr/local/bin/resticprofile
       when: not resticprofile_installed.stat.exists
             
+    - name: Install borg
+      ansible.builtin.apk:
+        name: borgbackup
+        state: present
+    - name: Create backup group
+      ansible.builtin.group:
+        name: backup
+        gid: 1000
+        state: present
+    - name: Create backup user
+      ansible.builtin.user:
+        name: backup
+        group: backup
+        groups:
+        shell: /bin/bash
+        home: /home/backup
+        create_home: yes
+        uid: 1000
+        password: "{{ lookup('password', '/dev/null length=15 chars=ascii_letters') }}"
+        state: present
+    - name: Create backup home directory
+      ansible.builtin.file:
+        path: /home/backup
+        state: directory
+        owner: backup
+        group: backup
+        mode: '0700'
+    - name: Create directory for backup repositories
+      ansible.builtin.file:
+        path: "{{ repositories_dir }}"
+        state: directory
+        owner: backup
+        group: backup
+        mode: '0700'
+    - name: Create backup ssh directory
+      ansible.builtin.file:
+        path: /home/backup/.ssh
+        state: directory
+        owner: backup
+        group: backup
+        mode: '0700'
+    - name: Set authorized_keys
+      ansible.builtin.authorized_key:
+        user: backup
+        key: "{{ item.key }}"
+        key_options: 'command="/usr/bin/borg serve --restrict-to-path {{ repositories_dir }}/{{ item.host }}",restrict'
+      with_items: "{{ auth_users }}"
+    - name: Set authrized keys permissions
+      ansible.builtin.file:
+        path: /home/backup/.ssh/authorized_keys
+        owner: backup
+        group: backup
+        mode: '0600'
+        state: file
+
+    - name: Init borg repositories if they don't already exist
+      ansible.builtin.command:
+        cmd: test -f "{{ repositories_dir }}/{{ item.host }}/config" || borg init --encryption=none {{ repositories_dir }}/{{ item.host }}
+        creates: "{{ repositories_dir }}/{{ item.host }}/config"
+      with_items: "{{ auth_users }}"

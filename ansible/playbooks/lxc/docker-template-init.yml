@@ -11,7 +11,7 @@
   tasks:
     - name: Install Docker
       ansible.builtin.apk:
-        name: ['docker', 'docker-compose']
+        name: [docker, docker-compose]
         state: present
         update_cache: true
 
@@ -21,13 +21,22 @@
         state: started
         enabled: true
 
+    - name: Install borg + ssh
+      ansible.builtin.apk:
+        name: [borgbackup, borgmatic, openssh]
+        state: present
+    - name: Create .ssh directory
+      ansible.builtin.file:
+        dest: /root/.ssh
+        state: directory
+
     - name: Stop the container
       ansible.builtin.command:
         "pct stop {{ lxc_host }}"
       delegate_to: "{{ ansible_host }}"
       changed_when: false
 
-    - name: Create Docker template
+    - name: Create template
       ansible.builtin.command:
         "pct set {{ lxc_host }} --template 1"
       delegate_to: "{{ ansible_host }}"
