@@ -129,6 +129,13 @@ resource "proxmox_virtual_environment_firewall_rules" "lxc_dmz_router" {
   }
 
   rule {
+    type    = "in"
+    action  = "ACCEPT"
+    comment = "Allow input traffic from DMZ"
+    iface   = "net1"
+  }
+
+  rule {
     type    = "out"
     action  = "ACCEPT"
     comment = "Allow output traffic to WAN (Internet) only on port 51820/udp (WireGuard)"
@@ -139,9 +146,13 @@ resource "proxmox_virtual_environment_firewall_rules" "lxc_dmz_router" {
   }
 
   rule {
-    type    = "in"
+    type    = "out"
     action  = "ACCEPT"
-    comment = "Allow input traffic from DMZ"
-    iface   = "net1"
+    comment = "Allow output traffic to backup server on ssh port"
+    iface   = "net0"
+    dport   = 22
+    proto   = "tcp"
+    dest    = split("/", var.lxc_backup_ip.address)[0]
+    log     = "notice"
   }
 }

@@ -76,11 +76,11 @@
         name: backup
         group: backup
         groups:
-        shell: /bin/bash
+        shell: /bin/ash
         home: /home/backup
         create_home: yes
         uid: 1000
-        password: "{{ lookup('password', '/dev/null length=15 chars=ascii_letters') }}"
+        password: "{{ lookup('password', '/dev/null length=15 chars=ascii_letters') | password_hash('sha512') }}"
         state: present
     - name: Create backup home directory
       ansible.builtin.file:
@@ -121,4 +121,8 @@
       ansible.builtin.command:
         cmd: test -f "{{ repositories_dir }}/{{ item.host }}/config" || borg init --encryption=none {{ repositories_dir }}/{{ item.host }}
         creates: "{{ repositories_dir }}/{{ item.host }}/config"
+      become: true
+      become_user: backup
+      become_method: su
+      become_flags: '-s /bin/sh'
       with_items: "{{ auth_users }}"

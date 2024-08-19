@@ -17,7 +17,6 @@ resource "proxmox_virtual_environment_container" "lxc_jellyfin" {
   initialization {
     hostname = "jellyfin"
 
-    # dmz interface
     ip_config {
       ipv4 {
         address = var.jellyfin_ip.address
@@ -25,15 +24,8 @@ resource "proxmox_virtual_environment_container" "lxc_jellyfin" {
       }
     }
 
-    # lan interface
-    ip_config {
-      ipv4 {
-        address = "dhcp"
-      }
-    }
-
     dns {
-      servers = ["10.1.0.1"]
+      servers = [split("/", var.dmz_router_lan_ip.address)[0]]
     }
   }
 
@@ -51,12 +43,6 @@ resource "proxmox_virtual_environment_container" "lxc_jellyfin" {
   network_interface {
     name     = "dmz"
     bridge   = proxmox_virtual_environment_network_linux_bridge.dmz_bridge.name
-    firewall = true
-  }
-
-  network_interface {
-    name     = "lan"
-    bridge   = "vmbr0"
     firewall = true
   }
 
@@ -96,28 +82,38 @@ resource "proxmox_virtual_environment_firewall_rules" "lxc_jellyfin" {
   container_id = proxmox_virtual_environment_container.lxc_jellyfin.vm_id
 
   rule {
-    type    = "out"
+    type    = "in"
     action  = "ACCEPT"
-    comment = "Allow output traffic to ssh backup serer"
-    iface   = "lan"
-    dport   = 22
+    comment = "Jellyfin HTTP"
+    iface   = "net0"
+    dport   = 8096
     proto   = "tcp"
-    log     = "notice"
-  }
-
-  rule {
-    type    = "out"
-    action  = "DROP"
-    comment = "Drop all other output traffic to the LAN"
-    iface   = "lan"
   }
 
   rule {
     type    = "in"
     action  = "ACCEPT"
-    comment = "Allow input traffic from the DMZ to port 80"
-    iface   = "dmz"
-    dport   = 80
+    comment = "Jellyfin https"
+    iface   = "net0"
+    dport   = 8920
     proto   = "tcp"
+  }
+
+  rule {
+    type    = "in"
+    action  = "ACCEPT"
+    comment = "Jellyfin DLNA"
+    iface   = "net0"
+    dport   = 1900
+    proto   = "udp"
+  }
+
+  rule {
+    type    = "in"
+    action  = "ACCEPT"
+    comment = "Jellyfin DLNA"
+    iface   = "net0"
+    dport   = 7359
+    proto   = "udp"
   }
 }

@@ -136,7 +136,9 @@
           ansible.builtin.service:
             name: nginx
             state: stopped
-            enabled: true
+        - name: Kill all nginx processes
+          ansible.builtin.shell: killall -9 nginx
+          ignore_errors: true
         - name: Start nginx
           ansible.builtin.service:
             name: nginx

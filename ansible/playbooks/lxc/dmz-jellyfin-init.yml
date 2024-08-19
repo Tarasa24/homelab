@@ -27,7 +27,7 @@
 
     - name: Import data from backup
       ansible.builtin.command:
-        cmd: "borgmatic extract --archive latest"
+        cmd: "borgmatic extract --archive latest --destination /"
 
     - name: Setup cron job for borgmatic
       ansible.builtin.cron:
