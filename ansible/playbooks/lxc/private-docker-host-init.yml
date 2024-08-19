@@ -1,0 +1,30 @@
+---
+- name: Configure private docker host
+  hosts: lxc_private-docker-host
+  gather_facts: false
+  vars:
+    ansible_host: "{{ hostvars[inventory_hostname].ansible_host }}"
+    lxc_host: "{{ hostvars[inventory_hostname].lxc_host }}"
+    ip_range: [
+      "10.0.1.21",
+      "10.0.1.22",
+      "10.0.1.23",
+      "10.0.1.24",
+      "10.0.1.25",
+      "10.0.1.26",
+      "10.0.1.27",
+      "10.0.1.28",
+      "10.0.1.29",
+      "10.0.1.30"
+    ]
+  roles:
+    - role: lxc_python3
+    #- role: borgmatic
+
+  tasks:
+    - name: Assign IP range to virtual nics
+      shell: ip addr add {{ ip }} dev eth0:{{ index }}
+      loop: "{{ ip_range }}"
+      loop_control:
+        loop_var: ip
+        index_var: index
