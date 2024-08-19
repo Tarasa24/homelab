@@ -6,7 +6,7 @@ location:
 
 storage:
     compression: "zlib,6"
-    ssh_command: "ssh -i /root/.ssh/jellyfin -o StrictHostKeychecking=no"
+    ssh_command: "ssh -i /root/.ssh/id_ed25519 -o StrictHostKeychecking=no"
     unknown_unencrypted_repo_access_is_ok: true
 
 retention:

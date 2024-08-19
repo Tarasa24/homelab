@@ -1,0 +1,38 @@
+---
+- name: Install borg
+  ansible.builtin.apk:
+    name: [borgbackup, borgmatic, openssh]
+    state: present
+
+- name: Make sure .ssh directory exists
+  ansible.builtin.file:
+    dest: /root/.ssh
+    state: directory
+    mode: 0700
+- name: Import ssh private key
+  ansible.builtin.copy:
+    src: ../../../secrets/backup/ssh/id_ed25519
+    dest: /root/.ssh/id_ed25519
+    mode: 0600
+
+- name: Create /etc/borgmatic directory
+  ansible.builtin.file:
+    dest: /etc/borgmatic
+    state: directory
+- name: Copy over borgmatic configuration
+  ansible.builtin.copy:
+    src: ../../../configs/backup/borg/{{ ansible_hostname }}.yaml
+    dest: /etc/borgmatic/config.yaml
+    mode: 0644
+
+- name: Import data from backup
+  ansible.builtin.command:
+    cmd: "borgmatic extract --archive latest --destination /"
+
+- name: Setup cron job for borgmatic
+  ansible.builtin.cron:
+    name: "Run borgmatic backup"
+    job: "borgmatic --verbosity 0"
+    minute: "0"
+    hour: "2"
+    state: present

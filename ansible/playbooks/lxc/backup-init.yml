@@ -6,13 +6,21 @@
   vars:
     ansible_host: "{{ hostvars[inventory_hostname].ansible_host }}"
     lxc_host: "{{ hostvars[inventory_hostname].lxc_host }}"
-    auth_users:
-      - host: jellyfin
-        key: "{{ lookup('file', '../../../secrets/backup/ssh/jellyfin.pub') }}"
     repositories_dir: /backup/repos
   roles:
     - role: lxc_python3
 
+  pre_tasks:
+    - name: Find all ".yaml" and ".yml" borgmatic configuration files
+      local_action:
+        module: find
+        paths: "/path/to/your/local/directory"
+        patterns: "*.yml,*.yaml"
+        file_type: file
+      register: borgmatic_configs
+    - name: Set the config names as a variable
+      ansible.builtin.set_fact:
+        repositories: "{{ borgmatic_configs.files | map(attribute='path') | map('basename') | map('regex_replace', '\\.(yml|yaml)$', '') | list }}"
   tasks:
     - name: Install ssh
       ansible.builtin.apk:
@@ -106,9 +114,8 @@
     - name: Set authorized_keys
       ansible.builtin.authorized_key:
         user: backup
-        key: "{{ item.key }}"
-        key_options: 'command="/usr/bin/borg serve --restrict-to-path {{ repositories_dir }}/{{ item.host }}",restrict'
-      with_items: "{{ auth_users }}"
+        key: "{{ lookup('file', '../../../secrets/backup/ssh/id_ed25519.pub') }}"
+        key_options: 'command="/usr/bin/borg serve --restrict-to-path {{ repositories_dir }}",restrict'
     - name: Set authrized keys permissions
       ansible.builtin.file:
         path: /home/backup/.ssh/authorized_keys
@@ -119,10 +126,10 @@
 
     - name: Init borg repositories if they don't already exist
       ansible.builtin.command:
-        cmd: test -f "{{ repositories_dir }}/{{ item.host }}/config" || borg init --encryption=none {{ repositories_dir }}/{{ item.host }}
-        creates: "{{ repositories_dir }}/{{ item.host }}/config"
+        cmd: borg init --encryption=none {{ repositories_dir }}/{{ item }}
+        creates: "{{ repositories_dir }}/{{ item }}/config"
       become: true
       become_user: backup
       become_method: su
       become_flags: '-s /bin/sh'
-      with_items: "{{ auth_users }}"
+      with_items: "{{ repositories }}"
