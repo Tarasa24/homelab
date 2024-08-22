@@ -1,0 +1,23 @@
+location:
+    source_directories:
+        - /config
+    repositories:
+        - ssh://backup@10.0.1.3/backup/repos/private-docker-host
+
+storage:
+    compression: "zlib,6"
+    ssh_command: "ssh -i /root/.ssh/id_ed25519 -o StrictHostKeychecking=no"
+    unknown_unencrypted_repo_access_is_ok: true
+
+retention:
+    keep_daily: 7
+    keep_weekly: 4
+    keep_monthly: 6
+    keep_yearly: 2
+    prefix: "{hostname}-"
+
+consistency:
+    checks:
+        - "repository"
+        - "archives"
+    check_last: 3
