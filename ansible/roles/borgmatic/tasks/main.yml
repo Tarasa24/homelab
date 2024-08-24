@@ -28,6 +28,13 @@
 - name: Import data from backup
   ansible.builtin.command:
     cmd: "borgmatic extract --archive latest --destination /"
+  ignore_errors: true
+  register: borgmatic_extract
+
+- name: Fail if borgmatic extract failed (dont fail if error contains "No archives found in the repository")
+  ansible.builtin.fail:
+    msg: "borgmatic extract failed"
+  when: borgmatic_extract.rc != 0 and "No archives found in the repository" not in borgmatic_extract.stderr
 
 - name: Setup cron job for borgmatic
   ansible.builtin.cron:

@@ -1,0 +1,13 @@
+services:
+  nginx:
+    image: nginx:latest
+    container_name: nginx
+    ports:
+      - 10.0.1.21:80:80
+      - 10.0.1.21:443:443
+    volumes:
+      - /root/nginx/etc/nginx:/config/nginx
+      - /etc/letsencrypt:/etc/letsencrypt
+    restart: unless-stopped
+    # First merge /config/nginx/ into /etc/nginx/ and then start nginx
+    command: /bin/sh -c "cp -r /config/nginx/* /etc/nginx/ && nginx -g 'daemon off;'"

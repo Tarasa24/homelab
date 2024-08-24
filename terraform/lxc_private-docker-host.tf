@@ -7,11 +7,17 @@ resource "proxmox_virtual_environment_container" "lxc_private-docker-host" {
   tags = ["alpine", "docker"]
   depends_on = [
     proxmox_virtual_environment_container.lxc_templates_docker_template,
-    proxmox_virtual_environment_container.lxc_backup
+    proxmox_virtual_environment_container.lxc_backup,
+    proxmox_virtual_environment_container.lxc_dmz_router # For ssl certificate
   ]
 
   clone {
     vm_id = proxmox_virtual_environment_container.lxc_templates_docker_template.vm_id
+  }
+
+  memory {
+    dedicated = 2048
+    swap      = 2048
   }
 
   initialization {
@@ -27,6 +33,12 @@ resource "proxmox_virtual_environment_container" "lxc_private-docker-host" {
 
   network_interface {
     name = "eth0"
+  }
+
+  mount_point {
+    volume    = "/mnt/usb-ssd/ssl"
+    path      = "/etc/letsencrypt"
+    read_only = true
   }
 
   provisioner "local-exec" {

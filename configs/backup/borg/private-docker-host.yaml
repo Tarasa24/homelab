@@ -1,6 +1,7 @@
 location:
     source_directories:
-        - /config
+        - /var/lib/docker/volumes/root_mealie-data/_data
+        - /var/lib/docker/volumes/root_vaultwarden-data/_data
     repositories:
         - ssh://backup@10.0.1.3/backup/repos/private-docker-host
 
@@ -21,3 +22,11 @@ consistency:
         - "repository"
         - "archives"
     check_last: 3
+
+hooks:
+    before_backup:
+        - "docker ps --filter 'name=mealie' --filter 'status=running' --format '{{.Names}}' | grep -w mealie && docker stop mealie && echo 'mealie stopped' || echo 'mealie already stopped or does not exist'"
+        - "docker ps --filter 'name=vaultwarden' --filter 'status=running' --format '{{.Names}}' | grep -w vaultwarden && docker stop vaultwarden && echo 'vaultwarden stopped' || echo 'vaultwarden already stopped or does not exist'"
+    after_backup:
+        - "docker inspect -f '{{.State.Running}}' mealie | grep false && docker start mealie && echo 'mealie started' || echo 'mealie already running or does not exist'"
+        - "docker inspect -f '{{.State.Running}}' vaultwarden | grep false && docker start vaultwarden && echo 'vaultwarden started' || echo 'vaultwarden already running or does not exist'"

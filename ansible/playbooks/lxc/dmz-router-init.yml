@@ -16,6 +16,7 @@
 
     certificates:
       - "*.homelab.tarasa24.dev"
+      - "*.lan.tarasa24.dev"
     certbot_email: "admin@tarasa24.dev"
     certbot_linode_credentials: "{{ lookup('file', '../../../secrets/linode/certbot_acme_api_creds.ini') }}"
   roles:

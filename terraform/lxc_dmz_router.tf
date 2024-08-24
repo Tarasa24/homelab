@@ -50,6 +50,11 @@ resource "proxmox_virtual_environment_container" "lxc_dmz_router" {
     size         = 5
   }
 
+  mount_point {
+    volume = "/mnt/usb-ssd/ssl"
+    path   = "/etc/letsencrypt"
+  }
+
   provisioner "local-exec" {
     command = <<-EOT
       cd ../ansible && \

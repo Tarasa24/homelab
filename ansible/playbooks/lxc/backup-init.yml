@@ -7,11 +7,6 @@
     ansible_host: "{{ hostvars[inventory_hostname].ansible_host }}"
     lxc_host: "{{ hostvars[inventory_hostname].lxc_host }}"
     repositories_dir: /backup/repos
-    postgres_user: "postgres"
-    postgres_data_directory: "/var/lib/postgresql/data"
-    postgres_replicator_password: "{{ lookup('password', '../../../secrets/backup/postgres/replicator_password') }}"
-    primary_postgres_db_hosts: "{{ groups['private-docker_postgres_dbs'] }}"
-
   roles:
     - role: lxc_python3
 
@@ -19,7 +14,7 @@
     - name: Find all ".yaml" and ".yml" borgmatic configuration files
       local_action:
         module: find
-        paths: "/path/to/your/local/directory"
+        paths: "../../../configs/backup/borg"
         patterns: "*.yml,*.yaml"
         file_type: file
       register: borgmatic_configs
@@ -138,54 +133,3 @@
       become_method: su
       become_flags: '-s /bin/sh'
       with_items: "{{ repositories }}"
-
-    - name: Install PostgreSQL
-      apk:
-        name: "postgresql"
-        state: present
-    - name: Install required pip package for postgres manipulation
-      ansible.builtin.pip:
-        name: psycopg2-binary
-        state: present
-    - name: Ensure Postgres data directory exists
-      file:
-        path: "{{ postgres_data_directory }}"
-        state: directory
-        owner: "{{ postgres_user }}"
-        group: "{{ postgres_user }}"
-        mode: '0700'
-    - name: Initialize PostgreSQL data directory
-      command:
-        cmd: "/usr/bin/initdb -D {{ postgres_data_directory }}"
-        creates: "{{ postgres_data_directory }}/PG_VERSION"
-      become: true
-      become_user: "{{ postgres_user }}"
-      become_method: su
-      become_flags: '-s /bin/sh'
-    - name: Ensure PostgreSQL is started and enabled on boot
-      service:
-        name: postgresql
-        enabled: true
-        state: started
-
-    - name: Create database for each primary db
-      ansible.builtin.postgresql_db:
-        name: "{{ hostvars[item].db_name }}" 
-        state: present
-      with_items: "{{ primary_postgres_db_hosts }}"
-
-    - name: Create subscription for each primary db
-      ansible.builtin.postgresql_subscription:
-        name: "{{ hostvars[item].db_name }}_subscription"
-        publications: "{{ hostvars[item].db_name }}_publication"
-        db: "{{ hostvars[item].db_name }}"
-        connparams:
-          host: "{{ item }}"
-          port: 5432
-          user: "replicator"
-          password: "{{ postgres_replicator_password }}"
-          dbname: "{{ hostvars[item].db_name }}"
-        subsparams:
-          connect: false
-        state: present
-      with_items: "{{ primary_postgres_db_hosts }}"
