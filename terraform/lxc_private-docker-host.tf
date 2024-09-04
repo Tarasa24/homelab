@@ -40,6 +40,20 @@ resource "proxmox_virtual_environment_container" "lxc_private-docker-host" {
     path      = "/etc/letsencrypt"
     read_only = true
   }
+  mount_point {
+    volume = "/mnt/usb-hdd/jellyfin-media"
+    path   = "/media"
+  }
+
+  mount_point {
+    volume = "/mnt/usb-ssd/downloads"
+    path   = "/downloads"
+  }
+
+  disk {
+    datastore_id = "local-lvm"
+    size         = 10
+  }
 
   provisioner "local-exec" {
     command = <<-EOT

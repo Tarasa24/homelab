@@ -63,8 +63,14 @@
       vars:
         compose_files: "{{ docker_compose_files.files | map(attribute='path') | join(':') }}"
 
+    - name: Pull images
+      shell: docker-compose pull
+      args:
+        chdir: /root
+      timeout: 600
+
     - name: Start containers
       shell: docker-compose up -d
       args:
         chdir: /root
-      timeout: 600
+
