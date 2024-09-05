@@ -67,7 +67,7 @@
       shell: docker-compose pull
       args:
         chdir: /root
-      timeout: 600
+      timeout: 1200
 
     - name: Start containers
       shell: docker-compose up -d
