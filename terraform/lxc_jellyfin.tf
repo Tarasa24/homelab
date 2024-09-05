@@ -6,6 +6,7 @@ resource "proxmox_virtual_environment_container" "lxc_jellyfin" {
 
   tags = ["alpine", "docker", "dmz"]
   depends_on = [
+    proxmox_virtual_environment_network_linux_bridge.dmz_bridge,
     proxmox_virtual_environment_container.lxc_templates_docker_template,
     proxmox_virtual_environment_container.lxc_backup
   ]

@@ -6,7 +6,10 @@ resource "proxmox_virtual_environment_container" "lxc_dmz_router" {
 
   tags = ["alpine", "dmz", "router"]
 
-  depends_on = [proxmox_virtual_environment_download_file.alpine_linux_template]
+  depends_on = [
+    proxmox_virtual_environment_download_file.alpine_linux_template,
+    proxmox_virtual_environment_network_linux_bridge.dmz_bridge
+  ]
 
   initialization {
     hostname = "dmz-router"

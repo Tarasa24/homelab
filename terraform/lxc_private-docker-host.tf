@@ -20,6 +20,10 @@ resource "proxmox_virtual_environment_container" "lxc_private-docker-host" {
     swap      = 2048
   }
 
+  cpu {
+    cores = 2
+  }
+
   initialization {
     hostname = "private-docker-host"
 
@@ -52,7 +56,7 @@ resource "proxmox_virtual_environment_container" "lxc_private-docker-host" {
 
   disk {
     datastore_id = "local-lvm"
-    size         = 10
+    size         = "10G"
   }
 
   provisioner "local-exec" {
