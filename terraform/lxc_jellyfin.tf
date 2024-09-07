@@ -31,12 +31,6 @@ resource "proxmox_virtual_environment_container" "lxc_jellyfin" {
   }
 
   mount_point {
-    volume = "USB-SSD:10004"
-    path   = "/config"
-    size   = "5G"
-  }
-
-  mount_point {
     volume = "/mnt/usb-hdd/jellyfin-media"
     path   = "/media"
   }

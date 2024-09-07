@@ -37,7 +37,7 @@ resource "proxmox_virtual_environment_container" "lxc_templates_docker_template"
 
   disk {
     datastore_id = "local-lvm"
-    size         = 5
+    size         = 10
   }
 
   lifecycle {

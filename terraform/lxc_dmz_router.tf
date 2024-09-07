@@ -14,6 +14,10 @@ resource "proxmox_virtual_environment_container" "lxc_dmz_router" {
   initialization {
     hostname = "dmz-router"
 
+    dns {
+      servers = ["1.1.1.1", "1.0.0.1"]
+    }
+
     ip_config {
       ipv4 {
         address = var.dmz_router_wan_ip.address

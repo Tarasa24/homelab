@@ -56,14 +56,23 @@ resource "proxmox_virtual_environment_container" "lxc_private-docker-host" {
 
   disk {
     datastore_id = "local-lvm"
-    size         = "10G"
   }
 
   provisioner "local-exec" {
+    when    = create
     command = <<-EOT
       cd ../ansible && \
       ansible-playbook \
       ./playbooks/lxc/private-docker-host-init.yml
+    EOT
+  }
+
+  provisioner "local-exec" {
+    when    = destroy
+    command = <<-EOT
+      cd ../ansible && \
+      ansible-playbook \
+      ./playbooks/all/borg-backup-all.yml --extra-vars "variable_host=lxc_private-docker-host"
     EOT
   }
 }
