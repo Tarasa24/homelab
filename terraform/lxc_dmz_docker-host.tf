@@ -1,10 +1,10 @@
-resource "proxmox_virtual_environment_container" "lxc_private-docker-host" {
-  description = "Container for hosting containized internal services"
+resource "proxmox_virtual_environment_container" "lxc_dmz-docker-host" {
+  description = "Container for hosting containized external services"
 
   node_name = "pve"
-  vm_id     = 1020
+  vm_id     = 100020
 
-  tags = ["alpine", "docker"]
+  tags = ["alpine", "docker", "dmz"]
   depends_on = [
     proxmox_virtual_environment_container.lxc_backup,
     proxmox_virtual_environment_container.lxc_dmz_router
@@ -24,33 +24,30 @@ resource "proxmox_virtual_environment_container" "lxc_private-docker-host" {
   }
 
   initialization {
-    hostname = "private-docker-host"
+    hostname = "dmz-docker-host"
+
+    dns {
+      servers = [split("/", var.dmz_router_lan_ip.address)[0]]
+    }
 
     ip_config {
       ipv4 {
-        address = var.private-docker-host_ip.address
-        gateway = var.private-docker-host_ip.gateway
+        address = var.dmz-docker-host_ip.address
+        gateway = var.dmz-docker-host_ip.gateway
       }
     }
   }
 
   network_interface {
-    name = "eth0"
+    name     = "dmz"
+    bridge   = proxmox_virtual_environment_network_linux_bridge.dmz_bridge.name
+    firewall = true
   }
 
   mount_point {
     volume    = "/mnt/usb-ssd/ssl"
     path      = "/etc/letsencrypt"
     read_only = true
-  }
-  mount_point {
-    volume = "/mnt/usb-hdd/jellyfin-media"
-    path   = "/media"
-  }
-
-  mount_point {
-    volume = "/mnt/usb-ssd/downloads"
-    path   = "/downloads"
   }
 
   disk {
@@ -62,7 +59,7 @@ resource "proxmox_virtual_environment_container" "lxc_private-docker-host" {
     command = <<-EOT
       cd ../ansible && \
       ansible-playbook \
-      ./playbooks/lxc/private-docker-host-init.yml
+      ./playbooks/lxc/dmz-docker-host-init.yml
     EOT
   }
 
@@ -71,19 +68,19 @@ resource "proxmox_virtual_environment_container" "lxc_private-docker-host" {
     command = <<-EOT
       cd ../ansible && \
       ansible-playbook \
-      ./playbooks/all/borg-backup-all.yml --extra-vars "variable_host=lxc_private-docker-host"
+      ./playbooks/all/borg-backup-all.yml --extra-vars "variable_host=lxc_dmz_docker-host"
     EOT
   }
 }
 
-variable "private-docker-host_ip" {
+variable "dmz-docker-host_ip" {
   type = object({
     address = string
     gateway = string
   })
 
   default = {
-    address = "10.0.1.20/22"
-    gateway = "10.0.0.1"
+    address = "10.1.0.20/22"
+    gateway = "10.1.0.1"
   }
 }

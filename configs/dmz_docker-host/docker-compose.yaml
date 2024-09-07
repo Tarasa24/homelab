@@ -1,0 +1,23 @@
+services:
+  # Monitoring services
+  prometheus:
+    image: prom/prometheus:latest
+    volumes:
+      - ./root/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus_data:/prometheus
+    ports:
+      - "9090:9090"
+    restart: always
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+  promtail:
+    image: grafana/promtail:latest
+    volumes:
+      - /var/log:/var/log
+      - /var/lib/docker/containers:/var/lib/docker/containers
+      - ./root/promtail/config.yml:/etc/promtail/config.yml
+    restart: always
+
+volumes:
+  prometheus_data:

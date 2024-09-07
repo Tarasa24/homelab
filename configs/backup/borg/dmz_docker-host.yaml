@@ -1,8 +1,8 @@
 location:
     source_directories:
-        - /config
+        - /var/lib/docker/volumes/root_jelllyfin_config/_data
     repositories:
-        - ssh://backup@10.0.1.3/backup/repos/jellyfin
+        - ssh://backup@10.0.1.3/backup/repos/dmz_docker-host
 
 storage:
     compression: "zlib,6"
@@ -10,25 +10,20 @@ storage:
     unknown_unencrypted_repo_access_is_ok: true
 
 retention:
-    # Retention policy to keep a smart number of backups:
-    keep_daily: 7 # Keep the last 7 daily backups.
-    keep_weekly: 4 # Keep the last 4 weekly backups.
-    keep_monthly: 6 # Keep the last 6 monthly backups.
-    keep_yearly: 2 # Keep the last 2 yearly backups.
-    prefix: "{hostname}-" # Match backups made by this system.
+    keep_daily: 7
+    keep_weekly: 4
+    keep_monthly: 6
+    keep_yearly: 2
+    prefix: "{hostname}-"
 
 consistency:
-    # Check and verify the backups.
     checks:
         - "repository"
         - "archives"
-    check_last: 3 # Check only the last 3 archives.
+    check_last: 3
 
 hooks:
     before_backup:
-        # Only stop the container if it is running
         - "docker ps --filter 'name=jellyfin' --filter 'status=running' --format '{{.Names}}' | grep -w jellyfin && docker stop jellyfin || echo 'jellyfin already stopped or does not exist'"
-
     after_backup:
-        # Only start the container if it is not already running
         - "docker inspect -f '{{.State.Running}}' jellyfin | grep false && docker start jellyfin || echo 'jellyfin already running or does not exist'"

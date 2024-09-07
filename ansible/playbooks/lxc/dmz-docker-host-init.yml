@@ -1,0 +1,76 @@
+---
+- name: Configure dmz (public) docker host
+  hosts: lxc_dmz_docker-host
+  gather_facts: false
+  vars:
+    ansible_host: "{{ hostvars[inventory_hostname].ansible_host }}"
+    lxc_host: "{{ hostvars[inventory_hostname].lxc_host }}"
+    ip_range: [
+      "10.1.0.21",
+      "10.1.0.22",
+      "10.1.0.23",
+      "10.1.0.24",
+      "10.1.0.25",
+      "10.1.0.26",
+      "10.1.0.27",
+      "10.1.0.28",
+      "10.1.0.29",
+      "10.1.0.30"
+    ]
+  roles:
+    - role: lxc_python3
+    - role: borgmatic
+
+  tasks:
+    - name: Assign IP range to virtual nics if not already assigned
+      shell: ip addr add {{ ip }} dev dmz:{{ index }} || true
+      loop: "{{ ip_range }}"
+      loop_control:
+        loop_var: ip
+        index_var: index
+
+    - name: Have ip addr add commands run at boot
+      copy:
+        content: |
+          {% for ip in ip_range %}
+          ip addr add {{ ip }} dev dmz:{{ loop.index0 }}
+          {% endfor %}
+        dest: /etc/local.d/assign-ips.start
+        mode: "0755"
+
+    - name: Enable local.d scripts
+      ansible.builtin.command: rc-update add local default
+
+    - name: Stop and remove existing containers
+      shell: docker compose down || true
+
+    - name: Copy over configs
+      copy:
+        src: "../../../configs/dmz_docker-host/"
+        dest: "/root/"
+        force: yes
+
+    - name: Find each docker-compose.yaml in relation to /root
+      find:
+        paths: /root
+        patterns: "docker-compose.yaml"
+        recurse: yes
+      register: docker_compose_files
+    - name: Create .env file which contains COMPOSE_FILE=... for each docker-compose.yaml
+      copy:
+        content: "COMPOSE_FILE={{ compose_files }}"
+        dest: "/root/.env"
+      vars:
+        compose_files: "{{ docker_compose_files.files | map(attribute='path') | join(':') }}"
+
+    - name: Pull images
+      shell: docker-compose pull
+      args:
+        chdir: /root
+      timeout: 1200
+
+    - name: Start containers
+      shell: docker-compose up -d
+      args:
+        chdir: /root
+
