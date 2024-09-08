@@ -6,8 +6,7 @@ resource "proxmox_virtual_environment_container" "lxc_private-docker-host" {
 
   tags = ["alpine", "docker"]
   depends_on = [
-    proxmox_virtual_environment_container.lxc_backup,
-    proxmox_virtual_environment_container.lxc_dmz_router
+    proxmox_virtual_environment_container.lxc_backup
   ]
 
   clone {

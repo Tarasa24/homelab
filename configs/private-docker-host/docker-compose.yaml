@@ -6,7 +6,7 @@ services:
       - ./root/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
       - prometheus_data:/prometheus
     ports:
-      - "9090:9090"
+      - "10.0.1.20:9090:9090"
     restart: always
     command:
       - '--config.file=/etc/prometheus/prometheus.yml'

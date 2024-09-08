@@ -9,9 +9,6 @@ location:
         - /var/lib/docker/volumes/root_radarr-config/_data
         - /var/lib/docker/volumes/root_bazarr-config/_data
         - /var/lib/docker/volumes/root_qbittorrent-config/_data
-
-        - /var/lib/docker/volumes/root_firefly_iii_upload/_data
-        - /var/lib/docker/volumes/root_firefly_iii_db/_data
     repositories:
         - ssh://backup@10.0.1.3/backup/repos/private-docker-host
 
@@ -44,9 +41,6 @@ hooks:
         - "docker ps --filter 'name=radarr' --filter 'status=running' --format '{{.Names}}' | grep -w radarr && docker stop radarr && echo 'radarr stopped' || echo 'radarr already stopped or does not exist'"
         - "docker ps --filter 'name=bazarr' --filter 'status=running' --format '{{.Names}}' | grep -w bazarr && docker stop bazarr && echo 'bazarr stopped' || echo 'bazarr already stopped or does not exist'"
         - "docker ps --filter 'name=qbittorrent' --filter 'status=running' --format '{{.Names}}' | grep -w qbittorrent && docker stop qbittorrent && echo 'qbittorrent stopped' || echo 'qbittorrent already stopped or does not exist'"
-
-        - "docker ps --filter 'name=firefly_iii_core' --filter 'status=running' --format '{{.Names}}' | grep -w firefly_iii_core && docker stop firefly_iii_core && echo 'firefly_iii_core stopped' || echo 'firefly_iii_core already stopped or does not exist'"
-        - "docker ps --filter 'name=firefly_iii_db' --filter 'status=running' --format '{{.Names}}' | grep -w firefly_iii_db && docker stop firefly_iii_db && echo 'firefly_iii_db stopped' || echo 'firefly_iii_db already stopped or does not exist'"
     after_backup:
         - "docker inspect -f '{{.State.Running}}' mealie | grep false && docker start mealie && echo 'mealie started' || echo 'mealie already running or does not exist'"
 
@@ -57,6 +51,3 @@ hooks:
         - "docker inspect -f '{{.State.Running}}' radarr | grep false && docker start radarr && echo 'radarr started' || echo 'radarr already running or does not exist'"
         - "docker inspect -f '{{.State.Running}}' bazarr | grep false && docker start bazarr && echo 'bazarr started' || echo 'bazarr already running or does not exist'"
         - "docker inspect -f '{{.State.Running}}' qbittorrent | grep false && docker start qbittorrent && echo 'qbittorrent started' || echo 'qbittorrent already running or does not exist'"
-
-        - "docker inspect -f '{{.State.Running}}' firefly_iii_core | grep false && docker start firefly_iii_core && echo 'firefly_iii_core started' || echo 'firefly_iii_core already running or does not exist'"
-        - "docker inspect -f '{{.State.Running}}' firefly_iii_db | grep false && docker start firefly_iii_db && echo 'firefly_iii_db started' || echo 'firefly_iii_db already running or does not exist'"

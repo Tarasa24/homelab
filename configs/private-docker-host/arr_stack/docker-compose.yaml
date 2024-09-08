@@ -21,11 +21,11 @@ services:
       - net.ipv6.conf.default.disable_ipv6=0
       - net.ipv6.conf.lo.disable_ipv6=0
     ports:
-      - 10.0.1.25:9696:9696 #prowlarr
-      - 10.0.1.25:8989:8989 #sonarr
-      - 10.0.1.25:7878:7878 #radarr
-      - 10.0.1.25:6767:6767 #bazarr
-      - 10.0.1.25:8080:8080 #qbittorrent
+      - 10.0.1.23:9696:9696 #prowlarr
+      - 10.0.1.23:8989:8989 #sonarr
+      - 10.0.1.23:7878:7878 #radarr
+      - 10.0.1.23:6767:6767 #bazarr
+      - 10.0.1.23:8080:8080 #qbittorrent
   prowlarr:
     network_mode: service:wireguard
     depends_on:
