@@ -48,6 +48,7 @@ resource "proxmox_virtual_environment_container" "lxc_dmz-docker-host" {
     volume    = "/mnt/usb-ssd/ssl"
     path      = "/etc/letsencrypt"
     read_only = true
+    shared    = true
   }
 
   disk {
@@ -59,7 +60,8 @@ resource "proxmox_virtual_environment_container" "lxc_dmz-docker-host" {
     command = <<-EOT
       cd ../ansible && \
       ansible-playbook \
-      ./playbooks/lxc/dmz-docker-host-init.yml
+      ./playbooks/lxc/dmz-docker-host-init.yml \
+      || echo "Failed to initialize dmz-docker-host"
     EOT
   }
 
@@ -68,7 +70,8 @@ resource "proxmox_virtual_environment_container" "lxc_dmz-docker-host" {
     command = <<-EOT
       cd ../ansible && \
       ansible-playbook \
-      ./playbooks/all/borg-backup-all.yml --extra-vars "variable_host=lxc_dmz_docker-host"
+      ./playbooks/all/borg-backup-all.yml --extra-vars "variable_host=lxc_dmz_docker-host" \
+      || echo "Failed to backup dmz-docker-host"
     EOT
   }
 }

@@ -1,0 +1,14 @@
+---
+###############################################################
+#                         Users Database                      #
+###############################################################
+
+# List of users
+users:
+  admin:
+    disabled: false
+    displayname: "admin"
+    password: "$argon2id$v=19$m=65536,t=3,p=4$Hsk/3BIexDI3Y0OvOe7mtA$bfcb96frMewZPpW0UmuCQfRcIYMIFF55i/Ddwkb39gE"
+    email: admin@tarasa24.dev
+    groups:
+      - admins

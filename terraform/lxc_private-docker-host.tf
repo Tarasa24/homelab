@@ -41,6 +41,7 @@ resource "proxmox_virtual_environment_container" "lxc_private-docker-host" {
     volume    = "/mnt/usb-ssd/ssl"
     path      = "/etc/letsencrypt"
     read_only = true
+    shared    = true
   }
   mount_point {
     volume = "/mnt/usb-hdd/jellyfin-media"
@@ -61,7 +62,8 @@ resource "proxmox_virtual_environment_container" "lxc_private-docker-host" {
     command = <<-EOT
       cd ../ansible && \
       ansible-playbook \
-      ./playbooks/lxc/private-docker-host-init.yml
+      ./playbooks/lxc/private-docker-host-init.yml \
+      || echo "Failed to initialize private-docker-host"
     EOT
   }
 
@@ -70,7 +72,8 @@ resource "proxmox_virtual_environment_container" "lxc_private-docker-host" {
     command = <<-EOT
       cd ../ansible && \
       ansible-playbook \
-      ./playbooks/all/borg-backup-all.yml --extra-vars "variable_host=lxc_private-docker-host"
+      ./playbooks/all/borg-backup-all.yml --extra-vars "variable_host=lxc_private-docker-host" \
+      || echo "Failed to backup private-docker-host"
     EOT
   }
 }
