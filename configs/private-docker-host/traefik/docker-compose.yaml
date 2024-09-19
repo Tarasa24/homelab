@@ -1,0 +1,24 @@
+version: "3.3"
+
+services:
+
+  traefik:
+    image: "traefik:v3.1.4"
+    container_name: "traefik"
+    command:
+      #- "--log.level=DEBUG"
+      - "--api.insecure=true"
+      - "--providers.docker=true"
+      - "--providers.docker.exposedbydefault=false"
+      - "--providers.file.filename=/etc/traefik/dynamic.yml"
+      - "--entrypoints.http.address=:80"
+      - "--entrypoints.https.address=:443"
+    ports:
+      - "10.0.1.20:80:80"
+      - "10.0.1.20:443:443"
+      - "10.0.1.20:8080:8080"
+    volumes:
+      - "/var/run/docker.sock:/var/run/docker.sock:ro"
+      - "/etc/letsencrypt/live/*.lan.tarasa24.dev/fullchain.pem:/certs/fullchain.pem:ro"
+      - "/etc/letsencrypt/live/*.lan.tarasa24.dev/privkey.pem:/certs/privkey.pem:ro"
+      - "./traefik/config/dynamic.yml:/etc/traefik/dynamic.yml:ro"

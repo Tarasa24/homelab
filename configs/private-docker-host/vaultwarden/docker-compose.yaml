@@ -7,6 +7,12 @@ services:
      - 10.0.1.22:80:80
     volumes:
      - vaultwarden_data:/data:rw
+    labels:
+     - "traefik.enable=true"
+     - "traefik.http.routers.vaultwarden.rule=Host(`vaultwarden.lan.tarasa24.dev`)"
+     - "traefik.http.routers.vaultwarden.entrypoints=https"
+     - "traefik.http.routers.vaultwarden.tls=true"
+     - "traefik.http.routers.vaultwarden.middlewares=hsts@file"
 
 volumes:
   vaultwarden_data:

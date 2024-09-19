@@ -1,0 +1,18 @@
+tls:
+  stores:
+    default:
+      defaultCertificate:
+        certFile: /certs/fullchain.pem
+        keyFile: /certs/privkey.pem
+
+http:
+  middlewares:
+    hsts:
+      headers:
+        sslRedirect: true
+        stsPreload: true
+        stsSeconds: 31536000
+        customRequestHeaders:
+          Strict-Transport-Security: max-age=31536000
+        customResponseHeaders:
+          Strict-Transport-Security: max-age=31536000
