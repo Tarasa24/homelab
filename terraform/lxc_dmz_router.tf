@@ -167,4 +167,14 @@ resource "proxmox_virtual_environment_firewall_rules" "lxc_dmz_router" {
     dest    = split("/", var.lxc_backup_ip.address)[0]
     log     = "notice"
   }
+
+  rule {
+    type    = "out"
+    action  = "ACCEPT"
+    comment = "Allow output traffic to authelia"
+    iface   = "net0"
+    dport   = 9091
+    proto   = "tcp"
+    dest    = "10.0.1.21/32"
+  }
 }

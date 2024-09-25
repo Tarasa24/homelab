@@ -11,4 +11,12 @@ users:
     password: "$argon2id$v=19$m=65536,t=3,p=4$Hsk/3BIexDI3Y0OvOe7mtA$bfcb96frMewZPpW0UmuCQfRcIYMIFF55i/Ddwkb39gE"
     email: admin@tarasa24.dev
     groups:
-      - admins
+      - jellyfin-admins
+      - jellyfin-users
+  tarasa24:
+    disabled: false
+    displayname: "Tarasa24"
+    password: "$argon2id$v=19$m=65536,t=3,p=4$YyV7sJzTlQDPOsL1yTlGOA$x6p9YpICP6pAuAZEnVKNo+jOmu6hrwzI7fl7mLCCeyQ"
+    email: tarasa24@tarasa24.dev
+    groups:
+      - jellyfin-users

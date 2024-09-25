@@ -5,12 +5,16 @@
 
 server:
   address: "tcp://:9091"
+  endpoints:
+    authz:
+      auth-request:
+        implementation: "AuthRequest"
 
 log:
   level: "debug"
 
 totp:
-  issuer: "authelia.com"
+  issuer: "tarasa24.dev"
 
 # identity_validation:
 #   reset_password:
@@ -23,23 +27,17 @@ authentication_backend:
 access_control:
   default_policy: "deny"
   rules:
-    - domain: "public.example.com"
+    - domain: "homelab.tarasa24.dev"
       policy: "bypass"
-    - domain: "traefik.example.com"
-      policy: "one_factor"
-    - domain: "secure.example.com"
-      policy: "two_factor"
+      resources:
+        - "^(.*)$$" # All resources
 
 session:
   # secret: 'insecure_session_secret'
-
   cookies:
-    - name: "authelia_session"
-      domain: "example.com" # Should match whatever your root protected domain is
-      authelia_url: "https://authelia.example.com"
-      expiration: "1 hour" # 1 hour
-      inactivity: "5 minutes" # 5 minutes
-      default_redirection_url: "https://public.example.com"
+    - domain: "homelab.tarasa24.dev"
+      authelia_url: "https://auth.homelab.tarasa24.dev"
+      default_redirection_url: "https://www.homelab.tarasa24.dev"
 
 regulation:
   max_retries: 3
@@ -54,3 +52,32 @@ storage:
 notifier:
   filesystem:
     filename: "/config/notification.txt"
+
+identity_providers:
+  oidc:
+    # hmac_secret:
+    jwks:
+      - key_id: "default"
+        algorithm: "RS256"
+        use: "sig"
+        key: {{ secret "/secrets/private.pem" | mindent 10 "|" | msquote }}
+        certificate_chain: {{ secret "/secrets/public.crt" | mindent 10 "|" | msquote }}
+
+    ## The other portions of the mandatory OpenID Connect 1.0 configuration go here.
+    ## See: https://www.authelia.com/c/oidc
+    clients:
+      - client_id: "jellyfin"
+        client_name: "Jellyfin"
+        client_secret: "$$pbkdf2-sha512$$310000$$M1o6uYU/oOYaj29otbR3Xg$$vM91QqHObirMXp8D9vVvGN/2iAnuEM72wow6KI7m4XwnsNTL9qJaTWr5bN8AF0jPxdYZp2AcslK9EVnInJsKNA"
+        public: false
+        authorization_policy: "one_factor"
+        require_pkce: true
+        pkce_challenge_method: "S256"
+        redirect_uris:
+          - "https://jellyfin.homelab.tarasa24.dev/sso/OID/redirect/Authelia"
+        scopes:
+          - "openid"
+          - "profile"
+          - "groups"
+        userinfo_signed_response_alg: "none"
+        token_endpoint_auth_method: "client_secret_post"
