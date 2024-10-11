@@ -1,6 +1,7 @@
 location:
     source_directories:
         - /var/lib/docker/volumes/root_jelllyfin_config/_data
+        - /var/lib/docker/volumes/root_radicale_data/_data
     repositories:
         - ssh://backup@10.0.1.3/backup/repos/dmz_docker-host
 
@@ -25,5 +26,7 @@ consistency:
 hooks:
     before_backup:
         - "docker ps --filter 'name=jellyfin' --filter 'status=running' --format '{{.Names}}' | grep -w jellyfin && docker stop jellyfin || echo 'jellyfin already stopped or does not exist'"
+        - "docker ps --filter 'name=radicale' --filter 'status=running' --format '{{.Names}}' | grep -w radicale && docker stop radicale || echo 'radicale already stopped or does not exist'"
     after_backup:
         - "docker inspect -f '{{.State.Running}}' jellyfin | grep false && docker start jellyfin || echo 'jellyfin already running or does not exist'"
+        - "docker inspect -f '{{.State.Running}}' radicale | grep false && docker start radicale || echo 'radicale already running or does not exist'"

@@ -7,14 +7,23 @@ server:
   address: "tcp://:9091"
   endpoints:
     authz:
-      auth-request:
-        implementation: "AuthRequest"
+      normal:
+      #auth-request:
+        implementation: 'AuthRequest'
+        authn_strategies:
+          - name: 'CookieSession'
+      basic:
+        implementation: 'AuthRequest'
+        authn_strategies:
+          - name: 'HeaderAuthorization'
+            schemes:
+              - 'Basic'
 
 log:
   level: "debug"
 
 totp:
-  issuer: "tarasa24.dev"
+  issuer: "homelab.tarasa24.dev"
 
 # identity_validation:
 #   reset_password:
@@ -27,10 +36,10 @@ authentication_backend:
 access_control:
   default_policy: "deny"
   rules:
-    - domain: "homelab.tarasa24.dev"
-      policy: "bypass"
-      resources:
-        - "^(.*)$$" # All resources
+    - domain: "cal.homelab.tarasa24.dev"
+      policy: "one_factor"
+      subject:
+        - ['group:radicale-users']
 
 session:
   # secret: 'insecure_session_secret'

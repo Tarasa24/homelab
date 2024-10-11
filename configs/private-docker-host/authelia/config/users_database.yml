@@ -20,3 +20,4 @@ users:
     email: tarasa24@tarasa24.dev
     groups:
       - jellyfin-users
+      - radicale-users
