@@ -58,7 +58,7 @@ resource "proxmox_virtual_environment_container" "lxc_dmz_router" {
   }
 
   mount_point {
-    volume = "/mnt/usb-ssd/ssl"
+    volume = "/mnt/USB-SSD/ssl"
     path   = "/etc/letsencrypt"
   }
 
@@ -127,7 +127,8 @@ resource "proxmox_virtual_environment_firewall_options" "lxc_dmz_router" {
 
 resource "proxmox_virtual_environment_firewall_rules" "lxc_dmz_router" {
   depends_on = [
-    proxmox_virtual_environment_container.lxc_dmz_router
+    proxmox_virtual_environment_container.lxc_dmz_router,
+    proxmox_virtual_environment_firewall_options.lxc_dmz_router
   ]
 
   node_name    = "pve"

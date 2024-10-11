@@ -37,7 +37,7 @@ resource "proxmox_virtual_environment_container" "lxc_backup" {
   }
 
   mount_point {
-    volume = "/mnt/usb-ssd/backup"
+    volume = "/mnt/USB-SSD/backup"
     path   = "/backup"
   }
 

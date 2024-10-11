@@ -38,7 +38,7 @@ resource "proxmox_virtual_environment_container" "lxc_private-docker-host" {
   }
 
   mount_point {
-    volume    = "/mnt/usb-ssd/ssl"
+    volume    = "/mnt/USB-SSD/ssl"
     path      = "/etc/letsencrypt"
     read_only = true
     shared    = true

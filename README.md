@@ -1,0 +1,1 @@
+1. Add ssh pubkey to pve's authorized_keys file

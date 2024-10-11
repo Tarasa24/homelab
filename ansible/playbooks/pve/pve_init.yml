@@ -1,0 +1,61 @@
+- name: Initialize proxmox host to the state expected by terraform
+  hosts: proxmox
+  gather_facts: false
+  vars:
+    disks: {
+      "USB-HDD": "/dev/disk/by-uuid/497659fd-3b59-45ce-8547-949d178b97a6",
+      "USB-SSD": "/dev/disk/by-uuid/99a2c009-aaee-4b80-afba-c70bd9f74a49"
+    }
+    storage: {
+      "USB-HDD": {
+        "type": "dir",
+        "path": "/mnt/USB-HDD",
+        "content": "images,rootdir,vztmpl,snippets"
+      },
+      "USB-SSD": {
+        "type": "dir",
+        "path": "/mnt/USB-SSD",
+        "content": "images,rootdir,vztmpl,snippets"
+      }
+    }
+    required_directories: [
+      "/mnt/USB-SSD/ssl",
+      "/mnt/USB-SSD/backup"
+    ]
+
+  tasks:
+    - name: Create mount points
+      ansible.builtin.file:
+        name: "/mnt/{{ item.key }}"
+        state: directory
+      with_dict: "{{ disks }}"
+    - name: Make sure the disks are in fstab and mounted
+      ansible.builtin.mount:
+        name: "/mnt/{{ item.key }}"
+        src: "{{ item.value }}"
+        fstype: ext4
+        state: present
+        opts: defaults
+      with_dict: "{{ disks }}"
+      notify: reload systemd
+    - name: Remove storage from the cluster only if it exists
+      ansible.builtin.shell:
+        cmd: pvesm list {{ item.key }} && pvesm remove {{ item.key }}
+      with_dict: "{{ storage }}"
+      register: remove_storage
+      failed_when: remove_storage.rc == 1
+    - name: Add storage to cluster as a directory
+      ansible.builtin.shell:
+        cmd: pvesm add dir {{ item.key }} --path {{ item.value.path }} --content {{ item.value.content }}
+      with_dict: "{{ storage }}"
+      notify: reload systemd
+    - name: Create required directories
+      ansible.builtin.file:
+        name: "{{ item }}"
+        state: directory
+      with_items: "{{ required_directories }}"
+
+  handlers:
+    - name: reload systemd
+      ansible.builtin.systemd:
+        daemon_reload: yes
