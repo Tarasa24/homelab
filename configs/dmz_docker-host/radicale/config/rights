@@ -1,0 +1,19 @@
+[_]
+user: .+
+collection:
+permissions: R
+
+[user]
+user: .+
+collection: {user}
+permissions: RW
+
+[user-inherit]
+user: .+
+collection: {user}/[^/]+
+permissions: rw
+
+[admin]
+user: admin
+collection: .+
+permissions: RW

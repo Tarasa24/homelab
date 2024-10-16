@@ -1,30 +1,13 @@
 version: '3.5'
 services:
   radicale:
-    image: tomsquest/docker-radicale
+    image: 11notes/radicale:3.1.9
     container_name: radicale
     ports:
       - "10.1.0.22:5232:5232"
-    init: true
-    read_only: true
-    security_opt:
-      - no-new-privileges:true
-    cap_drop:
-      - ALL
-    cap_add:
-      - CHOWN
-      - SETUID
-      - SETGID
-      - KILL
-    healthcheck:
-      test: ["CMD", "curl", "--fail", "http://localhost:5232"]
-      interval: 30s
-      retries: 3
-    environment:
-      - TAKE_FILE_OWNERSHIP=false
     volumes:
-      - radicale_data:/data
-      - ./radicale/config:/config:ro
+      - radicale_data:/radicale/var
+      - ./radicale/config:/radicale/etc
     restart: unless-stopped
 
 volumes:

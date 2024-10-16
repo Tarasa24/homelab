@@ -7,18 +7,11 @@ server:
   address: "tcp://:9091"
   endpoints:
     authz:
-      normal:
-      #auth-request:
-        implementation: 'AuthRequest'
+      auth-request:
+        implementation: "AuthRequest"
         authn_strategies:
-          - name: 'CookieSession'
-      basic:
-        implementation: 'AuthRequest'
-        authn_strategies:
-          - name: 'HeaderAuthorization'
-            schemes:
-              - 'Basic'
-
+          - name: "CookieSession"
+          - name: "HeaderAuthorization"
 log:
   level: "debug"
 
@@ -39,10 +32,9 @@ access_control:
     - domain: "cal.homelab.tarasa24.dev"
       policy: "one_factor"
       subject:
-        - ['group:radicale-users']
+        - ["group:radicale-users"]
 
 session:
-  # secret: 'insecure_session_secret'
   cookies:
     - domain: "homelab.tarasa24.dev"
       authelia_url: "https://auth.homelab.tarasa24.dev"
