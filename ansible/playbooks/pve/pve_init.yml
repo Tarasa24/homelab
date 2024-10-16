@@ -20,7 +20,9 @@
     }
     required_directories: [
       "/mnt/USB-SSD/ssl",
-      "/mnt/USB-SSD/backup"
+      "/mnt/USB-SSD/backup",
+      "/mnt/USB-SSD/downloads",
+      "/mnt/USB-HDD/jellyfin-media",
     ]
 
   tasks:
@@ -53,6 +55,8 @@
       ansible.builtin.file:
         name: "{{ item }}"
         state: directory
+        owner: 101000
+        group: 101000
       with_items: "{{ required_directories }}"
 
   handlers:

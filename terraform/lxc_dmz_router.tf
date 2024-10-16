@@ -108,7 +108,12 @@ resource "proxmox_virtual_environment_network_linux_bridge" "dmz_bridge" {
 
   node_name = "pve"
   name      = "vmbr1"
-  mtu       = 1450
+}
+
+resource "time_sleep" "wait_for_dmz_bridge_creation" {
+  depends_on = [proxmox_virtual_environment_network_linux_bridge.dmz_bridge]
+
+  create_duration = "5s"
 }
 
 resource "proxmox_virtual_environment_firewall_options" "lxc_dmz_router" {

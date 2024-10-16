@@ -44,13 +44,13 @@ resource "proxmox_virtual_environment_container" "lxc_private-docker-host" {
     shared    = true
   }
   mount_point {
-    volume = "/mnt/usb-hdd/jellyfin-media"
+    volume = "/mnt/USB-HDD/jellyfin-media"
     path   = "/media"
     shared = true
   }
 
   mount_point {
-    volume = "/mnt/usb-ssd/downloads"
+    volume = "/mnt/USB-SSD/downloads"
     path   = "/downloads"
   }
 

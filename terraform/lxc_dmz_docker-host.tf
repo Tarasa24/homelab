@@ -52,7 +52,7 @@ resource "proxmox_virtual_environment_container" "lxc_dmz-docker-host" {
   }
 
   mount_point {
-    volume = "/mnt/usb-hdd/jellyfin-media"
+    volume = "/mnt/USB-HDD/jellyfin-media"
     path   = "/media"
     shared = true
   }
