@@ -7,6 +7,8 @@
     ansible_host: "{{ hostvars[inventory_hostname].ansible_host }}"
     lxc_host: "{{ hostvars[inventory_hostname].lxc_host }}"
     repositories_dir: /backup/repos
+    linode_access_key: "{{ lookup('file', '../../../secrets/backup/resticprofile/access_key') }}"
+    linode_secret_key: "{{ lookup('file', '../../../secrets/backup/resticprofile/secret_key') }}"
   roles:
     - role: lxc_python3
 
@@ -69,6 +71,20 @@
             cmd: /tmp/resticprofile.sh -b /usr/local/bin
             creates: /usr/local/bin/resticprofile
       when: not resticprofile_installed.stat.exists
+    - name: Create resticprofile configuration directory
+      ansible.builtin.file:
+        path: /etc/resticprofile
+        state: directory
+        mode: '0700'
+    - name: Copy resticprofile configuration
+      ansible.builtin.template:
+        src: ../../../configs/backup/resticprofile/borg-to-linode-s3.yaml.j2
+        dest: /etc/resticprofile/profiles.yaml
+        mode: '0600'
+    - name: Copy resticprofile password file
+      ansible.builtin.copy:
+        src: ../../../secrets/backup/resticprofile/restic-password.txt
+        dest: /etc/resticprofile/restic-password.txt
 
     - name: Install borg + borgmatic
       ansible.builtin.apk:

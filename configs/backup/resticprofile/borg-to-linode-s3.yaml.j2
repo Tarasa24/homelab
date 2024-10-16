@@ -1,0 +1,22 @@
+global:
+    scheduler: crond
+
+default:
+  repository: s3:eu-central-1.linodeobjects.com/homelab-backups/
+  password-file: /etc/resticprofile/restic-password.txt
+  env:
+    AWS_ACCESS_KEY_ID: {{ linode_access_key }}
+    AWS_SECRET_ACCESS_KEY: {{ linode_secret_key }}
+
+  backup:
+    verbose: true
+    source:
+      - {{ repositories_dir }}
+    schedule: daily
+
+  retention:
+    keep-last: 7        # Keep the last 7 snapshots
+    keep-daily: 7       # Keep 1 daily snapshot for the last 7 days
+    keep-weekly: 4      # Keep 1 weekly snapshot for the last 4 weeks
+    keep-monthly: 6     # Keep 1 monthly snapshot for the last 6 months
+
