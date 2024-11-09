@@ -3,8 +3,9 @@
   gather_facts: false
   vars:
     disks: {
-      "USB-HDD": "/dev/disk/by-uuid/497659fd-3b59-45ce-8547-949d178b97a6",
-      "USB-SSD": "/dev/disk/by-uuid/99a2c009-aaee-4b80-afba-c70bd9f74a49"
+      "USB-HDD": "/dev/disk/by-uuid/d10e88e6-9a20-4d5f-972f-c432c26f9019",
+      "USB-SSD": "/dev/disk/by-uuid/c06ebfa7-0bf3-4751-87c4-19c5f0c3515f",
+      "USB-BITCOIN": "/dev/disk/by-uuid/475ebfe4-0fc7-4770-990e-cba43a90d7b0"
     }
     storage: {
       "USB-HDD": {
