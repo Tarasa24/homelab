@@ -7,8 +7,7 @@ resource "proxmox_virtual_environment_container" "lxc_dmz_router" {
   tags = ["alpine", "dmz", "router"]
 
   depends_on = [
-    proxmox_virtual_environment_download_file.alpine_linux_template,
-    proxmox_virtual_environment_network_linux_bridge.dmz_bridge
+    proxmox_virtual_environment_download_file.alpine_linux_template
   ]
 
   initialization {
@@ -108,12 +107,6 @@ resource "proxmox_virtual_environment_network_linux_bridge" "dmz_bridge" {
 
   node_name = "pve"
   name      = "vmbr1"
-}
-
-resource "time_sleep" "wait_for_dmz_bridge_creation" {
-  depends_on = [proxmox_virtual_environment_network_linux_bridge.dmz_bridge]
-
-  create_duration = "5s"
 }
 
 resource "proxmox_virtual_environment_firewall_options" "lxc_dmz_router" {

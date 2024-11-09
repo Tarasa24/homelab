@@ -59,8 +59,20 @@
         owner: 101000
         group: 101000
       with_items: "{{ required_directories }}"
+    - name: "Create DMZ bridge"
+      ansible.builtin.copy:
+        content: |
+          auto vmbr1
+          iface vmbr1 inet manual
+          	bridge-ports none
+          	bridge-stp off
+          	bridge-fd 0
+        dest: /etc/network/interfaces.d/vmbr1.cfg
+    - name: "Up the DMZ bridge"
+      ansible.builtin.command:
+        cmd: ifup vmbr1
 
   handlers:
     - name: reload systemd
       ansible.builtin.systemd:
-        daemon_reload: yes
+        daemon_reload: true
