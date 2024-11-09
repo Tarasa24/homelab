@@ -23,6 +23,7 @@
       "/mnt/USB-SSD/ssl",
       "/mnt/USB-SSD/backup",
       "/mnt/USB-SSD/downloads",
+      "/mnt/USB-SSD/cache",
       "/mnt/USB-HDD/jellyfin-media",
     ]
 
