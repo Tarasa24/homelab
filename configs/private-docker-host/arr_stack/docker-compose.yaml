@@ -63,8 +63,7 @@ services:
       - TZ=Europe/Prague
     volumes:
       - sonarr-config:/config
-      - /media/tv:/tv
-      - /media/series:/series
+      - /media/shows:/shows
       - /downloads:/downloads
     restart: always
   radarr:
@@ -95,8 +94,7 @@ services:
     volumes:
       - bazarr-config:/config
       - /media/movies:/movies
-      - /media/tv:/tv
-      - /media/series:/series
+      - /media/shows:/shows
     restart: always
 
   qbittorrent:
@@ -111,7 +109,7 @@ services:
       - TZ=Europe/Prague
     volumes:
       - qbittorrent-config:/config
-      - /media/downloads:/downloads
+      - /downloads:/downloads
     restart: always
 
 networks:
