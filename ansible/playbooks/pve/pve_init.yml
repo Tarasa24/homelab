@@ -42,6 +42,10 @@
         opts: defaults
       with_dict: "{{ disks }}"
       notify: reload systemd
+    - name: Run mount -a
+      ansible.builtin.shell:
+        cmd: mount -a
+      notify: reload systemd
     - name: Remove storage from the cluster only if it exists
       ansible.builtin.shell:
         cmd: pvesm list {{ item.key }} && pvesm remove {{ item.key }}
