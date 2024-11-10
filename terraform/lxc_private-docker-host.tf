@@ -54,6 +54,12 @@ resource "proxmox_virtual_environment_container" "lxc_private-docker-host" {
     path   = "/downloads"
   }
 
+  mount_point {
+    volume = "/mnt/USB-SSD/cache"
+    path   = "/cache"
+    shared = true
+  }
+
   disk {
     datastore_id = "local-lvm"
   }

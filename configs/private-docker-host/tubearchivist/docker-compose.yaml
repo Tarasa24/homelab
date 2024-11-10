@@ -1,0 +1,66 @@
+version: '3.5'
+
+services:
+  tubearchivist:
+    container_name: tubearchivist
+    restart: unless-stopped
+    image: bbilly1/tubearchivist
+    ports:
+      - 10.0.1.23:8000:8000
+    volumes:
+      - /media/youtube:/youtube
+      - /cache:/cache
+    environment:
+      - ES_URL=http://archivist-es:9200         # needs protocol e.g. http and port
+      - REDIS_HOST=archivist-redis              # don't add protocol
+      - HOST_UID=1000
+      - HOST_GID=1000
+      - TA_HOST=10.0.1.23:8000                  # set your host name
+      - TA_USERNAME=admin                       # your initial TA credentials
+      - TA_PASSWORD=p@ssw0rd                    # your initial TA credentials
+      - ELASTIC_PASSWORD=p@ssw0rd               # set password for Elasticsearch
+      - TZ=Europe/Prague                        # set your time zone
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.tubearchivist.rule=Host(`tubearchivist.lan.tarasa24.dev`)"
+      - "traefik.http.routers.tubearchivist.entrypoints=https"
+      - "traefik.http.routers.tubearchivist.tls=true"
+      - "traefik.http.routers.tubearchivist.middlewares=hsts@file"
+      - "traefik.http.middlewares.hsts.headers.customrequestheaders.Host=10.0.1.23:8000"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 2m
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    depends_on:
+      - archivist-es
+      - archivist-redis
+  archivist-redis:
+    image: redis/redis-stack-server
+    container_name: archivist-redis
+    restart: unless-stopped
+    expose:
+      - "6379"
+    volumes:
+      - archivist-redis:/data
+    depends_on:
+      - archivist-es
+  archivist-es:
+    image: bbilly1/tubearchivist-es         # only for amd64, or use official es 8.14.3
+    container_name: archivist-es
+    restart: unless-stopped
+    environment:
+      - "ELASTIC_PASSWORD=p@ssw0rd"         # matching Elasticsearch password
+      - "ES_JAVA_OPTS=-Xms1g -Xmx1g"
+      - "xpack.security.enabled=true"
+      - "discovery.type=single-node"
+      - "path.repo=/usr/share/elasticsearch/data/snapshot"
+    volumes:
+      - archivist-es:/usr/share/elasticsearch/data    # check for permission error when using bind mount, see readme
+    expose:
+      - "9200"
+
+volumes:
+  archivist-redis:
+  archivist-es:

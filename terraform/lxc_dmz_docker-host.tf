@@ -60,6 +60,7 @@ resource "proxmox_virtual_environment_container" "lxc_dmz-docker-host" {
   mount_point {
     volume = "/mnt/USB-SSD/cache"
     path   = "/cache"
+    shared = true
   }
 
   disk {
