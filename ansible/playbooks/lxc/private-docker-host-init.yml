@@ -64,7 +64,7 @@
         compose_files: "{{ docker_compose_files.files | map(attribute='path') | join(':') }}"
 
     - name: Pull images
-      shell: docker-compose pull
+      shell: docker-compose pull -q
       args:
         chdir: /root
       timeout: 1200
