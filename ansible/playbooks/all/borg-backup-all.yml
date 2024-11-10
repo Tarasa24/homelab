@@ -1,5 +1,6 @@
 - name: Run borg backup on all configured servers to have the most up-to-date backup
   hosts: "{{ variable_host | default('all:!proxmox:!linode_dmz_bastion') }}"
+  ignore_unreachable: true
   gather_facts: false
 
   tasks:
