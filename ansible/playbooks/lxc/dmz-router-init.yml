@@ -133,6 +133,12 @@
             src: ../../../configs/dmz_router/nginx/
             dest: /etc/nginx/
             mode: "0644"
+        - name: Ensure correct permission for /var/lib/nginx
+          ansible.builtin.file:
+            path: /var/lib/nginx
+            state: directory
+            owner: www
+            group: www
         - name: Stop nginx
           ansible.builtin.service:
             name: nginx
