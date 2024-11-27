@@ -1,22 +1,41 @@
 global:
-    scheduler: crond
+  scheduler: crond
 
-default:
-  repository: s3:eu-central-1.linodeobjects.com/homelab-backups/
+{% for repository_name in repositories %}
+{{ repository_name }}:
+  repository: s3:eu-central-1.linodeobjects.com/homelab-borg-backups/{{ repository_name }}
   password-file: /etc/resticprofile/restic-password.txt
   env:
     AWS_ACCESS_KEY_ID: {{ linode_access_key }}
     AWS_SECRET_ACCESS_KEY: {{ linode_secret_key }}
 
-  backup:
-    verbose: true
-    source:
-      - {{ repositories_dir }}
-    schedule: daily
-
   retention:
+    after-backup: true
     keep-last: 7        # Keep the last 7 snapshots
     keep-daily: 7       # Keep 1 daily snapshot for the last 7 days
     keep-weekly: 4      # Keep 1 weekly snapshot for the last 4 weeks
     keep-monthly: 6     # Keep 1 monthly snapshot for the last 6 months
 
+  backup:
+    schedule: "03:00" # Daily at 3:00am
+    schedule-permission: user
+    schedule-lock-wait: 10m
+    exclude-caches: true
+    source: {{ repositories_dir }}/{{ repository_name }}
+    run-before:
+      - "borg break-lock {{ repositories_dir }}/{{ repository_name }}"
+      - "borg check --verify-data --lock-wait 10 {{ repositories_dir }}/{{ repository_name }}"
+    run-after:
+      - "BORG_UNKNOWN_UNENCRYPTED_REPO_ACCESS_IS_OK=yes borg list {{ repositories_dir }}/{{ repository_name }}"
+
+  prune:
+    schedule: "sun 3:30" # Weekly on Sunday at 3:30am
+    schedule-permission: user
+    schedule-lock-wait: 1h
+{% endfor %}
+
+groups:
+  borg-repositories:
+    {% for repository_name in repositories %}
+    - {{ repository_name }}
+    {% endfor %}

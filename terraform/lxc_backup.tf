@@ -7,6 +7,10 @@ resource "proxmox_virtual_environment_container" "lxc_backup" {
   tags         = ["alpine"]
   unprivileged = true
 
+  features {
+    fuse = true
+  }
+
   initialization {
     hostname = "backup"
 

@@ -85,6 +85,23 @@
       ansible.builtin.copy:
         src: ../../../secrets/backup/resticprofile/restic-password.txt
         dest: /etc/resticprofile/restic-password.txt
+    - name: Init restic repositories if they don't already exist
+      ansible.builtin.command: resticprofile {{ item }}.init
+      with_items: "{{ repositories }}"
+      ignore_errors: true
+      register: restic_init
+    - name: Check for errors in restic init
+      ansible.builtin.fail:
+        msg: "Error initializing restic repository"
+      when: item.rc != 0 and not ("repository master key and config already initialized" in item.stderr)
+      with_items: "{{ restic_init.results }}"
+    - name: Schedule restic backups
+      ansible.builtin.command: resticprofile {{ item }}.schedule
+      with_items: "{{ repositories }}"
+    - name: Install fuse (for restic mount)
+      ansible.builtin.apk:
+        name: fuse
+        state: present
 
     - name: Install borg + borgmatic
       ansible.builtin.apk:
@@ -149,3 +166,8 @@
       become_method: su
       become_flags: '-s /bin/sh'
       with_items: "{{ repositories }}"
+
+    - name: Install pyfuse3 (for borg mount)
+      ansible.builtin.apk:
+        name: py3-pyfuse3
+        state: present
