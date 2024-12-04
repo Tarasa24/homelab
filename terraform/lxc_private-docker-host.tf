@@ -9,10 +9,6 @@ resource "proxmox_virtual_environment_container" "lxc_private-docker-host" {
     proxmox_virtual_environment_container.lxc_backup
   ]
 
-  clone {
-    vm_id = proxmox_virtual_environment_container.lxc_templates_docker_template.vm_id
-  }
-
   memory {
     dedicated = 2048
     swap      = 2048
@@ -31,10 +27,30 @@ resource "proxmox_virtual_environment_container" "lxc_private-docker-host" {
         gateway = var.private-docker-host_ip.gateway
       }
     }
+
+    user_account {
+      password = random_password.private_docker_host_password.result
+    }
   }
+
+  features {
+    nesting = true
+  }
+  unprivileged = true
 
   network_interface {
     name = "eth0"
+  }
+
+  operating_system {
+    template_file_id = proxmox_virtual_environment_download_file.alpine_linux_template.id
+    type             = "alpine"
+  }
+
+
+  disk {
+    datastore_id = "local-lvm"
+    size         = 20
   }
 
   mount_point {
@@ -58,10 +74,6 @@ resource "proxmox_virtual_environment_container" "lxc_private-docker-host" {
     volume = "/mnt/USB-SSD/cache"
     path   = "/cache"
     shared = true
-  }
-
-  disk {
-    datastore_id = "local-lvm"
   }
 
   provisioner "local-exec" {
@@ -95,4 +107,15 @@ variable "private-docker-host_ip" {
     address = "10.0.1.20/22"
     gateway = "10.0.0.1"
   }
+}
+
+resource "random_password" "private_docker_host_password" {
+  length           = 16
+  override_special = "_%@"
+  special          = true
+}
+
+output "private-docker_host_password" {
+  value     = random_password.private_docker_host_password.result
+  sensitive = true
 }

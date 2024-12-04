@@ -10,10 +10,6 @@ resource "proxmox_virtual_environment_container" "lxc_dmz-docker-host" {
     proxmox_virtual_environment_container.lxc_dmz_router
   ]
 
-  clone {
-    vm_id = proxmox_virtual_environment_container.lxc_templates_docker_template.vm_id
-  }
-
   memory {
     dedicated = 2048
     swap      = 2048
@@ -36,6 +32,24 @@ resource "proxmox_virtual_environment_container" "lxc_dmz-docker-host" {
         gateway = var.dmz-docker-host_ip.gateway
       }
     }
+
+    user_account {
+      password = random_password.dmz_docker_host_password.result
+    }
+  }
+
+  features {
+    nesting = true
+  }
+  unprivileged = true
+
+  network_interface {
+    name = "eth0"
+  }
+
+  operating_system {
+    template_file_id = proxmox_virtual_environment_download_file.alpine_linux_template.id
+    type             = "alpine"
   }
 
   network_interface {
@@ -65,6 +79,7 @@ resource "proxmox_virtual_environment_container" "lxc_dmz-docker-host" {
 
   disk {
     datastore_id = "local-lvm"
+    size         = 10
   }
 
   provisioner "local-exec" {
@@ -98,4 +113,15 @@ variable "dmz-docker-host_ip" {
     address = "10.1.0.20/22"
     gateway = "10.1.0.1"
   }
+}
+
+resource "random_password" "dmz_docker_host_password" {
+  length           = 16
+  override_special = "_%@"
+  special          = true
+}
+
+output "dmz-docker_host_password" {
+  value     = random_password.dmz_docker_host_password.result
+  sensitive = true
 }

@@ -1,0 +1,12 @@
+---
+- name: Install Docker
+  ansible.builtin.apk:
+    name: [docker, docker-compose]
+    state: present
+    update_cache: true
+
+- name: Start Docker
+  ansible.builtin.service:
+    name: docker
+    state: started
+    enabled: true

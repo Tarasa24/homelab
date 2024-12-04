@@ -19,6 +19,7 @@
     ]
   roles:
     - role: lxc_python3
+    - role: docker
     - role: borgmatic
 
   tasks:
