@@ -22,6 +22,21 @@
     certbot_linode_credentials: "{{ lookup('file', '../../../secrets/linode/certbot_acme_api_creds.ini') }}"
   roles:
     - role: lxc_python3
+  pre_tasks:
+    - name: Check if wireguard is installed
+      ansible.builtin.command: lxc-attach {{ lxc_host }} -- which wg
+      delegate_to: "{{ ansible_host }}"
+      ignore_errors: true
+      register: wireguard_installed
+
+    - name: If wireguard is not installed, disable firewall
+      ansible.builtin.command: pvesh set /nodes/pve/lxc/{{ lxc_host }}/firewall/options -enable 0
+      delegate_to: "{{ ansible_host }}"
+      when: wireguard_installed.rc != 0
+  post_tasks:
+    - name: Enable firewall
+      ansible.builtin.command: pvesh set /nodes/pve/lxc/{{ lxc_host }}/firewall/options -enable 1
+      delegate_to: "{{ ansible_host }}"
 
   tasks:
     - name: Setup wireguard tunnel
@@ -90,12 +105,7 @@
       block:
         - name: Install Certbot
           ansible.builtin.package:
-            name: certbot
-            state: present
-        - name: Install Certbot DNS plugin for Linode
-          ansible.builtin.pip:
-            name: certbot-dns-linode
-            break_system_packages: true
+            name: [certbot, certbot-dns-linode]
             state: present
         - name: Create Certbot folder - /etc/letsencrypt
           file:

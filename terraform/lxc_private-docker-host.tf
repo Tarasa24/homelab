@@ -28,6 +28,10 @@ resource "proxmox_virtual_environment_container" "lxc_private-docker-host" {
       }
     }
 
+    dns {
+      servers = ["1.1.1.1", "8.8.8.8"]
+    }
+
     user_account {
       password = random_password.private_docker_host_password.result
     }

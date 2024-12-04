@@ -21,6 +21,10 @@ resource "proxmox_virtual_environment_container" "lxc_backup" {
       }
     }
 
+    dns {
+      servers = ["1.1.1.1", "8.8.8.8"]
+    }
+
     user_account {
       password = random_password.lxc_backup_password.result
     }

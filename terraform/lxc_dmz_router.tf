@@ -14,7 +14,7 @@ resource "proxmox_virtual_environment_container" "lxc_dmz_router" {
     hostname = "dmz-router"
 
     dns {
-      servers = ["1.1.1.1", "1.0.0.1"]
+      servers = ["1.1.1.1", "8.8.8.8"]
     }
 
     ip_config {
