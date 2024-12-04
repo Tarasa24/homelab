@@ -95,6 +95,7 @@
         - name: Install Certbot DNS plugin for Linode
           ansible.builtin.pip:
             name: certbot-dns-linode
+            break_system_packages: true
             state: present
         - name: Create Certbot folder - /etc/letsencrypt
           file:
