@@ -91,16 +91,6 @@ resource "proxmox_virtual_environment_container" "lxc_dmz-docker-host" {
       || echo "Failed to initialize dmz-docker-host"
     EOT
   }
-
-  provisioner "local-exec" {
-    when    = destroy
-    command = <<-EOT
-      cd ../ansible && \
-      ansible-playbook \
-      ./playbooks/all/borg-backup-all.yml --extra-vars "variable_host=lxc_dmz_docker-host" \
-      || echo "Failed to backup dmz-docker-host"
-    EOT
-  }
 }
 
 variable "dmz-docker-host_ip" {

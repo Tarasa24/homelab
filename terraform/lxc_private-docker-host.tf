@@ -85,16 +85,6 @@ resource "proxmox_virtual_environment_container" "lxc_private-docker-host" {
       || echo "Failed to initialize private-docker-host"
     EOT
   }
-
-  provisioner "local-exec" {
-    when    = destroy
-    command = <<-EOT
-      cd ../ansible && \
-      ansible-playbook \
-      ./playbooks/all/borg-backup-all.yml --extra-vars "variable_host=lxc_private-docker-host" \
-      || echo "Failed to backup private-docker-host"
-    EOT
-  }
 }
 
 variable "private-docker-host_ip" {
