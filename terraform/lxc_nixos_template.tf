@@ -4,7 +4,8 @@ resource "proxmox_virtual_environment_container" "lxc_nixos_template" {
   node_name = "pve"
   vm_id     = 3002
 
-  tags = ["template", "nixos"]
+  tags       = ["template", "nixos"]
+  depends_on = [proxmox_virtual_environment_download_file.nixos_template]
 
   initialization {
     hostname = "nixos-template"
@@ -23,11 +24,11 @@ resource "proxmox_virtual_environment_container" "lxc_nixos_template" {
   unprivileged = true
 
   network_interface {
-    name = "veth0"
+    name = "eth0"
   }
 
   operating_system {
-    template_file_id = proxmox_virtual_environment_file.nixos_template.id
+    template_file_id = proxmox_virtual_environment_download_file.nixos_template.id
     type             = "nixos"
   }
 
@@ -68,19 +69,9 @@ variable "nixos_template_ip" {
   }
 }
 
-resource "proxmox_virtual_environment_file" "nixos_template" {
+resource "proxmox_virtual_environment_download_file" "nixos_template" {
   content_type = "vztmpl"
   datastore_id = "USB-HDD"
   node_name    = "pve"
-
-  source_file {
-    path = "${data.external.generate_nixos_template.result["path"]}/tarball/nixos-system-x86_64-linux.tar.xz"
-  }
-}
-
-data "external" "generate_nixos_template" {
-  program = [
-    "sh", "-c",
-    "if [ ! -f /tmp/nixos-template ]; then nix run github:nix-community/nixos-generators -- --format proxmox-lxc -o /tmp/nixos-template > /dev/null 2>&1; fi; echo '{\"path\": \"/tmp/nixos-template\"}'"
-  ]
+  url          = "https://hydra.nixos.org/build/280671319/download/1/nixos-system-x86_64-linux.tar.xz"
 }
