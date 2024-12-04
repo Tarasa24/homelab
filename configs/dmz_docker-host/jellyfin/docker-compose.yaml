@@ -1,4 +1,3 @@
-version: '3.5'
 services:
   jellyfin:
     image: jellyfin/jellyfin
@@ -20,3 +19,5 @@ services:
 
 volumes:
   jelllyfin_config:
+    external: true
+    name: root_jellyfin_config

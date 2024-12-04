@@ -43,10 +43,6 @@ resource "proxmox_virtual_environment_container" "lxc_dmz-docker-host" {
   }
   unprivileged = true
 
-  network_interface {
-    name = "eth0"
-  }
-
   operating_system {
     template_file_id = proxmox_virtual_environment_download_file.alpine_linux_template.id
     type             = "alpine"

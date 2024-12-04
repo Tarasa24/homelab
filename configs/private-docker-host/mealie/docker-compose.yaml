@@ -18,3 +18,5 @@ services:
 
 volumes:
   mealie-data:
+    external: true
+    name: root_mealie-data

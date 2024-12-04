@@ -25,8 +25,8 @@ consistency:
 
 hooks:
     before_backup:
-        - "docker ps --filter 'name=jellyfin' --filter 'status=running' --format '{{.Names}}' | grep -w jellyfin && docker stop jellyfin || echo 'jellyfin already stopped or does not exist'"
-        - "docker ps --filter 'name=radicale' --filter 'status=running' --format '{{.Names}}' | grep -w radicale && docker stop radicale || echo 'radicale already stopped or does not exist'"
+        - "cd /root && docker-compose stop jelllyfin"
+        - "cd /root && docker-compose stop radicale"
     after_backup:
-        - "docker inspect -f '{{.State.Running}}' jellyfin | grep false && docker start jellyfin || echo 'jellyfin already running or does not exist'"
-        - "docker inspect -f '{{.State.Running}}' radicale | grep false && docker start radicale || echo 'radicale already running or does not exist'"
+        - "cd /root && docker-compose up -d jelllyfin"
+        - "cd /root && docker-compose up -d radicale"

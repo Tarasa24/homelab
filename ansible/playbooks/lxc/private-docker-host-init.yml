@@ -45,6 +45,9 @@
     - name: Stop and remove existing containers
       shell: docker compose down || true
 
+    - name: Remove old configs
+      shell: rm -rf /root/*
+
     - name: Copy over configs
       copy:
         src: "../../../configs/private-docker-host/"
@@ -69,6 +72,7 @@
       args:
         chdir: /root
       timeout: 1200
+      retries: 3
 
     - name: Start containers
       shell: docker-compose up -d

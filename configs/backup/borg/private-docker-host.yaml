@@ -35,30 +35,12 @@ consistency:
 
 hooks:
     before_backup:
-        - "docker ps --filter 'name=mealie' --filter 'status=running' --format '{{.Names}}' | grep -w mealie && docker stop mealie && echo 'mealie stopped' || echo 'mealie already stopped or does not exist'"
-
-        - "docker ps --filter 'name=vaultwarden' --filter 'status=running' --format '{{.Names}}' | grep -w vaultwarden && docker stop vaultwarden && echo 'vaultwarden stopped' || echo 'vaultwarden already stopped or does not exist'"
-
-        - "docker ps --filter 'name=prowlarr' --filter 'status=running' --format '{{.Names}}' | grep -w prowlarr && docker stop prowlarr && echo 'prowlarr stopped' || echo 'prowlarr already stopped or does not exist'"
-        - "docker ps --filter 'name=sonarr' --filter 'status=running' --format '{{.Names}}' | grep -w sonarr && docker stop sonarr && echo 'sonarr stopped' || echo 'sonarr already stopped or does not exist'"
-        - "docker ps --filter 'name=radarr' --filter 'status=running' --format '{{.Names}}' | grep -w radarr && docker stop radarr && echo 'radarr stopped' || echo 'radarr already stopped or does not exist'"
-        - "docker ps --filter 'name=bazarr' --filter 'status=running' --format '{{.Names}}' | grep -w bazarr && docker stop bazarr && echo 'bazarr stopped' || echo 'bazarr already stopped or does not exist'"
-        - "docker ps --filter 'name=qbittorrent' --filter 'status=running' --format '{{.Names}}' | grep -w qbittorrent && docker stop qbittorrent && echo 'qbittorrent stopped' || echo 'qbittorrent already stopped or does not exist'"
-
-        - "docker ps --filter 'name=tubearchivist' --filter 'status=running' --format '{{.Names}}' | grep -w tubearchivist && docker stop tubearchivist && echo 'tubearchivist stopped' || echo 'tubearchivist already stopped or does not exist'"
-        - "docker ps --filter 'name=archivist-redis' --filter 'status=running' --format '{{.Names}}' | grep -w archivist-redis && docker stop archivist-redis && echo 'archivist-redis stopped' || echo 'archivist-redis already stopped or does not exist'"
-        - "docker ps --filter 'name=archivist-es' --filter 'status=running' --format '{{.Names}}' | grep -w archivist-es && docker stop archivist-es && echo 'archivist-es stopped' || echo 'archivist-es already stopped or does not exist'"
+        - "cd /root && docker-compose stop mealie"
+        - "cd /root && docker-compose stop vaultwarden"
+        - "cd /root && docker-compose stop prowlarr sonarr radarr bazarr qbittorrent"
+        - "cd /root && docker-compose stop tubearchivist"
     after_backup:
-        - "docker inspect -f '{{.State.Running}}' mealie | grep false && docker start mealie && echo 'mealie started' || echo 'mealie already running or does not exist'"
-
-        - "docker inspect -f '{{.State.Running}}' vaultwarden | grep false && docker start vaultwarden && echo 'vaultwarden started' || echo 'vaultwarden already running or does not exist'"
-
-        - "docker inspect -f '{{.State.Running}}' prowlarr | grep false && docker start prowlarr && echo 'prowlarr started' || echo 'prowlarr already running or does not exist'"
-        - "docker inspect -f '{{.State.Running}}' sonarr | grep false && docker start sonarr && echo 'sonarr started' || echo 'sonarr already running or does not exist'"
-        - "docker inspect -f '{{.State.Running}}' radarr | grep false && docker start radarr && echo 'radarr started' || echo 'radarr already running or does not exist'"
-        - "docker inspect -f '{{.State.Running}}' bazarr | grep false && docker start bazarr && echo 'bazarr started' || echo 'bazarr already running or does not exist'"
-        - "docker inspect -f '{{.State.Running}}' qbittorrent | grep false && docker start qbittorrent && echo 'qbittorrent started' || echo 'qbittorrent already running or does not exist'"
-
-        - "docker inspect -f '{{.State.Running}}' tubearchivist | grep false && docker start tubearchivist && echo 'tubearchivist started' || echo 'tubearchivist already running or does not exist'"
-        - "docker inspect -f '{{.State.Running}}' archivist-redis | grep false && docker start archivist-redis && echo 'archivist-redis started' || echo 'archivist-redis already running or does not exist'"
-        - "docker inspect -f '{{.State.Running}}' archivist-es | grep false && docker start archivist-es && echo 'archivist-es started' || echo 'archivist-es already running or does not exist'"
+        - "cd /root && docker-compose up -d mealie"
+        - "cd /root && docker-compose up -d vaultwarden"
+        - "cd /root && docker-compose up -d prowlarr sonarr radarr bazarr qbittorrent"
+        - "cd /root && docker-compose up -d tubearchivist"

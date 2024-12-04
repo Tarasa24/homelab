@@ -1,5 +1,3 @@
-version: '3.5'
-
 services:
   tubearchivist:
     container_name: tubearchivist
@@ -63,4 +61,8 @@ services:
 
 volumes:
   archivist-redis:
+    external: true
+    name: root_archivist-redis
   archivist-es:
+    external: true
+    name: root_archivist-es

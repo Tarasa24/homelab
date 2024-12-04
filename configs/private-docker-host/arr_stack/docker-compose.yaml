@@ -121,7 +121,17 @@ networks:
 
 volumes:
   prowlarr-config:
+    external: true
+    name: root_prowlarr-config
   sonarr-config:
+    external: true
+    name: root_sonarr-config
   radarr-config:
+    external: true
+    name: root_radarr-config
   bazarr-config:
+    external: true
+    name: root_bazarr-config
   qbittorrent-config:
+    external: true
+    name: root_qbittorrent-config

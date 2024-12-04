@@ -69,6 +69,7 @@
       args:
         chdir: /root
       timeout: 1200
+      retries: 3
 
     - name: Start containers
       shell: docker-compose up -d

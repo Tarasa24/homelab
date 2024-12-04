@@ -1,7 +1,7 @@
 ---
 - name: Install borg
   ansible.builtin.apk:
-    name: [borgbackup, borgmatic, openssh]
+    name: [borgbackup, borgmatic, openssh, yq]
     state: present
 
 - name: Make sure .ssh directory exists
@@ -35,6 +35,16 @@
   ansible.builtin.fail:
     msg: "borgmatic extract failed"
   when: borgmatic_extract.rc != 0 and "No archives found in the repository" not in borgmatic_extract.stderr
+
+- name: Extract source_directories from borgmatic configuration and export from the role
+  ansible.builtin.shell: "yq '.location.source_directories[]' /etc/borgmatic/config.yaml"
+  register: source_directories
+
+- name: Make sure docker volumes are creates (if path contains /var/lib/docker/volumes)
+  ansible.builtin.command:
+    cmd: "docker volume create {{ item | regex_replace('/var/lib/docker/volumes/', '') | regex_replace('/_data', '') }}"
+  with_items: "{{ source_directories.stdout_lines }}"
+  when: item is search('/var/lib/docker/volumes')  
 
 - name: Setup cron job for borgmatic
   ansible.builtin.cron:
