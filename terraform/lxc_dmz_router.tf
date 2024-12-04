@@ -60,14 +60,6 @@ resource "proxmox_virtual_environment_container" "lxc_dmz_router" {
     volume = "/mnt/USB-SSD/ssl"
     path   = "/etc/letsencrypt"
   }
-
-  provisioner "local-exec" {
-    command = <<-EOT
-      cd ../ansible && \
-      ansible-playbook \
-      ./playbooks/lxc/dmz-router-init.yml
-    EOT
-  }
 }
 
 variable "dmz_router_wan_ip" {

@@ -75,16 +75,6 @@ resource "proxmox_virtual_environment_container" "lxc_private-docker-host" {
     path   = "/cache"
     shared = true
   }
-
-  provisioner "local-exec" {
-    when    = create
-    command = <<-EOT
-      cd ../ansible && \
-      ansible-playbook \
-      ./playbooks/lxc/private-docker-host-init.yml \
-      || echo "Failed to initialize private-docker-host"
-    EOT
-  }
 }
 
 variable "private-docker-host_ip" {

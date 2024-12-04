@@ -81,16 +81,6 @@ resource "proxmox_virtual_environment_container" "lxc_dmz-docker-host" {
     datastore_id = "local-lvm"
     size         = 10
   }
-
-  provisioner "local-exec" {
-    when    = create
-    command = <<-EOT
-      cd ../ansible && \
-      ansible-playbook \
-      ./playbooks/lxc/dmz-docker-host-init.yml \
-      || echo "Failed to initialize dmz-docker-host"
-    EOT
-  }
 }
 
 variable "dmz-docker-host_ip" {

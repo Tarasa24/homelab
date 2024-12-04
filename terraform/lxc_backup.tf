@@ -44,14 +44,6 @@ resource "proxmox_virtual_environment_container" "lxc_backup" {
     volume = "/mnt/USB-SSD/backup"
     path   = "/backup"
   }
-
-  provisioner "local-exec" {
-    command = <<-EOT
-      cd ../ansible && \
-      ansible-playbook \
-      ./playbooks/lxc/backup-init.yml
-    EOT
-  }
 }
 
 variable "lxc_backup_ip" {
