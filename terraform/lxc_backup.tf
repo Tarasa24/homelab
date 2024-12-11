@@ -22,6 +22,7 @@ resource "proxmox_virtual_environment_container" "lxc_backup" {
     }
 
     dns {
+      domain = " "
       servers = ["1.1.1.1", "8.8.8.8"]
     }
 

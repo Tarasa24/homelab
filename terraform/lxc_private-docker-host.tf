@@ -29,6 +29,7 @@ resource "proxmox_virtual_environment_container" "lxc_private-docker-host" {
     }
 
     dns {
+      domain  = " "
       servers = ["1.1.1.1", "8.8.8.8"]
     }
 

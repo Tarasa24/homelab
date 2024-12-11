@@ -23,7 +23,8 @@ resource "proxmox_virtual_environment_container" "lxc_dmz-docker-host" {
     hostname = "dmz-docker-host"
 
     dns {
-      servers = [split("/", var.dmz_router_lan_ip.address)[0], "1.1.1.1", "8.8.8.8"]
+      domain = " "
+      servers = ["1.1.1.1", "8.8.8.8"] # split("/", var.dmz_router_lan_ip.address)[0]
     }
 
     ip_config {
