@@ -167,6 +167,14 @@
       become_flags: '-s /bin/sh'
       with_items: "{{ repositories }}"
 
+    - name: Recursively change owner of borg repos
+      ansible.builtin.file:
+        path: "{{ repositories_dir }}/"
+        state: directory
+        owner: backup
+        group: backup
+        recurse: yes
+
     - name: Install pyfuse3 (for borg mount)
       ansible.builtin.apk:
         name: py3-pyfuse3

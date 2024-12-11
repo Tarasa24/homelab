@@ -40,7 +40,7 @@
   ansible.builtin.shell: "yq '.location.source_directories[]' /etc/borgmatic/config.yaml"
   register: source_directories
 
-- name: Make sure docker volumes are creates (if path contains /var/lib/docker/volumes)
+- name: Make sure docker volumes get created (if path contains /var/lib/docker/volumes)
   ansible.builtin.command:
     cmd: "docker volume create {{ item | regex_replace('/var/lib/docker/volumes/', '') | regex_replace('/_data', '') }}"
   with_items: "{{ source_directories.stdout_lines }}"
