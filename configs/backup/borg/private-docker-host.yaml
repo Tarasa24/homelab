@@ -38,9 +38,9 @@ hooks:
         - "cd /root && docker-compose stop mealie"
         - "cd /root && docker-compose stop vaultwarden"
         - "cd /root && docker-compose stop prowlarr sonarr radarr bazarr qbittorrent"
-        - "cd /root && docker-compose stop tubearchivist"
+        - "cd /root && docker-compose stop tubearchivist archivist-es archivist-redis"
     after_backup:
         - "cd /root && docker-compose up -d mealie"
         - "cd /root && docker-compose up -d vaultwarden"
         - "cd /root && docker-compose up -d prowlarr sonarr radarr bazarr qbittorrent"
-        - "cd /root && docker-compose up -d tubearchivist"
+        - "cd /root && docker-compose up -d tubearchivist archivist-es archivist-redis"

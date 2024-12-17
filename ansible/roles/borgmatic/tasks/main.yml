@@ -1,6 +1,6 @@
 ---
 - name: Install borg
-  ansible.builtin.apk:
+  community.general.apk:
     name: [borgbackup, borgmatic, openssh, yq]
     state: present
 

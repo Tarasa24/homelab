@@ -48,65 +48,6 @@
         name: sshd
         state: restarted
 
-    - name: Install restic
-      ansible.builtin.apk:
-        name: restic
-        state: present
-
-    - name: Check if resticprofile is installed
-      ansible.builtin.stat:
-        path: /usr/local/bin/resticprofile
-      register: resticprofile_installed
-
-    - name: Install resticprofile
-      block:
-        - name: Curl resticprofile
-          ansible.builtin.get_url:
-            url: https://raw.githubusercontent.com/creativeprojects/resticprofile/master/install.sh
-            dest: /tmp/resticprofile.sh
-            mode: 'u+x'
-
-        - name: Compile resticprofile
-          ansible.builtin.command:
-            cmd: /tmp/resticprofile.sh -b /usr/local/bin
-            creates: /usr/local/bin/resticprofile
-      when: not resticprofile_installed.stat.exists
-    - name: Create resticprofile configuration directory
-      ansible.builtin.file:
-        path: /etc/resticprofile
-        state: directory
-        mode: '0700'
-    - name: Copy resticprofile configuration
-      ansible.builtin.template:
-        src: ../../../configs/backup/resticprofile/borg-to-linode-s3.yaml.j2
-        dest: /etc/resticprofile/profiles.yaml
-        mode: '0600'
-    - name: Copy resticprofile password file
-      ansible.builtin.copy:
-        src: ../../../secrets/backup/resticprofile/restic-password.txt
-        dest: /etc/resticprofile/restic-password.txt
-    - name: Init restic repositories if they don't already exist
-      ansible.builtin.command: resticprofile {{ item }}.init
-      with_items: "{{ repositories }}"
-      ignore_errors: true
-      register: restic_init
-    - name: Check for errors in restic init
-      ansible.builtin.fail:
-        msg: "Error initializing restic repository"
-      when: item.rc != 0 and not ("repository master key and config already initialized" in item.stderr)
-      with_items: "{{ restic_init.results }}"
-    - name: Schedule restic backups
-      ansible.builtin.command: resticprofile {{ item }}.schedule
-      with_items: "{{ repositories }}"
-    - name: Install fuse (for restic mount)
-      ansible.builtin.apk:
-        name: fuse
-        state: present
-
-    - name: Install borg + borgmatic
-      ansible.builtin.apk:
-        name: [ borgbackup, borgmatic ]
-        state: present
     - name: Create backup group
       ansible.builtin.group:
         name: backup
@@ -130,6 +71,92 @@
         owner: backup
         group: backup
         mode: '0700'
+    - name: Create backup crontab entry
+      ansible.builtin.file:
+        path: /var/spool/cron/crontabs/backup
+        state: touch
+        owner: backup
+        group: backup
+        mode: '0600'
+
+    - name: Install restic
+      ansible.builtin.apk:
+        name: restic
+        state: present
+    - name: Install fuse (for restic mount)
+      ansible.builtin.apk:
+        name: fuse
+        state: present
+    - name: Check if resticprofile is installed
+      ansible.builtin.stat:
+        path: /usr/local/bin/resticprofile
+      register: resticprofile_installed
+    - name: Install resticprofile
+      block:
+        - name: Curl resticprofile
+          ansible.builtin.get_url:
+            url: https://raw.githubusercontent.com/creativeprojects/resticprofile/master/install.sh
+            dest: /tmp/resticprofile.sh
+            mode: 'u+x'
+
+        - name: Compile resticprofile
+          ansible.builtin.command:
+            cmd: /tmp/resticprofile.sh -b /usr/local/bin
+            creates: /usr/local/bin/resticprofile
+      when: not resticprofile_installed.stat.exists
+
+    - name: Create resticprofile configuration directory
+      ansible.builtin.file:
+        path: /home/backup/.config/resticprofile
+        state: directory
+        owner: backup
+        group: backup
+        mode: '0700'
+    - name: Copy resticprofile configuration
+      ansible.builtin.template:
+        src: ../../../configs/backup/resticprofile/borg-to-linode-s3.yaml.j2
+        dest: /home/backup/.config/resticprofile/profiles.yaml
+        mode: '0600'
+        owner: backup
+        group: backup
+    - name: Copy resticprofile password file
+      ansible.builtin.copy:
+        src: ../../../secrets/backup/resticprofile/restic-password.txt
+        dest: /home/backup/.config/resticprofile/restic-password.txt
+        mode: '0400'
+        owner: backup
+        group: backup
+    - name: Init restic repositories if they don't already exist
+      ansible.builtin.command: resticprofile {{ item }}.init
+      with_items: "{{ repositories }}"
+      ignore_errors: true
+      register: restic_init
+      become: true
+      become_user: backup
+      become_method: su
+      become_flags: '-s /bin/sh'
+    - name: Check for errors in restic init
+      ansible.builtin.fail:
+        msg: "Error initializing restic repository"
+      when: item.rc != 0 and not ("repository master key and config already initialized" in item.stderr)
+      with_items: "{{ restic_init.results }}"
+      become: true
+      become_user: backup
+      become_method: su
+      become_flags: '-s /bin/sh'
+    - name: Schedule restic backups
+      ansible.builtin.command: resticprofile {{ item }}.schedule
+      with_items: "{{ repositories }}"
+      become: true
+      become_user: backup
+      become_method: su
+      become_flags: '-s /bin/sh'
+      
+
+    - name: Install borg + borgmatic
+      ansible.builtin.apk:
+        name: [ borgbackup, borgmatic ]
+        state: present
     - name: Create directory for backup repositories
       ansible.builtin.file:
         path: "{{ repositories_dir }}"

@@ -4,7 +4,7 @@ global:
 {% for repository_name in repositories %}
 {{ repository_name }}:
   repository: s3:eu-central-1.linodeobjects.com/homelab-borg-backups/{{ repository_name }}
-  password-file: /etc/resticprofile/restic-password.txt
+  password-file: /home/backup/.config/resticprofile/restic-password.txt
   env:
     AWS_ACCESS_KEY_ID: {{ linode_access_key }}
     AWS_SECRET_ACCESS_KEY: {{ linode_secret_key }}

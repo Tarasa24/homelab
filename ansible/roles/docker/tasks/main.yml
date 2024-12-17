@@ -1,6 +1,6 @@
 ---
 - name: Install Docker
-  ansible.builtin.apk:
+  community.general.apk:
     name: [docker, docker-compose]
     state: present
     update_cache: true
