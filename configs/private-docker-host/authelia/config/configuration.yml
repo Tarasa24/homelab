@@ -82,3 +82,17 @@ identity_providers:
           - "groups"
         userinfo_signed_response_alg: "none"
         token_endpoint_auth_method: "client_secret_post"
+      - client_id: "immich"
+        client_name: "Immich"
+        client_secret: "$$pbkdf2-sha512$$310000$$gdeg58hplH4CYWDtpg8z3A$$jviQMBc2GuzKQ9ophWQqxvNTa6aAvWdz6EiIVKgYvkD.TbbfLK4FLk989c1VgznxZnm0dP9w6ZDeztbk5qOM5A"
+        public: false
+        authorization_policy: "one_factor"
+        redirect_uris:
+          - "app.immich:///oauth-callback"
+          - "https://immich.homelab.tarasa24.dev/auth/login"
+          - "https://immich.homelab.tarasa24.dev/user-settings"
+        scopes:
+          - "openid"
+          - "profile"
+          - "email"
+        userinfo_signed_response_alg: "none"
