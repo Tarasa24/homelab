@@ -2,6 +2,7 @@ location:
     source_directories:
         - /var/lib/docker/volumes/root_jellyfin_config/_data
         - /var/lib/docker/volumes/root_radicale_data/_data
+        - /var/lib/docker/volumes/root_immich_database/_data
     repositories:
         - ssh://backup@10.0.1.3/backup/repos/dmz_docker-host
 
@@ -27,6 +28,8 @@ hooks:
     before_backup:
         - "cd /root && docker-compose stop jellyfin"
         - "cd /root && docker-compose stop radicale"
+        - "cd /root && docker-compose stop immich-database"
     after_backup:
         - "cd /root && docker-compose up -d jellyfin"
         - "cd /root && docker-compose up -d radicale"
+        - "cd /root && docker-compose up -d immich-database"

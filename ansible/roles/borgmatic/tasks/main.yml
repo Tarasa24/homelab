@@ -36,6 +36,12 @@
     msg: "borgmatic extract failed"
   when: borgmatic_extract.rc != 0 and "No archives found in the repository" not in borgmatic_extract.stderr
 
+- name: Copy over borgmatic configuration (again since extract might have overwritten it)
+  ansible.builtin.copy:
+    src: ../../../configs/backup/borg/{{ ansible_hostname }}.yaml
+    dest: /etc/borgmatic/config.yaml
+    mode: 0644 
+
 - name: Extract source_directories from borgmatic configuration and export from the role
   ansible.builtin.shell: "yq '.location.source_directories[]' /etc/borgmatic/config.yaml"
   register: source_directories

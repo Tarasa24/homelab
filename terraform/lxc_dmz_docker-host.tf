@@ -74,6 +74,12 @@ resource "proxmox_virtual_environment_container" "lxc_dmz-docker-host" {
     shared = true
   }
 
+  mount_point {
+    volume = "/mnt/USB-HDD/immich"
+    path   = "/immich"
+    shared = true
+  }
+
   disk {
     datastore_id = "local-lvm"
     size         = 10
