@@ -16,7 +16,7 @@ resource "proxmox_virtual_environment_container" "lxc_dmz-docker-host" {
   }
 
   cpu {
-    cores = 2
+    cores = 4
   }
 
   initialization {
