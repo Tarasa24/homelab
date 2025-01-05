@@ -145,12 +145,13 @@
             src: ../../../configs/dmz_router/nginx/
             dest: /etc/nginx/
             mode: "0644"
-        - name: Ensure correct permission for /var/lib/nginx
+        - name: Ensure correct permission for /var/lib/nginx (recursive)
           ansible.builtin.file:
             path: /var/lib/nginx
             state: directory
             owner: www
             group: www
+            recurse: true
         - name: Stop nginx
           ansible.builtin.service:
             name: nginx
