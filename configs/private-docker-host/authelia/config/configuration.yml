@@ -96,3 +96,16 @@ identity_providers:
           - "profile"
           - "email"
         userinfo_signed_response_alg: "none"
+      - client_id: "mealie"
+        client_name: "Mealie"
+        client_secret: "$$pbkdf2-sha512$$310000$$GZaxsuC.p.gx3uaRLoVnrg$$2DOTSoxbkBoxEoFJ6.cuXTLSaR12L.p05GVAsUEx4OXR3T9llRbLLqgbROe.TJrCt67t93f9tZcJ0anTf79PTQ"
+        public: false
+        authorization_policy: "one_factor"
+        redirect_uris:
+          - "https://mealie.lan.tarasa24.dev/login"
+          - "https://mealie.lan.tarasa24.dev/login?direct=1"
+        scopes:
+         - "openid"
+         - "profile"
+         - "email"
+        userinfo_signed_response_alg: "none"
