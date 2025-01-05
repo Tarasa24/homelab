@@ -168,15 +168,4 @@ resource "proxmox_virtual_environment_firewall_rules" "lxc_dmz_router" {
     proto   = "tcp"
     dest    = "10.0.1.21/32"
   }
-
-  rule {
-    type    = "out"
-    action  = "ACCEPT"
-    comment = "Allow output traffic tubearchivist (jellyfin api access)"
-    iface   = "net0"
-    dport   = 8000
-    proto   = "tcp"
-    dest    = "10.0.1.23/32"
-    source  = "10.1.0.21/32"
-  }
 }
