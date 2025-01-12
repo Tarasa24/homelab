@@ -80,6 +80,21 @@ resource "proxmox_virtual_environment_container" "lxc_dmz-docker-host" {
     shared = true
   }
 
+  device_passthrough {
+    deny_write = false
+    gid        = 44
+    mode       = "0777"
+    path       = "/dev/dri/card0"
+    uid        = 0
+  }
+  device_passthrough {
+    deny_write = false
+    gid        = 104
+    mode       = "0777"
+    path       = "/dev/dri/renderD128"
+    uid        = 0
+  }
+
   disk {
     datastore_id = "local-lvm"
     size         = 10
