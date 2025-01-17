@@ -13,6 +13,10 @@ services:
      - "traefik.http.routers.vaultwarden.entrypoints=https"
      - "traefik.http.routers.vaultwarden.tls=true"
      - "traefik.http.routers.vaultwarden.middlewares=hsts@file"
+    environment:
+      DOMAIN: "https://vaultwarden.lan.tarasa24.dev"
+      SIGNUPS_ALLOWED: "false"
+      ADMIN_TOKEN: "$$argon2id$$v=19$$m=65540,t=3,p=4$$a0R3L2t5VjI4aWJoeDZSQk5JYllPYXFRcjNqay9TMUZyc0ZZaUxxTE5yaz0$$x4MxuzDz0z1dmIaWrHP4dh7cav9xjVOb5lbF6jLYxfc"
 
 volumes:
   vaultwarden-data:
