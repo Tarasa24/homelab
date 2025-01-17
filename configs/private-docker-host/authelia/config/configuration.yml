@@ -69,7 +69,7 @@ identity_providers:
     clients:
       - client_id: "jellyfin"
         client_name: "Jellyfin"
-        client_secret: "$$pbkdf2-sha512$$310000$$M1o6uYU/oOYaj29otbR3Xg$$vM91QqHObirMXp8D9vVvGN/2iAnuEM72wow6KI7m4XwnsNTL9qJaTWr5bN8AF0jPxdYZp2AcslK9EVnInJsKNA"
+        client_secret: "$$pbkdf2-sha512$$310000$$HT4XYxFi0TCQXKZXpsO.Wg$$GwT9khsBbLynH80KK9niS1NRO8kol9aId/q1vrksXeX4f7esYzk6f5tmPCDY2bFjeWu9eLWlwkfJsPT1Piy5OA"
         public: false
         authorization_policy: "one_factor"
         require_pkce: true
