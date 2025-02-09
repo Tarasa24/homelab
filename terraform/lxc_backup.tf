@@ -22,7 +22,7 @@ resource "proxmox_virtual_environment_container" "lxc_backup" {
     }
 
     dns {
-      domain = " "
+      domain  = " "
       servers = ["1.1.1.1", "8.8.8.8"]
     }
 
@@ -48,6 +48,12 @@ resource "proxmox_virtual_environment_container" "lxc_backup" {
   mount_point {
     volume = "/mnt/USB-SSD/backup"
     path   = "/backup"
+  }
+
+  mount_point {
+    volume = "/mnt/USB-HDD/immich"
+    path   = "/immich"
+    shared = true
   }
 }
 

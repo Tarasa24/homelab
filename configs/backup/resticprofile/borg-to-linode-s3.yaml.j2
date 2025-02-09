@@ -1,6 +1,3 @@
-global:
-  scheduler: crond
-
 {% for repository_name in repositories %}
 {{ repository_name }}:
   repository: s3:eu-central-1.linodeobjects.com/homelab-borg-backups/{{ repository_name }}

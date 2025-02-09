@@ -1,0 +1,29 @@
+immich-media:
+  repository: s3:eu-central-1.linodeobjects.com/homelab-immich-media-backups
+  password-file: /home/backup/.config/resticprofile/restic-password.txt
+  env:
+    AWS_ACCESS_KEY_ID: {{ linode_access_key }}
+    AWS_SECRET_ACCESS_KEY: {{ linode_secret_key }}
+
+  retention:
+    after-backup: true
+    keep-last: 7        # Keep the last 7 snapshots
+    keep-daily: 7       # Keep 1 daily snapshot for the last 7 days
+    keep-weekly: 4      # Keep 1 weekly snapshot for the last 4 weeks
+    keep-monthly: 6     # Keep 1 monthly snapshot for the last 6 months
+
+  backup:
+    schedule: "04:00" # Daily at 4:00am
+    schedule-permission: user
+    schedule-lock-wait: 10m
+    exclude-caches: true
+    source:
+      - /immich/library
+      - /immich/upload
+      - /immich/profile
+      - /immich/backups # Just to be sure, keep the automatic backups as well
+
+  prune:
+    schedule: "sun 4:30" # Weekly on Sunday at 4:30am
+    schedule-permission: user
+    schedule-lock-wait: 1h

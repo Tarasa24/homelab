@@ -9,6 +9,10 @@
     repositories_dir: /backup/repos
     linode_access_key: "{{ lookup('file', '../../../secrets/backup/resticprofile/access_key') }}"
     linode_secret_key: "{{ lookup('file', '../../../secrets/backup/resticprofile/secret_key') }}"
+    resticprofile_configurations:
+      - global
+      - borg-to-linode-s3
+      - immich-media-to-linode-s3
   roles:
     - role: lxc_python3
 
@@ -112,13 +116,22 @@
         owner: backup
         group: backup
         mode: '0700'
-    - name: Copy resticprofile configuration
+    - name: Clean up resticprofile configurations
+      ansible.builtin.command: rm -f /home/backup/.config/resticprofile/profiles.yaml
+    - name: Copy resticprofile configurations
       ansible.builtin.template:
-        src: ../../../configs/backup/resticprofile/borg-to-linode-s3.yaml.j2
-        dest: /home/backup/.config/resticprofile/profiles.yaml
+        src: ../../../configs/backup/resticprofile/{{ item }}.yaml.j2
+        dest: /tmp/{{ item }}.yaml
         mode: '0600'
         owner: backup
         group: backup
+      with_items: "{{ resticprofile_configurations }}"
+    - name: Concat resticprofile configurations
+      ansible.builtin.shell: cat /tmp/{{ item }}.yaml >> /home/backup/.config/resticprofile/profiles.yaml
+      with_items: "{{ resticprofile_configurations }}"
+      become_user: backup
+      become_method: su
+      become_flags: '-s /bin/sh'
     - name: Copy resticprofile password file
       ansible.builtin.copy:
         src: ../../../secrets/backup/resticprofile/restic-password.txt
@@ -128,7 +141,7 @@
         group: backup
     - name: Init restic repositories if they don't already exist
       ansible.builtin.command: resticprofile {{ item }}.init
-      with_items: "{{ repositories }}"
+      with_items: "{{ repositories + ['immich-media'] }}"
       ignore_errors: true
       register: restic_init
       become: true
@@ -146,7 +159,7 @@
       become_flags: '-s /bin/sh'
     - name: Schedule restic backups
       ansible.builtin.command: resticprofile {{ item }}.schedule
-      with_items: "{{ repositories }}"
+      with_items: "{{ repositories + ['immich-media'] }}"
       become: true
       become_user: backup
       become_method: su
