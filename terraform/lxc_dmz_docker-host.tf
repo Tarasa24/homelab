@@ -23,7 +23,7 @@ resource "proxmox_virtual_environment_container" "lxc_dmz-docker-host" {
     hostname = "dmz-docker-host"
 
     dns {
-      domain = " "
+      domain  = " "
       servers = ["1.1.1.1", "8.8.8.8"] # split("/", var.dmz_router_lan_ip.address)[0]
     }
 
@@ -81,18 +81,12 @@ resource "proxmox_virtual_environment_container" "lxc_dmz-docker-host" {
   }
 
   device_passthrough {
-    deny_write = false
-    gid        = 44
-    mode       = "0777"
-    path       = "/dev/dri/card0"
-    uid        = 0
+    path = "/dev/dri/card0"
+    mode = "0777"
   }
   device_passthrough {
-    deny_write = false
-    gid        = 104
-    mode       = "0777"
-    path       = "/dev/dri/renderD128"
-    uid        = 0
+    path = "/dev/dri/renderD128"
+    mode = "0777"
   }
 
   disk {
