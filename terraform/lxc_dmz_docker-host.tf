@@ -102,7 +102,7 @@ variable "dmz-docker-host_ip" {
   })
 
   default = {
-    address = "10.1.0.20/22"
+    address = "10.1.0.20/24"
     gateway = "10.1.0.1"
   }
 }
