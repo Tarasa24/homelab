@@ -68,10 +68,3 @@ variable "nixos_template_ip" {
     gateway = "10.0.0.1"
   }
 }
-
-resource "proxmox_virtual_environment_download_file" "nixos_template" {
-  content_type = "vztmpl"
-  datastore_id = "USB-HDD"
-  node_name    = "pve"
-  url          = "https://hydra.nixos.org/build/280671319/download/1/nixos-system-x86_64-linux.tar.xz"
-}

@@ -1,0 +1,94 @@
+---
+- name: Configure bitcoin node
+  hosts: lxc_dmz_bitcoin_node
+  gather_facts: true
+  vars:
+    ansible_host: "{{ hostvars[inventory_hostname].ansible_host }}"
+    lxc_host: "{{ hostvars[inventory_hostname].lxc_host }}"
+  roles:
+    - role: lxc_python3
+    # - role: borgmatic
+
+  tasks:
+    - name: Install dependencies
+      ansible.builtin.apt:
+        pkg: [apt-transport-https, build-essential, clang, cmake, curl, git, gnupg, sudo, cargo]
+        update_cache: yes
+      retries: 3
+
+    - name: Copy over service files
+      ansible.builtin.copy:
+        src: ../../../configs/dmz_bitcoin-node/{{ item }}
+        dest: /etc/systemd/system/{{ item }}
+        mode: 0644
+      with_items:
+        - bitcoind.service
+        - electrs.service
+
+    - name: Create bitcoin group
+      ansible.builtin.group:
+        name: bitcoin
+        state: present
+
+    - name: Create bitcoin user
+      ansible.builtin.user:
+        name: bitcoin
+        group: bitcoin
+        state: present
+        shell: /bin/bash
+        home: /home/bitcoin
+
+    - name: Install bitcoin core
+      block:
+        - name: Set bitcoin version
+          set_fact:
+            bitcoin_version: "28.1"
+            arch: "x86_64-linux-gnu"
+        - name: Download bitcoin core
+          ansible.builtin.get_url:
+            url: "https://bitcoincore.org/bin/bitcoin-core-{{ bitcoin_version }}/bitcoin-{{ bitcoin_version }}-{{ arch }}.tar.gz"
+            dest: /tmp/bitcoin-{{ bitcoin_version }}-{{ arch }}.tar.gz
+        - name: Download sums
+          ansible.builtin.get_url:
+            url: "https://bitcoincore.org/bin/bitcoin-core-{{ bitcoin_version }}/SHA256SUMS"
+            dest: /tmp/SHA256SUMS
+        - name: Download sums signature
+          ansible.builtin.get_url:
+            url: "https://bitcoincore.org/bin/bitcoin-core-{{ bitcoin_version }}/SHA256SUMS.asc"
+            dest: /tmp/SHA256SUMS.asc
+        - name: Clone bitcoin core keys
+          ansible.builtin.git:
+            repo: "https://github.com/bitcoin-core/guix.sigs.git"
+            dest: /tmp/guix.sigs
+        - name: Import bitcoin core keys
+          ansible.builtin.shell: "gpg --import /tmp/guix.sigs/builder-keys/*"
+          args:
+            executable: /bin/bash
+        - name: Verify sums signatures
+          ansible.builtin.command: "gpg --verify /tmp/SHA256SUMS.asc /tmp/SHA256SUMS"
+        - name: Verify sums
+          ansible.builtin.command:
+            cmd: "sha256sum --check --ignore-missing SHA256SUMS"
+            chdir: /tmp
+        - name: Extract bitcoin core
+          ansible.builtin.command:
+            cmd: "tar -vxzf /tmp/bitcoin-{{ bitcoin_version }}-{{ arch }}.tar.gz"
+            chdir: /tmp
+        - name: Install bitcoin core
+          ansible.builtin.shell: "cp -r /tmp/bitcoin-{{ bitcoin_version }}/bin/{bitcoin-cli,bitcoind} /usr/bin/"
+          args:
+            executable: /bin/bash
+        - name: Create bitcoin config directory
+          ansible.builtin.file:
+            dest: /etc/bitcoin
+            state: directory
+            mode: "0710"
+        - name: Copy over bitcoin config
+          ansible.builtin.copy:
+            src: ../../../configs/dmz_bitcoin-node/bitcoin.conf
+            dest: /etc/bitcoin/bitcoin.conf
+        - name: Enable bitcoin service
+          ansible.builtin.systemd:
+            name: bitcoind
+            enabled: yes
+            state: started
