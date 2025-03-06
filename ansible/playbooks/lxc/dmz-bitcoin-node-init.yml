@@ -38,7 +38,15 @@
         shell: /bin/bash
         home: /home/bitcoin
 
+    - name: Check if bitcoind and bitcoin-cli are installed
+      ansible.builtin.command: "which {{ item }}"
+      loop:
+        - bitcoind
+        - bitcoin-cli
+      register: bitcoind_installed
+      ignore_errors: yes
     - name: Install bitcoin core
+      when: bitcoind_installed.results | selectattr('rc', 'ne', 0) | list | length > 0
       block:
         - name: Set bitcoin version
           set_fact:
@@ -87,8 +95,35 @@
           ansible.builtin.copy:
             src: ../../../configs/dmz_bitcoin-node/bitcoin.conf
             dest: /etc/bitcoin/bitcoin.conf
-        - name: Enable bitcoin service
-          ansible.builtin.systemd:
-            name: bitcoind
-            enabled: yes
-            state: started
+
+    - name: Check if electrs is installed
+      ansible.builtin.command: "which electrs"
+      register: electrs_installed
+      ignore_errors: yes
+    - name: Install electrs
+      when: electrs_installed.rc != 0
+      block:
+        - name: Clone electrs
+          ansible.builtin.git:
+            repo: "https://github.com/romanz/electrs.git"
+            dest: /tmp/electrs
+        - name: Build electrs
+          ansible.builtin.shell: "cargo build --release -j $(nproc)"
+          args:
+            chdir: /tmp/electrs
+            executable: /bin/bash
+        - name: Install electrs
+          ansible.builtin.shell: "cp /tmp/electrs/target/release/electrs /usr/bin/"
+          args:
+            executable: /bin/bash
+
+    - name: Enable bitcoin service
+      ansible.builtin.systemd:
+        name: bitcoind
+        enabled: yes
+        state: started
+    - name: Enable electrs service
+      ansible.builtin.systemd:
+        name: electrs
+        enabled: yes
+        state: started

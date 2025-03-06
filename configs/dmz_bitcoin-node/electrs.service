@@ -5,8 +5,8 @@ After=bitcoind.service
 Wants=bitcoind.service
 
 [Service]
-ExecStart=/usr/bin/electrs --db-dir /var/lib/electrs \
-                           --cookie-file /var/lib/bitcoind/.cookie \
+ExecStart=/usr/bin/electrs --db-dir /mnt/usb-bitcoin/electrs \
+                           --cookie-file /mnt/usb-bitcoin/bitcoind/.cookie \
                            --electrum-rpc-addr="127.0.0.1:50001" \
                            --log-filters INFO
 
@@ -23,10 +23,6 @@ TimeoutSec=60
 # Run as bitcoin:bitcoin
 User=bitcoin
 Group=bitcoin
-
-# /var/lib/electrs
-StateDirectory=electrs
-StateDirectoryMode=0710
 
 [Install]
 WantedBy=multi-user.target
