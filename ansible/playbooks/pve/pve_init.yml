@@ -5,7 +5,8 @@
     disks: {
       "USB-HDD": "/dev/disk/by-uuid/d10e88e6-9a20-4d5f-972f-c432c26f9019",
       "USB-SSD": "/dev/disk/by-uuid/c06ebfa7-0bf3-4751-87c4-19c5f0c3515f",
-      "USB-BITCOIN": "/dev/disk/by-uuid/475ebfe4-0fc7-4770-990e-cba43a90d7b0"
+      "USB-BITCOIN": "/dev/disk/by-uuid/fcadd3af-add3-4a92-a1d7-6abe1b265abf",
+      "USB-BITCOIN-APPS": "/dev/disk/by-uuid/9fa5a1fb-a536-41c0-be36-1a55edb84737",
     }
     storage: {
       "USB-HDD": {
@@ -37,9 +38,9 @@
       ansible.builtin.mount:
         name: "/mnt/{{ item.key }}"
         src: "{{ item.value }}"
-        fstype: ext4
+        fstype: "{% if item.key == 'USB-BITCOIN' %}xfs{% else %}ext4{% endif %}"
         state: present
-        opts: defaults
+        opts: "noatime,nodiratime,nofail,{% if item.key == 'USB-BITCOIN' %}logbufs=8,logbsize=256k,allocsize=64m{% else %}data=journal,commit=30{% endif %}"
       with_dict: "{{ disks }}"
       notify: reload systemd
     - name: Run mount -a

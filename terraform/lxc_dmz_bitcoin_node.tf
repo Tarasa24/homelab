@@ -62,7 +62,12 @@ resource "proxmox_virtual_environment_container" "lxc_dmz_bitcoin_node" {
 
   mount_point {
     volume    = "/mnt/USB-BITCOIN"
-    path      = "/mnt/usb-bitcoin"
+    path      = "/mnt/bitcoin"
+  }
+
+  mount_point {
+    volume    = "/mnt/USB-BITCOIN-APPS"
+    path      = "/mnt/bitcoin-apps"
   }
 
   provisioner "local-exec" {

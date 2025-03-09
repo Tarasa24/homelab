@@ -5,8 +5,8 @@ After=bitcoind.service
 Wants=bitcoind.service
 
 [Service]
-ExecStart=/usr/bin/electrs --db-dir /mnt/usb-bitcoin/electrs \
-                           --cookie-file /mnt/usb-bitcoin/bitcoind/.cookie \
+ExecStart=/usr/bin/electrs --db-dir /mnt/bitcoin-apps/electrs \
+                           --cookie-file /mnt/bitcoin/.cookie \
                            --electrum-rpc-addr="127.0.0.1:50001" \
                            --log-filters INFO
 
