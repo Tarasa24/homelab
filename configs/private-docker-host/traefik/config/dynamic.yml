@@ -16,3 +16,53 @@ http:
           Strict-Transport-Security: max-age=31536000
         customResponseHeaders:
           Strict-Transport-Security: max-age=31536000
+  routers:
+    prowlarr:
+      rule: Host(`prowlarr.lan.tarasa24.dev`)
+      entrypoints:
+        - https
+      tls: true
+      service: prowlarr
+      middlewares:
+        - hsts
+    sonarr:
+      rule: Host(`sonarr.lan.tarasa24.dev`)
+      entrypoints:
+        - https
+      tls: true
+      service: sonarr
+      middlewares:
+        - hsts
+    bazarr:
+      rule: Host(`bazarr.lan.tarasa24.dev`)
+      entrypoints:
+        - https
+      tls: true
+      service: bazarr
+      middlewares:
+        - hsts
+    qbittorrent:
+      rule: Host(`qbittorrent.lan.tarasa24.dev`)
+      entrypoints:
+        - https
+      tls: true
+      service: qbittorrent
+      middlewares:
+        - hsts
+  services:
+    prowlarr:
+      loadBalancer:
+        servers:
+          - url: http://10.0.1.23:9696
+    sonarr:
+      loadBalancer:
+        servers:
+          - url: http://10.0.1.23:8989
+    bazarr:
+      loadBalancer:
+        servers:
+          - url: http://10.0.1.23:6767
+    qbittorrent:
+      loadBalancer:
+        servers:
+          - url: http://10.0.1.23:8080

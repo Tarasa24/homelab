@@ -17,6 +17,10 @@
       "10.0.1.29",
       "10.0.1.30"
     ]
+  pre_tasks:
+    - name: Safely stop and remove existing containers
+      shell: docker compose down || true
+      ignore_errors: yes
   roles:
     - role: lxc_python3
     - role: docker

@@ -19,3 +19,4 @@ services:
       - "/etc/letsencrypt/live/*.lan.tarasa24.dev/fullchain.pem:/certs/fullchain.pem:ro"
       - "/etc/letsencrypt/live/*.lan.tarasa24.dev/privkey.pem:/certs/privkey.pem:ro"
       - "./traefik/config/dynamic.yml:/etc/traefik/dynamic.yml:ro"
+    restart: unless-stopped
