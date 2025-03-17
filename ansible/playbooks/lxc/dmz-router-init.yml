@@ -129,7 +129,7 @@
       block:
         - name: Install nginx
           ansible.builtin.package:
-            name: nginx
+            name: [nginx, nginx-mod-stream]
             state: present
         - name: Create www group
           ansible.builtin.group:
