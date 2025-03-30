@@ -29,4 +29,4 @@
   ignore_errors: true
 
 - include_tasks: install_python3.yml
-  when: python3_version.stdout_lines is not search('Python 3')
+  when: python3_version.stdout_lines is not defined or python3_version.stdout_lines is not search('Python 3')

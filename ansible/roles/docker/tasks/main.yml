@@ -4,6 +4,7 @@
     name: [docker, docker-compose]
     state: present
     update_cache: true
+  retries: 3
 
 - name: Start Docker
   ansible.builtin.service:
