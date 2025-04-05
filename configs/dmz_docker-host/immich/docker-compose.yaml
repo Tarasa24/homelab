@@ -28,6 +28,9 @@ services:
       - immich-database
     restart: always
     user: 1000:1000
+    devices:
+      - /dev/dri/card0:/dev/dri/card0
+      - /dev/dri/renderD128:/dev/dri/renderD128
     healthcheck:
       disable: false
     networks:
