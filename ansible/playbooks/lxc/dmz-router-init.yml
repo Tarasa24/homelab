@@ -164,3 +164,13 @@
             name: nginx
             state: started
             enabled: true
+
+    - name: Make sure staticroute is enabled
+      ansible.builtin.command: rc-update add staticroute
+    - name: Create /etc/conf.d/staticroute
+      ansible.builtin.copy:
+        dest: /etc/conf.d/staticroute
+        content: staticroute="net 100.64.0.0 netmask 255.192.0.0 gw 10.1.0.100"
+        mode: "0644"
+    - name: Start staticroute
+      ansible.builtin.command: rc-service staticroute start

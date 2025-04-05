@@ -1,0 +1,68 @@
+---
+- name: Configure dns
+  hosts: lxc_dns
+  gather_facts: false
+  vars:
+    ansible_host: "{{ hostvars[inventory_hostname].ansible_host }}"
+    lxc_host: "{{ hostvars[inventory_hostname].lxc_host }}"
+  roles:
+    - role: lxc_python3
+
+  tasks:
+    - name: Remove existing technitium dns
+      ansible.builtin.command:
+        cmd: rm -rf /opt/technitium-dns && rm -rf /tmp/DnsServerPortable.tar.gz
+
+    - name: Install ASP.NET Core 8 runtime
+      ansible.builtin.apk:
+        name: aspnetcore-runtime-8.0
+        state: present
+
+    - name: Download technitium dns
+      ansible.builtin.command:
+        cmd: wget https://download.technitium.com/dns/DnsServerPortable.tar.gz
+        chdir: /tmp
+    - name: Create technitium dns directory
+      ansible.builtin.file:
+        path: /opt/technitium-dns
+        state: directory
+        mode: '0755'
+        owner: root
+        group: root
+    - name: Extract technitium dns
+      ansible.builtin.command:
+        cmd: tar -xzf DnsServerPortable.tar.gz -C /opt/technitium-dns
+        chdir: /tmp
+
+    - name: Create technitium dns service
+      ansible.builtin.copy:
+        dest: /etc/init.d/technitium-dns
+        content: |
+          #!/sbin/openrc-run
+
+          name="Technitium DNS Server"
+          description="Technitium DNS as an Alpine Service"
+
+          directory="/opt/technitium-dns"
+          command="/opt/technitium-dns/start.sh"
+          command_user="root"
+          pidfile="/var/run/technitium-dns.pid"
+          
+
+          depend() {
+              need net
+          }
+
+          start_pre() {
+              checkpath -d -m 0755 -o root:root /opt/technitium-dns
+          }
+
+    - name: Make service executable
+      ansible.builtin.command:
+        cmd: chmod +x /etc/init.d/technitium-dns
+    - name: Register technitium dns service
+      ansible.builtin.command:
+        cmd: rc-update add technitium-dns default
+    - name: Start technitium dns service
+      ansible.builtin.command:
+        cmd: rc-service technitium-dns start

@@ -164,4 +164,12 @@ resource "proxmox_virtual_environment_firewall_rules" "lxc_dmz_router" {
     proto   = "tcp"
     dest    = "10.0.1.21/32"
   }
+
+  rule {
+    type    = "in"
+    action  = "ACCEPT"
+    comment = "Allow input traffic from local network"
+    iface   = "net0"
+    source  = "10.0.0.0/22"
+  }
 }
