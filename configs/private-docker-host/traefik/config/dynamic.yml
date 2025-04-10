@@ -33,6 +33,14 @@ http:
       service: sonarr
       middlewares:
         - hsts
+    radarr:
+      rule: Host(`radarr.lan.tarasa24.dev`)
+      entrypoints:
+        - https
+      tls: true
+      service: radarr
+      middlewares:
+        - hsts
     bazarr:
       rule: Host(`bazarr.lan.tarasa24.dev`)
       entrypoints:
@@ -58,6 +66,10 @@ http:
       loadBalancer:
         servers:
           - url: http://10.0.1.23:8989
+    radarr:
+      loadBalancer:
+        servers:
+          - url: http://10.0.1.23:7878
     bazarr:
       loadBalancer:
         servers:
