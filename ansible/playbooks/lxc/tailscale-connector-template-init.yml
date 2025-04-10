@@ -1,0 +1,41 @@
+---
+- name: Configure tailscale connector template container
+  hosts: lxc_tailscale-connector_template
+  gather_facts: false
+
+  vars:
+    ansible_host: "{{ hostvars[inventory_hostname].ansible_host }}"
+    lxc_host: "{{ hostvars[inventory_hostname].lxc_host }}"
+  roles:
+    - role: lxc_python3
+
+  tasks:
+    - name: Install tailscale
+      ansible.builtin.apk:
+        name: tailscale
+        state: present
+
+    - name: Start tailscale
+      ansible.builtin.service:
+        name: tailscale
+        state: started
+        enabled: true
+
+    - name: Enable IP forwarding
+      ansible.builtin.sysctl:
+        name: net.ipv4.ip_forward
+        value: 1
+        state: present
+        reload: yes
+
+    - name: Stop the container
+      ansible.builtin.command:
+        "pct stop {{ lxc_host }}"
+      delegate_to: "{{ ansible_host }}"
+      changed_when: false
+
+    - name: Create template
+      ansible.builtin.command:
+        "pct set {{ lxc_host }} --template 1"
+      delegate_to: "{{ ansible_host }}"
+      changed_when: false

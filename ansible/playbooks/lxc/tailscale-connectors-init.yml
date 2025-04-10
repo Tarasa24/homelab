@@ -1,0 +1,33 @@
+---
+- name: Configure tailscale connectors
+  hosts: lxc_homelab-tailscale-connector lxc_dmz_tailscale-connector
+  gather_facts: false
+
+  vars:
+    auth_key: "{{ lookup('env', 'TAILSCALE_AUTH_KEY') }}"
+    advertised_routes: {
+      "homelab-tailscale-connector": "10.0.0.0/22",
+      "dmz-tailscale-connector": "10.1.0.0/24",
+    }
+
+  tasks:
+    - name: Fail if auth_key is not set
+      ansible.builtin.fail:
+        msg: "The TAILSCALE_AUTH_KEY environment variable is not set."
+      when: auth_key is not defined or auth_key == ""
+
+    - name: Stop current tailscale connector"
+      ansible.builtin.command: "tailscale down --accept-risk=lose-ssh"
+
+    - name: Start tailscale
+      ansible.builtin.command:
+        "tailscale up --authkey={{ auth_key }} --advertise-exit-node --advertise-routes={{ advertised_routes[ansible_hostname] }}"
+      register: tailscale_up
+      changed_when: tailscale_up.rc != 0
+
+    - name: Check if tailscale is running
+      ansible.builtin.command:
+        "tailscale status"
+      register: tailscale_status
+      changed_when: false
+      failed_when: tailscale_status.rc != 0
