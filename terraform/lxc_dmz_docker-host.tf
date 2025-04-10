@@ -11,8 +11,8 @@ resource "proxmox_virtual_environment_container" "lxc_dmz-docker-host" {
   ]
 
   memory {
-    dedicated = 2048
-    swap      = 2048
+    dedicated = 4096
+    swap      = 4096
   }
 
   cpu {
@@ -91,7 +91,7 @@ resource "proxmox_virtual_environment_container" "lxc_dmz-docker-host" {
 
   disk {
     datastore_id = "local-lvm"
-    size         = 10
+    size         = 20
   }
 }
 

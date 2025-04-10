@@ -56,6 +56,14 @@ resource "proxmox_virtual_environment_container" "lxc_dns" {
     datastore_id = "local-lvm"
     size         = 20
   }
+
+  provisioner "local-exec" {
+    command = <<-EOT
+      cd ../ansible && \
+      ansible-playbook \
+      ./playbooks/lxc/dns-init.yml
+    EOT
+  }
 }
 
 variable "dns_ip" {
