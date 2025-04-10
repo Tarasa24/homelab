@@ -80,10 +80,21 @@ services:
       - immich-internal
     hostname: database
 
+  immich-machine-learning:
+    container_name: immich_machine_learning
+    image: ghcr.io/immich-app/immich-machine-learning:${IMMICH_VERSION:-release}
+    volumes:
+      - model-cache:/cache
+    restart: always
+    networks:
+      - default
+      - immich-internal
+
 volumes:
   immich-database-data:
     external: true
     name: root_immich_database
+  model-cache:
 
 networks:
   default:
