@@ -16,6 +16,7 @@ services:
     volumes:
       # Do not edit the next line. If you want to change the media storage location on your system, edit the value of UPLOAD_LOCATION in the .env file
       - /immich:/usr/src/app/upload
+      - /immich/external:/external 
     environment:
       - TZ=Europe/Prague
       - DB_USERNAME=postgres
