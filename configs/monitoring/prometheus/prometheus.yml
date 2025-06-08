@@ -1,0 +1,29 @@
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+  external_labels:
+    monitor: 'monitoring'
+
+scrape_configs:
+  - job_name: 'prometheus'
+    scrape_interval: 100ms
+    static_configs:
+      - targets: ['localhost:9001']
+
+  - job_name: 'minio'
+    scrape_interval: 100ms
+    metrics_path: /minio/prometheus/metrics
+    static_configs:
+      - targets: ['minio:9000']
+
+  - job_name: 'thanos-sidecar'
+    static_configs:
+      - targets: ['thanos-sidecar:10902']
+
+  - job_name: 'thanos-query'
+    static_configs:
+      - targets: ['thanos-querier:10902']
+  
+  - job_name: 'thanos-store'
+    static_configs:
+      - targets: ['thanos-store:10902']

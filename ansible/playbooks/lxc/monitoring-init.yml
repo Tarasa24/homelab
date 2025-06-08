@@ -1,0 +1,42 @@
+---
+- name: Configure private docker host
+  hosts: lxc_monitoring
+  gather_facts: false
+  roles:
+    - role: lxc_python3
+    - role: docker
+
+  tasks:
+    - name: Try to down containers
+      shell: docker-compose down || true
+      args:
+        chdir: /root
+      ignore_errors: true
+
+    - name: Remove old configs
+      shell: rm -rf /root/*
+    - name: Copy over configs
+      copy:
+        src: "../../../configs/monitoring/"
+        dest: "/root/"
+
+    - name: Pull images
+      shell: docker-compose pull -q
+      args:
+        chdir: /root
+      timeout: 1200
+      retries: 3
+
+    - name: Create directories for persistent storage
+      ansible.builtin.file:
+        name: "{{ item }}"
+        state: directory
+      with_items:
+        - /mnt/monitoring-cold/thanos
+        - /mnt/monitoring-cold/influxdb
+        - /mnt/monitoring-cold/minio
+    
+    - name: Start containers
+      shell: docker-compose up -d
+      args:
+        chdir: /root

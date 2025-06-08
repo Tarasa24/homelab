@@ -26,6 +26,10 @@
       "/mnt/USB-SSD/downloads",
       "/mnt/USB-SSD/cache",
       "/mnt/USB-HDD/jellyfin-media",
+      "/mnt/USB-SSD/monitoring-cold",
+      "/mnt/USB-SSD/monitoring-cold/thanos",
+      "/mnt/USB-SSD/monitoring-cold/influxdb",
+      "/mnt/USB-SSD/monitoring-cold/loki"
     ]
 
   tasks:
