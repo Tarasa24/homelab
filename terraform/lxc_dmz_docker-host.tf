@@ -81,10 +81,6 @@ resource "proxmox_virtual_environment_container" "lxc_dmz-docker-host" {
   }
 
   device_passthrough {
-    path = "/dev/dri/card0"
-    mode = "0777"
-  }
-  device_passthrough {
     path = "/dev/dri/renderD128"
     mode = "0777"
   }

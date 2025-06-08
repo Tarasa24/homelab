@@ -15,7 +15,6 @@ services:
         target: /media
     restart: 'unless-stopped'
     devices:
-      - /dev/dri/card0:/dev/dri/card0
       - /dev/dri/renderD128:/dev/dri/renderD128
     environment:
       - JELLYFIN_PublishedServerUrl=https://jellyfin.homelab.tarasa24.dev
