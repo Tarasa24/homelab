@@ -167,6 +167,16 @@ resource "proxmox_virtual_environment_firewall_rules" "lxc_dmz_router" {
   }
 
   rule {
+    type    = "out"
+    action  = "ACCEPT"
+    comment = "Allow output traffic to unify controller"
+    iface   = "net0"
+    dport   = 8080
+    proto   = "tcp"
+    dest    = "10.0.1.25/32"
+  }
+
+  rule {
     type    = "in"
     action  = "ACCEPT"
     comment = "Allow input traffic from local network"
