@@ -169,7 +169,7 @@ resource "proxmox_virtual_environment_firewall_rules" "lxc_dmz_router" {
   rule {
     type    = "out"
     action  = "ACCEPT"
-    comment = "Allow output traffic to unify controller"
+    comment = "Allow output traffic to unifi controller"
     iface   = "net0"
     dport   = 8080
     proto   = "tcp"

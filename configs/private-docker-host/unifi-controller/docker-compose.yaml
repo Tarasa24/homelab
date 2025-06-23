@@ -1,12 +1,13 @@
 services:
-  unify_controler:
+  unifi-controller:
     image: lscr.io/linuxserver/unifi-network-application:latest
-    container_name: unifi-network-application
+    container_name: unifi-controller
     environment:
       - PUID=1000
       - PGID=1000
       - TZ=Etc/UTC
       - MONGO_USER=unifi
+      # - MONGO_PASS=
       - MONGO_HOST=unifi-db
       - MONGO_PORT=27017
       - MONGO_DBNAME=unifi
@@ -15,15 +16,15 @@ services:
       - MEM_STARTUP=1024 #optional
       - MONGO_TLS= #optional
     env_file:
-      - /root/unify_controller/unifi.env
+      - /root/unifi-controller/unifi.env
     volumes:
-      - unify_controler-config:/config
+      - unifi-controller-config:/config
     ports:
       - 10.0.1.25:8443:8443
       - 10.0.1.25:3478:3478/udp
       - 10.0.1.25:10001:10001/udp
       - 10.0.1.25:8080:8080
-      - 10.0.1.25:1900:1900/udp #optional
+      # - 10.0.1.25:1900:1900/udp #optional
       - 10.0.1.25:8843:8843 #optional
       - 10.0.1.25:8880:8880 #optional
       - 10.0.1.25:6789:6789 #optional
@@ -36,10 +37,8 @@ services:
       - "traefik.http.routers.unifi.entrypoints=https"
       - "traefik.http.routers.unifi.tls=true"
       - "traefik.http.routers.unifi.middlewares=hsts@file"
-      - "traefik.http.routers.unifi.service=unifi-svc"
-      - "traefik.http.services.unifi-svc.loadbalancer.server.port=8443"
-      - "traefik.http.services.unifi-svc.loadbalancer.server.scheme=https"
-      - "traefik.http.services.unifi-svc.loadbalancer.server.ssl.insecureSkipVerify=true"
+      - "traefik.http.services.unifi.loadbalancer.server.port=8443"
+      - "traefik.http.services.unifi.loadbalancer.server.scheme=https"
     restart: unless-stopped
 
   unifi-db:
@@ -47,20 +46,22 @@ services:
     container_name: unifi-db
     environment:
       - MONGO_INITDB_ROOT_USERNAME=root
+      # - MONGO_INITDB_ROOT_PASSWORD=
       - MONGO_USER=unifi
+      # - MONGO_PASS=
       - MONGO_DBNAME=unifi
       - MONGO_AUTHSOURCE=admin
     env_file:
-      - /root/unify_controller/unifi.env
+      - /root/unifi-controller/unifi.env
     volumes:
       - unifi-db:/data/db
-      - /root/unify_controller/init-mongo.sh:/docker-entrypoint-initdb.d/init-mongo.sh:ro
+      - /root/unifi-controller/init-mongo.sh:/docker-entrypoint-initdb.d/init-mongo.sh:ro
     restart: unless-stopped
 
 volumes:
-  unify_controler-config:
+  unifi-controller-config:
     external: true
-    name: root_unify_controler-config
+    name: root_unifi-controller-config
   unifi-db:
     external: true
     name: root_unifi-db
