@@ -169,10 +169,20 @@ resource "proxmox_virtual_environment_firewall_rules" "lxc_dmz_router" {
   rule {
     type    = "out"
     action  = "ACCEPT"
-    comment = "Allow output traffic to unifi controller"
+    comment = "Allow output traffic to unifi controller inform port"
     iface   = "net0"
     dport   = 8080
     proto   = "tcp"
+    dest    = "10.0.1.25/32"
+  }
+
+  rule {
+    type    = "out"
+    action  = "ACCEPT"
+    comment = "Allow output traffic to unifi controller stun port"
+    iface   = "net0"
+    dport   = 3478
+    proto   = "udp"
     dest    = "10.0.1.25/32"
   }
 
