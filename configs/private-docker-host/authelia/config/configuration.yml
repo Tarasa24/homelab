@@ -58,11 +58,8 @@ identity_providers:
   oidc:
     # hmac_secret:
     jwks:
-      - key_id: "default"
-        algorithm: "RS256"
-        use: "sig"
-        key: {{ secret "/secrets/private.pem" | mindent 10 "|" | msquote }}
-        certificate_chain: {{ secret "/secrets/public.crt" | mindent 10 "|" | msquote }}
+      - key: |
+          {{ secret "/secrets/private.pem" | mindent 10 "|" | msquote }}
 
     ## The other portions of the mandatory OpenID Connect 1.0 configuration go here.
     ## See: https://www.authelia.com/c/oidc
