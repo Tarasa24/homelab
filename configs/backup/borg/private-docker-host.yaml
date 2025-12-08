@@ -1,7 +1,5 @@
 location:
     source_directories:
-        - /var/lib/docker/volumes/root_mealie-data/_data
-
         - /var/lib/docker/volumes/root_vaultwarden-data/_data
 
         - /var/lib/docker/volumes/root_prowlarr-config/_data
@@ -35,12 +33,10 @@ consistency:
 
 hooks:
     before_backup:
-        - "cd /root && docker-compose stop mealie"
         - "cd /root && docker-compose stop vaultwarden"
         - "cd /root && docker-compose stop prowlarr sonarr radarr bazarr qbittorrent"
         - "cd /root && docker-compose stop unifi-db unifi-controller"
     after_backup:
-        - "cd /root && docker-compose up -d mealie"
         - "cd /root && docker-compose up -d vaultwarden"
         - "cd /root && docker-compose up -d prowlarr sonarr radarr bazarr qbittorrent"
         - "cd /root && docker-compose up -d unifi-db unifi-controller"
