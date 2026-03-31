@@ -93,3 +93,18 @@ identity_providers:
           - "profile"
           - "email"
         userinfo_signed_response_alg: "none"
+      - client_id: "homeassistant"
+        client_name: "Home Assistant"
+        client_secret: "$$pbkdf2-sha512$$310000$$8DbtIz6xP9WeyhGImghRNw$$0U.xwtTBwMd/kjSjZWKCyjVchdrvYpmDXm5H/db49yHompyEWF2X7Ze1sroBMtz4lMdYHfT5S0se.hOfBTED7g"
+        public: false
+        require_pkce: true
+        pkce_challenge_method: "S256"
+        authorization_policy: "one_factor"
+        redirect_uris:
+          - "https://homeassistant.lan.tarasa24.dev/auth/oidc/callback"
+        scopes:
+          - "openid"
+          - "profile"
+          - "groups"
+        id_token_signed_response_alg: "RS256"
+        token_endpoint_auth_method: "client_secret_post"

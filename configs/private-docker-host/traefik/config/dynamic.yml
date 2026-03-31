@@ -57,6 +57,14 @@ http:
       service: qbittorrent
       middlewares:
         - hsts
+    homeassistant:
+      rule: Host(`homeassistant.lan.tarasa24.dev`)
+      entrypoints:
+        - https
+      tls: true
+      service: homeassistant
+      middlewares:
+        - hsts
   services:
     prowlarr:
       loadBalancer:
@@ -78,3 +86,7 @@ http:
       loadBalancer:
         servers:
           - url: http://10.0.1.23:8080
+    homeassistant:
+      loadBalancer:
+        servers:
+          - url: http://10.0.1.5:8123
