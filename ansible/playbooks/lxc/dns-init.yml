@@ -13,9 +13,21 @@
       ansible.builtin.command:
         cmd: rm -rf /opt/technitium-dns && rm -rf /tmp/DnsServerPortable.tar.gz
 
-    - name: Install ASP.NET Core 8 runtime
+    - name: Configure edge repositories
+      copy:
+        dest: /etc/apk/repositories
+        content: |
+          https://dl-cdn.alpinelinux.org/alpine/edge/main
+          https://dl-cdn.alpinelinux.org/alpine/edge/community
+          https://dl-cdn.alpinelinux.org/alpine/edge/testing
+
+    - name: Update apk repositories
+      ansible.builtin.command:
+        cmd: apk update
+
+    - name: Install ASP.NET Core 9 runtime
       ansible.builtin.apk:
-        name: aspnetcore-runtime-8.0
+        name: aspnetcore9-runtime
         state: present
 
     - name: Download technitium dns
