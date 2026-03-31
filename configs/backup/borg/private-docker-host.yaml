@@ -8,6 +8,9 @@ location:
         - /var/lib/docker/volumes/root_bazarr-config/_data
         - /var/lib/docker/volumes/root_qbittorrent-config/_data
 
+        - /var/lib/docker/volumes/root_firefly_iii_upload/_data
+        - /var/lib/docker/volumes/root_firefly_iii_db/_data
+
         - /var/lib/docker/volumes/root_unifi-controller-config/_data
         - /var/lib/docker/volumes/root_unifi-db/_data
     repositories:
@@ -35,8 +38,10 @@ hooks:
     before_backup:
         - "cd /root && docker-compose stop vaultwarden"
         - "cd /root && docker-compose stop prowlarr sonarr radarr bazarr qbittorrent"
+        - "cd /root && docker-compose stop firefly_iii_db firefly_iii_app firefly_iii_importer firefly_iii_cron"
         - "cd /root && docker-compose stop unifi-db unifi-controller"
     after_backup:
         - "cd /root && docker-compose up -d vaultwarden"
         - "cd /root && docker-compose up -d prowlarr sonarr radarr bazarr qbittorrent"
+        - "cd /root && docker-compose up -d firefly_iii_db firefly_iii_app firefly_iii_importer firefly_iii_cron"
         - "cd /root && docker-compose up -d unifi-db unifi-controller"

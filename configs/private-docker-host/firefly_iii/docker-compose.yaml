@@ -1,0 +1,80 @@
+services:
+  firefly_iii_app:
+    image: fireflyiii/core:latest            # Uses the latest Firefly III Docker image.
+    container_name: firefly_iii_app          # Names the container for easier management.
+    hostname: app                            # Sets the hostname inside the container.
+    restart: always                          # Restarts the container automatically on failure.
+    volumes:
+      - firefly_iii_upload:/var/www/html/storage/upload  # Stores uploaded files persistently.
+    env_file:
+      - ./firefly_iii/config/.env                                 # Loads environment variables from .env file.
+    networks:
+      - firefly_iii                          # Connects to the specified Docker network.
+      - default
+    ports:
+      - "10.0.1.24:8051:8080"                # Exposes Firefly III on port 8051.
+    depends_on:
+      - firefly_iii_db                                   # Ensures the database service starts before the app.
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.firefly.rule=Host(`firefly.lan.tarasa24.dev`)"
+      - "traefik.http.routers.firefly.entrypoints=https"
+      - "traefik.http.routers.firefly.tls=true"
+      - "traefik.http.routers.firefly.middlewares=hsts@file"
+      - "traefik.http.services.firefly.loadbalancer.server.port=8080"
+
+  firefly_iii_db:
+    image: mariadb:lts                       # Uses the latest stable MariaDB image.
+    container_name: firefly_iii_db           # Names the container for easier management.
+    hostname: db                             # Sets the hostname inside the container.
+    restart: always                          # Restarts the container automatically on failure.
+    env_file:
+      - ./firefly_iii/config/.db.env                              # Loads environment variables from .db.env file.
+    networks:
+      - firefly_iii                          # Connects to the specified Docker network.
+    volumes:
+      - firefly_iii_db:/var/lib/mysql        # Stores database data persistently.
+
+  firefly_iii_importer:
+    image: fireflyiii/data-importer:latest
+    hostname: importer
+    restart: always
+    container_name: firefly_iii_importer
+    networks:
+      - firefly_iii
+      - default
+    ports:
+      - '10.0.1.24:81:8080'
+    depends_on:
+      - firefly_iii_app
+    env_file: ./firefly_iii/config/.importer.env
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.firefly-importer.rule=Host(`firefly-importer.lan.tarasa24.dev`)"
+      - "traefik.http.routers.firefly-importer.entrypoints=https"
+      - "traefik.http.routers.firefly-importer.tls=true"
+      - "traefik.http.routers.firefly-importer.middlewares=hsts@file"
+      - "traefik.http.services.firefly-importer.loadbalancer.server.port=8080"
+
+  firefly_iii_cron:
+    image: alpine                            # Uses a lightweight Alpine Linux image.
+    container_name: firefly_iii_cron         # Names the container for easier management.
+    restart: always                          # Restarts the container automatically on failure.
+    command: >
+      sh -c "echo '0 3 * * * wget -qO- http://app:8080/api/v1/cron/$$STATIC_CRON_TOKEN' | crontab - && crond -f -L /dev/stdout"
+    networks:
+      - firefly_iii                          # Connects to the specified Docker network.
+    env_file:
+      - ./firefly_iii/config/.cron.env                     # Loads environment variables from .cron.env file.
+
+volumes:
+  firefly_iii_upload:
+    external: true
+    name: root_firefly_iii_upload
+  firefly_iii_db:
+    external: true
+    name: root_firefly_iii_db
+
+networks:
+  firefly_iii:
+    driver: bridge

@@ -55,7 +55,7 @@ resource "proxmox_virtual_environment_container" "lxc_private-docker-host" {
 
   disk {
     datastore_id = "local-lvm"
-    size         = 32
+    size         = 64
   }
 
   mount_point {
