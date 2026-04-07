@@ -7,13 +7,28 @@
     lxc_host: "{{ hostvars[inventory_hostname].lxc_host }}"
   roles:
     - role: lxc_python3
+    - role: borgmatic
 
   tasks:
-    - name: Remove existing technitium dns
+    - name: Check if technitium-dns directory exists
+      ansible.builtin.stat:
+        path: /opt/technitium-dns
+      register: technitium_exists
+      changed_when: false
+
+    - name: Trigger backup before removing existing technitium dns (ignore hook failures)
+      command: borgmatic --verbosity 1 --stats
+      register: backup_result
+      changed_when: false
+      failed_when: backup_result.rc != 0 and "Creating archive at" not in backup_result.stdout
+      when: technitium_exists.stat.exists
+
+    - name: Remove existing technitium dns only if it exists
       ansible.builtin.command:
         cmd: rm -rf /opt/technitium-dns && rm -rf /tmp/DnsServerPortable.tar.gz
+      when: technitium_exists.stat.exists
 
-    - name: Configure edge repositories
+    - name: Configure edge repositories for ASP.NET Core 9
       copy:
         dest: /etc/apk/repositories
         content: |
@@ -25,15 +40,27 @@
       ansible.builtin.command:
         cmd: apk update
 
-    - name: Install ASP.NET Core 9 runtime
+    - name: Install ASP.NET Core 9 runtime from Edge
       ansible.builtin.apk:
         name: aspnetcore9-runtime
         state: present
+
+    - name: Switch back to stable repositories
+      copy:
+        dest: /etc/apk/repositories
+        content: |
+          https://dl-cdn.alpinelinux.org/alpine/latest-stable/main
+          https://dl-cdn.alpinelinux.org/alpine/latest-stable/community
+
+    - name: Update apk repositories again
+      ansible.builtin.command:
+        cmd: apk update
 
     - name: Download technitium dns
       ansible.builtin.command:
         cmd: wget https://download.technitium.com/dns/DnsServerPortable.tar.gz
         chdir: /tmp
+
     - name: Create technitium dns directory
       ansible.builtin.file:
         path: /opt/technitium-dns
@@ -41,6 +68,7 @@
         mode: '0755'
         owner: root
         group: root
+
     - name: Extract technitium dns
       ansible.builtin.command:
         cmd: tar -xzf DnsServerPortable.tar.gz -C /opt/technitium-dns
@@ -60,7 +88,6 @@
           command_user="root"
           pidfile="/var/run/technitium-dns.pid"
           
-
           depend() {
               need net
           }
@@ -72,9 +99,11 @@
     - name: Make service executable
       ansible.builtin.command:
         cmd: chmod +x /etc/init.d/technitium-dns
+
     - name: Register technitium dns service
       ansible.builtin.command:
         cmd: rc-update add technitium-dns default
+
     - name: Start technitium dns service
       ansible.builtin.command:
         cmd: rc-service technitium-dns start

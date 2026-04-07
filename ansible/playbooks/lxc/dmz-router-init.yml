@@ -1,7 +1,7 @@
 ---
 - name: Configure Alpine Docker template in LXC container
   hosts: lxc_dmz_router
-  gather_facts: false
+  gather_facts: true
   vars:
     ansible_host: "{{ hostvars[inventory_hostname].ansible_host }}"
     lxc_host: "{{ hostvars[inventory_hostname].lxc_host }}"
@@ -22,6 +22,7 @@
     certbot_linode_credentials: "{{ lookup('file', '../../../secrets/linode/certbot_acme_api_creds.ini') }}"
   roles:
     - role: lxc_python3
+    - role: borgmatic
   pre_tasks:
     - name: Check if wireguard is installed
       ansible.builtin.command: lxc-attach {{ lxc_host }} -- which wg

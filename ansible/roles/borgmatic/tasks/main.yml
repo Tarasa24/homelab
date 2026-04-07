@@ -1,5 +1,5 @@
 ---
-- name: Install borg
+- name: Install borgmatic and dependencies
   community.general.apk:
     name: [borgbackup, borgmatic, openssh, yq]
     state: present
@@ -19,28 +19,30 @@
   ansible.builtin.file:
     dest: /etc/borgmatic
     state: directory
+
+- name: Check if borgmatic config already exists (indicates this container has been set up before)
+  ansible.builtin.stat:
+    path: /etc/borgmatic/config.yaml
+  register: existing_borgmatic_config
+  changed_when: false
+
 - name: Copy over borgmatic configuration
   ansible.builtin.copy:
     src: ../../../configs/backup/borg/{{ ansible_hostname }}.yaml
     dest: /etc/borgmatic/config.yaml
     mode: 0644
 
-- name: Import data from backup
+- name: Import data from backup (only if config didn't exist before - fresh container)
   ansible.builtin.command:
     cmd: "borgmatic extract --archive latest --destination /"
   ignore_errors: true
   register: borgmatic_extract
+  when: not existing_borgmatic_config.stat.exists
 
-- name: Fail if borgmatic extract failed (dont fail if error contains "No archives found in the repository")
+- name: Check if borgmatic extract failed
   ansible.builtin.fail:
     msg: "borgmatic extract failed"
-  when: borgmatic_extract.rc != 0 and "No archives found in the repository" not in borgmatic_extract.stderr
-
-- name: Copy over borgmatic configuration (again since extract might have overwritten it)
-  ansible.builtin.copy:
-    src: ../../../configs/backup/borg/{{ ansible_hostname }}.yaml
-    dest: /etc/borgmatic/config.yaml
-    mode: 0644 
+  when: borgmatic_extract is defined and borgmatic_extract.rc is defined and borgmatic_extract.rc != 0 and "No archives found in the repository" not in borgmatic_extract.stderr 
 
 - name: Extract source_directories from borgmatic configuration and export from the role
   ansible.builtin.shell: "yq '.location.source_directories[]' /etc/borgmatic/config.yaml"
