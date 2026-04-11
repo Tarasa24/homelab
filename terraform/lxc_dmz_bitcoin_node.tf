@@ -34,8 +34,14 @@ resource "proxmox_virtual_environment_container" "lxc_dmz_bitcoin_node" {
 
     ip_config {
       ipv4 {
-        address = var.dmz_bitcoin_node_ip.address
+        address = var.dmz_bitcoin_node_ip.address # DMZ IP (dmz)
         gateway = var.dmz_bitcoin_node_ip.gateway
+      }
+    }
+
+    ip_config {
+      ipv4 {
+        address = "10.0.50.103/24" # Monitoring VLAN IP (mon)
       }
     }
   }
@@ -51,6 +57,13 @@ resource "proxmox_virtual_environment_container" "lxc_dmz_bitcoin_node" {
     firewall = true
   }
 
+  network_interface {
+    name     = "mon"
+    bridge   = "vmbr0"
+    vlan_id  = var.vlan_ids["monitoring"]
+    firewall = true
+  }
+
   disk {
     datastore_id = "local-lvm"
     size         = 15
@@ -61,13 +74,13 @@ resource "proxmox_virtual_environment_container" "lxc_dmz_bitcoin_node" {
   }
 
   mount_point {
-    volume    = "/mnt/USB-BITCOIN"
-    path      = "/mnt/bitcoin"
+    volume = "/mnt/USB-BITCOIN"
+    path   = "/mnt/bitcoin"
   }
 
   mount_point {
-    volume    = "/mnt/USB-BITCOIN-APPS"
-    path      = "/mnt/bitcoin-apps"
+    volume = "/mnt/USB-BITCOIN-APPS"
+    path   = "/mnt/bitcoin-apps"
   }
 
   provisioner "local-exec" {

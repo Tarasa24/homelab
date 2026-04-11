@@ -1,29 +1,58 @@
 global:
-  scrape_interval: 15s
-  evaluation_interval: 15s
+  scrape_interval: 60s  # Reduced from 15s to save storage
+  evaluation_interval: 60s
   external_labels:
-    monitor: 'monitoring'
+    cluster: 'homelab'
+    environment: 'production'
+
+# Rule files defines recording and alerting rules
+rule_files:
+  - "alert.rules.yml"
 
 scrape_configs:
+  # Monitor Prometheus itself
   - job_name: 'prometheus'
-    scrape_interval: 100ms
     static_configs:
       - targets: ['localhost:9090']
 
-  - job_name: 'minio'
-    scrape_interval: 100ms
-    metrics_path: /minio/prometheus/metrics
+  # Node metrics from all hosts via VLAN 50
+  - job_name: 'node'
+    scrape_interval: 60s
     static_configs:
-      - targets: ['minio:9000']
+      # Static IP assignments for VLAN 50 monitoring network
+      - targets:
+        - '10.0.50.1:9100'  # DNS (T-DNS / Pi-hole)
+        - '10.0.50.2:9100'  # DMZ Router
+        - '10.0.50.3:9100'  # Backup server
+        - '10.0.50.4:9100'  # Monitoring (self)
+        - '10.0.50.20:9100' # Private docker-host
+        - '10.0.50.120:9100' # DMZ docker-host
+        - '10.0.50.103:9100' # DMZ bitcoin node
 
-  - job_name: 'thanos-sidecar'
+# Docker metrics from docker hosts
+  - job_name: 'docker'
+    scrape_interval: 60s
     static_configs:
-      - targets: ['thanos-sidecar:10902']
+      - targets:
+        - '10.0.50.20:9323'  # Private docker-host
+        - '10.0.50.120:9323'  # DMZ docker-host
+    metrics_path: /metrics
 
-  - job_name: 'thanos-query'
+  # Blackbox exporter for external service monitoring
+  - job_name: 'blackbox'
+    scrape_interval: 120s
+    metrics_path: /probe
+    params:
+      module: [http_2xx]
     static_configs:
-      - targets: ['thanos-querier:10902']
-  
-  - job_name: 'thanos-store'
-    static_configs:
-      - targets: ['thanos-store:10902']
+      - targets:
+        - 'https://jellyfin.homelab.tarasa24.dev'
+        - 'https://immich.homelab.tarasa24.dev'
+        - 'https://cal.homelab.tarasa24.dev'
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: __param_target
+      - source_labels: [__param_target]
+        target_label: instance
+      - target_label: __address__
+        replacement: blackbox-exporter:9115

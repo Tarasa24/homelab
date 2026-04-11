@@ -8,6 +8,7 @@
   roles:
     - role: lxc_python3
     - role: borgmatic
+    - role: node_exporter
 
   tasks:
     - name: Check if technitium-dns directory exists

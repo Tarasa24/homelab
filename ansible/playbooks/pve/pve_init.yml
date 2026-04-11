@@ -78,9 +78,24 @@
           	bridge-stp off
           	bridge-fd 0
         dest: /etc/network/interfaces.d/vmbr1.cfg
+    
     - name: "Up the DMZ bridge"
       ansible.builtin.command:
         cmd: ifup vmbr1
+    
+    - name: "Ensure vmbr0 is VLAN-aware"
+      ansible.builtin.lineinfile:
+        path: /etc/network/interfaces
+        regexp: '^\\s*iface vmbr0 inet'
+        line: 'iface vmbr0 inet manual'
+        insertbefore: '^auto vmbr0'
+    
+    - name: "Add VLAN awareness to vmbr0"
+      ansible.builtin.lineinfile:
+        path: /etc/network/interfaces
+        line: '    bridge-vlan-aware yes'
+        insertafter: '^iface vmbr0 inet manual'
+  
 
   handlers:
     - name: reload systemd

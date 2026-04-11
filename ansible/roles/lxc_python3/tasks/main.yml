@@ -25,7 +25,7 @@
 - name: Check if Python 3 is installed
   ansible.builtin.command: lxc-attach {{ lxc_host }} -- python3 --version
   register: python3_version
-  delegate_to: "{{ lxc_host }}"
+  delegate_to: "{{ ansible_host }}"
   ignore_errors: true
 
 - include_tasks: install_python3.yml

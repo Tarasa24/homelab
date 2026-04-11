@@ -1,0 +1,92 @@
+---
+- name: Gather OS facts
+  ansible.builtin.setup:
+    filter: ansible_distribution*
+  changed_when: false
+
+- name: Determine init system
+  ansible.builtin.set_fact:
+    init_system: "{{ 'systemd' if ansible_distribution == 'Debian' or ansible_distribution == 'Ubuntu' else 'openrc' }}"
+
+- name: Determine node_exporter service name
+  ansible.builtin.set_fact:
+    node_exporter_service_name: "{{ 'prometheus-node-exporter' if init_system == 'systemd' else 'node_exporter' }}"
+
+- name: Install node_exporter (Alpine)
+  community.general.apk:
+    name: prometheus-node-exporter
+    state: present
+    update_cache: true
+  when: ansible_distribution == "Alpine"
+
+- name: Install node_exporter (Debian/Ubuntu)
+  ansible.builtin.apt:
+    name: prometheus-node-exporter
+    state: present
+    update_cache: true
+  when: ansible_distribution == "Debian" or ansible_distribution == "Ubuntu"
+
+# OpenRC configuration (Alpine)
+- name: Create OpenRC service file for Alpine
+  ansible.builtin.copy:
+    dest: /etc/init.d/node_exporter
+    content: |
+      #!/sbin/openrc-run
+
+      name="Prometheus Node Exporter"
+      description="Prometheus node exporter for system metrics"
+      command="/usr/bin/node_exporter"
+      command_args="--web.listen-address=\":9100\" --collector.textfile.directory=/var/lib/node_exporter/textfile_collector"
+      command_user="nobody"
+      pidfile="/run/${RC_SVCNAME}.pid"
+      
+      depend() {
+          need net
+          after firewall
+      }
+    mode: '0755'
+  when: init_system == "openrc"
+
+- name: Start and enable node_exporter (OpenRC)
+  ansible.builtin.service:
+    name: node_exporter
+    state: started
+    enabled: true
+    use: openrc
+  when: init_system == "openrc"
+  async: 30
+  poll: 5
+  failed_when: false
+
+# Systemd configuration (Debian/Ubuntu)
+- name: Create systemd override directory
+  ansible.builtin.file:
+    path: /etc/systemd/system/prometheus-node-exporter.service.d
+    state: directory
+  when: init_system == "systemd"
+
+- name: Configure node_exporter systemd service
+  ansible.builtin.copy:
+    dest: /etc/systemd/system/prometheus-node-exporter.service.d/override.conf
+    content: |
+      [Service]
+      ExecStart=
+      ExecStart=/usr/bin/prometheus-node-exporter --web.listen-address=:9100 --collector.textfile.directory=/var/lib/node_exporter/textfile_collector
+      Restart=always
+  when: init_system == "systemd"
+
+- name: Start and enable node_exporter (Systemd)
+  ansible.builtin.service:
+    name: "{{ node_exporter_service_name }}"
+    state: started
+    enabled: true
+    daemon_reload: true
+  when: init_system == "systemd"
+
+- name: Create textfile collector directory
+  ansible.builtin.file:
+    path: /var/lib/node_exporter/textfile_collector
+    state: directory
+    mode: '0755'
+    owner: nobody
+    group: nogroup

@@ -15,6 +15,7 @@
       - immich-media-to-linode-s3
   roles:
     - role: lxc_python3
+    - role: node_exporter
 
   pre_tasks:
     - name: Find all ".yaml" and ".yml" borgmatic configuration files
