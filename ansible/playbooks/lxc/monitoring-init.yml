@@ -3,7 +3,7 @@
   hosts: lxc_monitoring
   gather_facts: false
   vars:
-    ntfy_alertmanager_password: "{{ lookup('file', '../../../secrets/monitoring/ntfy_alertmanager_password') }}"
+    ntfy_alertmanager_password: "{{ lookup('file', '../../../configs/monitoring/secrets/ntfy_alertmanager_password') }}"
   roles:
     - role: lxc_python3
     - role: docker
