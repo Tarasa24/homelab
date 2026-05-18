@@ -2,6 +2,7 @@ services:
   ntfy:
     image: binwiederhier/ntfy:latest
     container_name: ntfy
+    command: serve
     restart: unless-stopped
     environment:
       - NTFY_BASE_URL=https://ntfy.homelab.tarasa24.dev
