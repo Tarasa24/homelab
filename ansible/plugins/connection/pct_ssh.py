@@ -43,7 +43,7 @@ from ansible.errors import (
     AnsibleFileNotFound,
 )
 from ansible.errors import AnsibleOptionsError
-from ansible.compat import selectors
+import selectors
 from ansible.module_utils.six import PY3, text_type, binary_type
 from ansible.module_utils.six.moves import shlex_quote
 from ansible.module_utils._text import to_bytes, to_native, to_text
