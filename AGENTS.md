@@ -104,7 +104,7 @@ All containers use Alpine Linux unless noted. Templates are downloaded by Terraf
 | `lxc_dns` | `lxc_dns.tf` | Alpine | DNS server; provisioned via `local-exec` in Terraform |
 | `lxc_dmz_router` | `lxc_dmz_router.tf` | Alpine | Two NICs (LAN + DMZ bridge `vmbr1`); WireGuard + nginx + dnsmasq + Certbot |
 | `lxc_backup` | `lxc_backup.tf` | Alpine | Borg server + resticprofile; USB-SSD backup mount |
-| `lxc_monitoring` | `lxc_monitoring.tf` | Alpine | Docker; Prometheus/Thanos/Loki/Grafana; cold storage on USB-SSD |
+| `lxc_monitoring` | `lxc_monitoring.tf` | Alpine | Docker; Prometheus/Loki/Grafana/Alertmanager/Uptime Kuma; state in named Docker volumes |
 | `vm_homeassistant` | `vm_homeassistant.tf` | HAOS (qcow2) | Full VM; 4 GB RAM; OVMF/UEFI; q35 machine type |
 | `lxc_private-docker-host` | `lxc_private-docker-host.tf` | Alpine | Docker; internal services; SSL certs + media shares mounted |
 | `lxc_homelab_tailscale_connector` | `lxc_homelab_tailscale_connector.tf` | Alpine | Cloned from Tailscale connector template |
@@ -120,7 +120,7 @@ All containers use Alpine Linux unless noted. Templates are downloaded by Terraf
 | Mount | UUID | Filesystem | Used for |
 |---|---|---|---|
 | `/mnt/USB-HDD` | `d10e88e6-...` | ext4 | Jellyfin media, Immich photos, LXC templates/images |
-| `/mnt/USB-SSD` | `c06ebfa7-...` | ext4 | SSL certs, backups, downloads, cache, monitoring cold storage |
+| `/mnt/USB-SSD` | `c06ebfa7-...` | ext4 | SSL certs, backups, downloads, cache |
 | `/mnt/USB-BITCOIN` | `fcadd3af-...` | xfs | Bitcoin blockchain data |
 | `/mnt/USB-BITCOIN-APPS` | `9fa5a1fb-...` | xfs | Bitcoin application data |
 
@@ -201,6 +201,7 @@ Internet-accessible services, isolated in the DMZ. Has GPU passthrough (`/dev/dr
 | Jellyfin | Media server; `/media` from USB-HDD |
 | Immich | Photo management; `/immich` from USB-HDD |
 | Radicale | CalDAV/CardDAV server |
+| ntfy | Push notification server (`10.1.0.24`); exposed at `ntfy.homelab.tarasa24.dev` |
 | Prometheus + Promtail | Local metrics/log scraping agents |
 
 ---
@@ -290,6 +291,7 @@ Some containers (`lxc_dns`, `lxc_nixos_template`, `lxc_tailscale_connector_templ
 - **Secrets are never in configs**: all sensitive values are read at Ansible runtime via `lookup('file', '...')` from the encrypted `secrets/` tree.
 - **SSL certificates are centralised**: Certbot runs only on the DMZ router. Certs are stored on the shared USB-SSD mount and bind-mounted read-only into containers that need them.
 - **Borgmatic restore-on-deploy**: the borgmatic role always attempts `borgmatic extract --archive latest` before starting services — this is how service state (Docker volumes, configs) is restored after reprovisioning.
+- **State lives on the container disk, never on USB mounts**: Docker service state (databases, app data, config) always uses named Docker volumes, which default to `/var/lib/docker/volumes/` on the container's own disk. Borgmatic then backs these up to the borg server over SSH. USB-mounted cold storage (`/mnt/USB-SSD`, `/mnt/USB-HDD`) is reserved exclusively for bulk data that cannot reasonably be backed up (media libraries, blockchain data, SSL certs). Never use bind mounts to cold storage paths for service state.
 - **Terraform `terraform.tfvars`**: sensitive Proxmox endpoint/credentials live in `secrets/terraform.tfvars` (git-crypt encrypted). The Proxmox provider SSH key is read from `~/.ssh/homelab_proxmox`.
 - **Domain naming**: `*.lan.tarasa24.dev` for internal LAN services (via Traefik), `*.homelab.tarasa24.dev` and `*.dormlab.tarasa24.dev` for DMZ/externally reachable services (via nginx on the DMZ router).
 

@@ -53,3 +53,12 @@ compactor:
   working_directory: /loki/compactor
   shared_store: filesystem
   retention_enabled: true
+
+ruler:
+  enable_api: true
+  rule_path: /loki/rules
+  alertmanager_url: http://alertmanager:9093
+  external_labels:
+    cluster: 'homelab'
+    environment: 'production'
+  rule_store: local

@@ -1,11 +1,17 @@
 global:
-  scrape_interval: 60s  # Reduced from 15s to save storage
+  scrape_interval: 60s
   evaluation_interval: 60s
   external_labels:
     cluster: 'homelab'
     environment: 'production'
 
-# Rule files defines recording and alerting rules
+# Alerting configuration
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets: ['alertmanager:9093']
+
+# Rule files defines alerting rules
 rule_files:
   - "alert.rules.yml"
 
@@ -34,8 +40,8 @@ scrape_configs:
     scrape_interval: 60s
     static_configs:
       - targets:
-        - '10.0.50.20:9323'  # Private docker-host
-        - '10.0.50.120:9323'  # DMZ docker-host
+         - '10.0.50.20:9323'  # Private docker-host
+         - '10.0.50.120:9323'  # DMZ docker-host
     metrics_path: /metrics
 
   # Blackbox exporter for external service monitoring
@@ -46,9 +52,9 @@ scrape_configs:
       module: [http_2xx]
     static_configs:
       - targets:
-        - 'https://jellyfin.homelab.tarasa24.dev'
-        - 'https://immich.homelab.tarasa24.dev'
-        - 'https://cal.homelab.tarasa24.dev'
+         - 'https://jellyfin.homelab.tarasa24.dev'
+         - 'https://immich.homelab.tarasa24.dev'
+         - 'https://cal.homelab.tarasa24.dev'
     relabel_configs:
       - source_labels: [__address__]
         target_label: __param_target
@@ -56,3 +62,6 @@ scrape_configs:
         target_label: instance
       - target_label: __address__
         replacement: blackbox-exporter:9115
+
+  # Additional service targets can be added here
+  # See MONITORING_SETUP.md for configuration examples

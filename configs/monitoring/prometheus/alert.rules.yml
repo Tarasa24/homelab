@@ -1,60 +1,90 @@
 groups:
   - name: node_alerts
     rules:
-      - alert: HighCpuUsage
-        expr: 100 - (avg by(instance) (rate(node_cpu_seconds_total{mode="idle"}[5m])) * 100) > 85
-        for: 5m
-        labels:
-          severity: warning
-        annotations:
-          summary: "High CPU usage on {{ $labels.instance }}"
-          description: "CPU usage is {{ $value }}% on {{ $labels.instance }}"
+       - alert: HighCpuUsage
+         expr: 100 - (avg by(instance) (rate(node_cpu_seconds_total{mode="idle"}[5m])) * 100) > 85
+         for: 5m
+         labels:
+           severity: warning
+           alerttype: infrastructure
+         annotations:
+           summary: "High CPU usage on {{ $labels.instance }}"
+           description: "CPU usage is {{ $value }}% on {{ $labels.instance }}"
 
-      - alert: HighMemoryUsage
-        expr: (node_memory_MemTotal_bytes - node_memory_MemAvailable_bytes) / node_memory_MemTotal_bytes * 100 > 85
-        for: 5m
-        labels:
-          severity: warning
-        annotations:
-          summary: "High memory usage on {{ $labels.instance }}"
-          description: "Memory usage is {{ $value }}% on {{ $labels.instance }}"
+       - alert: HighMemoryUsage
+         expr: (node_memory_MemTotal_bytes - node_memory_MemAvailable_bytes) / node_memory_MemTotal_bytes * 100 > 85
+         for: 5m
+         labels:
+           severity: warning
+           alerttype: storage
+         annotations:
+           summary: "High memory usage on {{ $labels.instance }}"
+           description: "Memory usage is {{ $value }}% on {{ $labels.instance }}"
 
-      - alert: HighDiskUsage
-        expr: (node_filesystem_size_bytes{fstype!="tmpfs"} - node_filesystem_free_bytes{fstype!="tmpfs"}) / node_filesystem_size_bytes{fstype!="tmpfs"} * 100 > 85
-        for: 10m
-        labels:
-          severity: warning
-        annotations:
-          summary: "High disk usage on {{ $labels.instance }} {{ $labels.mountpoint }}"
-          description: "Disk usage is {{ $value }}% on {{ $labels.instance }} {{ $labels.mountpoint }}"
+       - alert: HighDiskUsage
+         expr: (node_filesystem_size_bytes{fstype!="tmpfs"} - node_filesystem_free_bytes{fstype!="tmpfs"}) / node_filesystem_size_bytes{fstype!="tmpfs"} * 100 > 85
+         for: 10m
+         labels:
+           severity: warning
+           alerttype: storage
+         annotations:
+           summary: "High disk usage on {{ $labels.instance }} {{ $labels.mountpoint }}"
+           description: "Disk usage is {{ $value }}% on {{ $labels.instance }} {{ $labels.mountpoint }}"
 
-      - alert: NodeDown
-        expr: up == 0
-        for: 2m
-        labels:
-          severity: critical
-        annotations:
-          summary: "Node {{ $labels.instance }} is down"
-          description: "{{ $labels.instance }} has been down for more than 2 minutes"
+       - alert: NodeDown
+         expr: up == 0
+         for: 2m
+         labels:
+           severity: critical
+           alerttype: infrastructure
+         annotations:
+           summary: "Node {{ $labels.instance }} is down"
+           description: "{{ $labels.instance }} has been down for more than 2 minutes"
 
   - name: service_alerts
     rules:
-      - alert: ServiceDown
-        expr: up{job!="node", job!="prometheus"} == 0
-        for: 3m
-        labels:
-          severity: critical
-        annotations:
-          summary: "Service {{ $labels.job }} on {{ $labels.instance }} is down"
-          description: "{{ $labels.job }} on {{ $labels.instance }} has been down for more than 3 minutes"
+       - alert: ServiceDown
+         expr: up{job!="node", job!="prometheus"} == 0
+         for: 3m
+         labels:
+           severity: critical
+           alerttype: service
+         annotations:
+           summary: "Service {{ $labels.job }} on {{ $labels.instance }} is down"
+           description: "{{ $labels.job }} on {{ $labels.instance }} has been down for more than 3 minutes"
 
   - name: network_alerts
     rules:
-      - alert: HighNetworkTraffic
-        expr: rate(node_network_receive_bytes_total[5m]) > 10000000
-        for: 5m
-        labels:
-          severity: warning
-        annotations:
-          summary: "High network traffic on {{ $labels.instance }} {{ $labels.device }}"
-          description: "Network receive rate is {{ $value }} bytes/sec on {{ $labels.instance }}"
+       - alert: HighNetworkTraffic
+         expr: rate(node_network_receive_bytes_total[5m]) > 10000000
+         for: 5m
+         labels:
+           severity: warning
+           alerttype: infrastructure
+         annotations:
+           summary: "High network traffic on {{ $labels.instance }} {{ $labels.device }}"
+           description: "Network receive rate is {{ $value }} bytes/sec on {{ $labels.instance }}"
+
+  - name: external_service_alerts
+    rules:
+       - alert: ExternalServiceDown
+         expr: 'probe_success{job="blackbox"} == 0'
+         for: 5m
+         labels:
+           severity: critical
+           alerttype: external
+           external: "true"
+         annotations:
+           summary: "External service {{ $labels.instance }} is down"
+           description: "Blackbox probe failed for {{ $labels.instance }}"
+
+       - alert: ExternalServiceHighLatency
+         expr: 'probe_duration_seconds{job="blackbox"} > 5'
+         for: 5m
+         labels:
+           severity: warning
+           alerttype: external
+           external: "true"
+         annotations:
+           summary: "External service {{ $labels.instance }} has high latency"
+           description: "Response time is {{ $value }}s for {{ $labels.instance }}"

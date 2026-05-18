@@ -6,6 +6,7 @@
     - role: lxc_python3
     - role: docker
     - role: node_exporter
+    - role: borgmatic
 
   tasks:
     - name: Try to down containers
@@ -34,52 +35,6 @@
 
     
 
-    - name: Create directories for persistent storage
-      ansible.builtin.file:
-        name: "{{ item.path }}"
-        state: directory
-        owner: "{{ item.owner | default('root') }}"
-        group: "{{ item.group | default('root') }}"
-        mode: "{{ item.mode | default('0755') }}"
-      with_items:
-        - { path: /mnt/monitoring-cold/prometheus, owner: nobody, group: nobody, mode: '0777' }
-        - { path: /mnt/monitoring-cold/loki, owner: root, group: root, mode: '0755' }
-        - { path: /mnt/monitoring-cold/uptime-kuma, owner: 1000, group: 1000, mode: '0755' }
-        - { path: /mnt/monitoring-cold/grafana, owner: nobody, group: nobody, mode: '0777' }
-    
-    - name: Create Loki subdirectories
-      ansible.builtin.file:
-        name: "{{ item }}"
-        state: directory
-        owner: root
-        group: root
-        mode: '0755'
-      with_items:
-        - /mnt/monitoring-cold/loki/wal
-        - /mnt/monitoring-cold/loki/index
-        - /mnt/monitoring-cold/loki/cache
-        - /mnt/monitoring-cold/loki/chunks
-        - /mnt/monitoring-cold/loki/compactor
-    
-    - name: Create missing Grafana provisioning directories
-      ansible.builtin.file:
-        name: "{{ item }}"
-        state: directory
-        owner: root
-        group: root
-        mode: '0755'
-      with_items:
-        - /root/grafana/provisioning/plugins
-        - /root/grafana/provisioning/alerting
-    
-    - name: Fix existing directory permissions
-      shell: |
-        # Fix permissions on existing directories if they exist
-        [ -d /mnt/monitoring-cold/prometheus ] && chown -R nobody:nobody /mnt/monitoring-cold/prometheus && chmod -R 0777 /mnt/monitoring-cold/prometheus || true
-        [ -d /mnt/monitoring-cold/loki ] && chown -R root:root /mnt/monitoring-cold/loki && chmod -R 0755 /mnt/monitoring-cold/loki || true
-        [ -d /mnt/monitoring-cold/grafana ] && chown -R nobody:nobody /mnt/monitoring-cold/grafana && chmod -R 0777 /mnt/monitoring-cold/grafana || true
-        [ -d /mnt/monitoring-cold/uptime-kuma ] && chown -R 1000:1000 /mnt/monitoring-cold/uptime-kuma && chmod -R 0755 /mnt/monitoring-cold/uptime-kuma || true
-    
     - name: Pull images
       shell: docker-compose pull -q
       args:
