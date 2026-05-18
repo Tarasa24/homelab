@@ -11,6 +11,15 @@ services:
       - NTFY_BEHIND_PROXY=true
       - NTFY_CACHE_FILE=/var/lib/ntfy/cache.db
       - NTFY_AUTH_FILE=/var/lib/ntfy/auth.db
+      # Disable self-registration and web push (not needed)
+      - NTFY_ENABLE_SIGNUP=false
+      - NTFY_ENABLE_LOGIN=true
+      - NTFY_ENABLE_RESERVATIONS=false
+      # Rate limiting - restrict publish/subscribe rates per visitor
+      - NTFY_VISITOR_REQUEST_LIMIT_BURST=60
+      - NTFY_VISITOR_REQUEST_LIMIT_REPLENISH=10s
+      - NTFY_VISITOR_AUTH_FAILURE_LIMIT_BURST=10
+      - NTFY_VISITOR_AUTH_FAILURE_LIMIT_REPLENISH=1m
     volumes:
       - ntfy-data:/var/lib/ntfy
     ports:
