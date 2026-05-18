@@ -2,6 +2,8 @@
 - name: Configure monitoring container
   hosts: lxc_monitoring
   gather_facts: false
+  vars:
+    ntfy_alertmanager_password: "{{ lookup('file', '../../../secrets/monitoring/ntfy_alertmanager_password') }}"
   roles:
     - role: lxc_python3
     - role: docker
@@ -32,6 +34,14 @@
         group: root
         mode: '0644'
         directory_mode: '0755'
+
+    - name: Render alertmanager config with secrets
+      template:
+        src: "../../../configs/monitoring/alertmanager/config.yml.j2"
+        dest: "/root/alertmanager/config.yml"
+        owner: root
+        group: root
+        mode: '0644'
 
     
 
