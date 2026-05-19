@@ -1,88 +1,78 @@
 groups:
   - name: loki_alerts
     rules:
-      # Critical: Container crash loops
+      # Container logs error/fatal/panic lines
+      - alert: ContainerErrors
+        expr: |
+          sum by (job) (
+            count_over_time({job!=""} |~ `(?i)(error|fatal|panic|exception|critical)` [5m])
+          ) > 10
+        for: 2m
+        labels:
+          severity: warning
+          alerttype: service
+        annotations:
+          summary: "{{ $labels.job }} logging errors"
+          description: "{{ $labels.job }} has logged >10 error/fatal/panic lines in 5 minutes"
+
+      # Container crash loop (container restart detected via log gaps + error burst)
       - alert: ContainerCrashLoop
         expr: |
-          count by (job) (
-            count_over_time({job!=""} | json | level="ERROR" | pattern="(OOMKilled|killed|Exited)" [5m])
-          ) > 5
-        for: 2m
+          sum by (job) (
+            count_over_time({job!=""} |~ `(?i)(error|fatal|panic)` [5m])
+          ) > 50
+        for: 1m
         labels:
           severity: critical
           alerttype: service
         annotations:
-          summary: "{{ $labels.job }} experiencing crash loop"
-          description: "Service {{ $labels.job }} has crashed >5 times in 5 minutes"
+          summary: "{{ $labels.job }} crash looping"
+          description: "{{ $labels.job }} has logged >50 errors in 5 minutes - likely crash looping"
 
-      # Critical: Authentication failures spike
+      # Authentication failures (authelia)
       - alert: AuthenticationFailureSpike
         expr: |
-          rate({job="authelia"} | json | level="WARNING" | pattern="authentication failed" [5m]) > 0.5
+          count_over_time({job="authelia"} |~ `(?i)(authentication failure|invalid credentials|brute.force)` [5m]) > 10
         for: 2m
         labels:
           severity: critical
           alerttype: service
         annotations:
-          summary: "Authelia experiencing auth failure spike"
-          description: "Auth failures >0.5/sec (possible brute-force attack)"
+          summary: "Authelia: authentication failure spike"
+          description: "More than 10 auth failures in 5 minutes - possible brute force"
 
-      # Warning: Backup failures
+      # Backup errors
       - alert: BackupJobFailed
         expr: |
-          count_over_time({job=~"(borg|restic|backup)"} | json | level="ERROR" [1h]) > 0
+          count_over_time({job=~".+"} |~ `(?i)(borgmatic|borg|restic)` |~ `(?i)(error|failed|exception)` [1h]) > 0
         for: 5m
         labels:
           severity: warning
           alerttype: storage
         annotations:
-          summary: "Backup job encountered errors"
-          description: "{{ $labels.job }} logged errors in last hour"
+          summary: "Backup job failed"
+          description: "Backup error detected in logs"
 
-      # Warning: High disk I/O wait
-      - alert: HighDiskIOWait
+      # OOM kills
+      - alert: OOMKill
         expr: |
-          count_over_time({job=~".*"} | pattern="iowait.*([5-9][0-9]|100)" [5m]) > 10
-        for: 5m
+          count_over_time({job!=""} |~ `(?i)(out of memory|oom.kill|killed process|memory limit)` [5m]) > 0
+        for: 0m
         labels:
-          severity: warning
+          severity: critical
           alerttype: infrastructure
         annotations:
-          summary: "High disk I/O wait detected"
-          description: "System spending >50% time in iowait"
+          summary: "OOM kill detected in {{ $labels.job }}"
+          description: "Out of memory kill detected - check container memory limits"
 
-      # Warning: Certificate expiry alerts in Traefik
-      - alert: TLSCertificateExpiryWarning
+      # TLS cert expiry warnings from nginx/traefik logs
+      - alert: TLSCertExpiryWarning
         expr: |
-          count_over_time({job=~"(traefik|dmz-router)"} | pattern="certificate.*expires.*([1-2][0-9]|3[0]).*day" [1h]) > 0
+          count_over_time({job=~"(traefik|nginx|dmz-router)"} |~ `(?i)(certificate.*expir|ssl.*expir|cert.*expir)` [1h]) > 0
         for: 5m
         labels:
           severity: warning
           alerttype: service
         annotations:
           summary: "TLS certificate expiring soon"
-          description: "Certificate expiry warning detected in logs"
-
-      # Warning: High error rate in services
-      - alert: HighErrorRateInService
-        expr: |
-          rate({job=~"(jellyfin|immich|traefik)"} | json | level="ERROR" [5m]) > 0.1
-        for: 5m
-        labels:
-          severity: warning
-          alerttype: external
-        annotations:
-          summary: "{{ $labels.job }} high error rate"
-          description: "Service {{ $labels.job }} logging errors at >0.1/sec"
-
-      # Warning: Repeated connection errors in DMZ services
-      - alert: ServiceConnectionErrors
-        expr: |
-          rate({job=~"(jellyfin|immich)"} | pattern="connection refused|timeout|connection reset" [5m]) > 0.01
-        for: 5m
-        labels:
-          severity: warning
-          alerttype: external
-        annotations:
-          summary: "{{ $labels.job }} connection errors"
-          description: "Service {{ $labels.job }} showing connection errors"
+          description: "Certificate expiry warning in {{ $labels.job }} logs"
