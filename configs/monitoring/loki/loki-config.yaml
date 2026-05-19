@@ -61,4 +61,7 @@ ruler:
   external_labels:
     cluster: 'homelab'
     environment: 'production'
-  rule_store: local
+  storage:
+    type: local
+    local:
+      directory: /loki/rules
