@@ -24,6 +24,7 @@
     - role: lxc_python3
     - role: borgmatic
     - role: node_exporter
+    - role: promtail
   pre_tasks:
     - name: Check if wireguard is installed
       ansible.builtin.command: lxc-attach {{ lxc_host }} -- which wg

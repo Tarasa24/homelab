@@ -1,0 +1,23 @@
+---
+- name: Install promtail
+  community.general.apk:
+    name:
+      - loki-promtail
+      - loki-promtail-openrc
+    state: present
+    update_cache: true
+
+- name: Deploy promtail config
+  ansible.builtin.copy:
+    src: "../../../configs/promtail/{{ ansible_hostname }}.yaml"
+    dest: /etc/loki/promtail-local-config.yaml
+    owner: root
+    group: root
+    mode: '0644'
+  notify: restart promtail
+
+- name: Enable and start promtail
+  ansible.builtin.service:
+    name: loki-promtail
+    enabled: true
+    state: started

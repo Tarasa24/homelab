@@ -16,6 +16,7 @@
   roles:
     - role: lxc_python3
     - role: node_exporter
+    - role: promtail
 
   pre_tasks:
     - name: Find all ".yaml" and ".yml" borgmatic configuration files
