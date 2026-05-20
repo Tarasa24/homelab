@@ -208,18 +208,50 @@ Internet-accessible services, isolated in the DMZ. Has GPU passthrough (`/dev/dr
 
 ## Monitoring Stack (`10.0.1.4`)
 
-Long-term metrics and log storage on a dedicated container.
+Metrics and log storage on a dedicated container. All state in named Docker volumes, backed up via borgmatic.
 
 | Service | Notes |
 |---|---|
-| Prometheus | Short-retention TSDB; 30 min block duration (feeds Thanos) |
-| Thanos sidecar | Ships Prometheus blocks to MinIO (object store) |
-| Thanos store | Reads historical data from MinIO |
-| Thanos querier | Unified query layer across sidecar + store |
-| Thanos compactor | Compacts/downsamples blocks in object store |
-| Loki | Log aggregation; stores chunks in MinIO |
-| MinIO | Local S3-compatible object store on cold USB-SSD mount |
-| Grafana | Dashboards; provisions datasources from `grafana/provisioning/` |
+| Prometheus | Metrics TSDB; 14d retention, 5GB cap; scrapes node exporters on VLAN 50 |
+| Loki | Log aggregation; 7d retention; receives logs from all Promtail agents |
+| Alertmanager | Routes alerts from Prometheus and Loki ruler to ntfy |
+| Grafana | Dashboards; configured manually (no provisioning); datasources added via UI |
+| Uptime Kuma | Uptime monitoring; configured manually via UI |
+
+Grafana datasources (add manually after first deploy):
+- **Prometheus** — `http://prometheus:9090` (set as default)
+- **Loki** — `http://loki:3100`
+
+### Log Collection (Loki / Promtail)
+
+Logs are collected from all Docker hosts via a Promtail agent running as a container on each host. Each agent ships to Loki at `http://10.0.50.4:3100` (monitoring VLAN).
+
+**Hosts shipping logs:**
+
+| Host | LXC ID | Promtail config |
+|---|---|---|
+| `monitoring` | 1004 | `configs/monitoring/promtail/promtail-config.yaml` |
+| `private-docker-host` | 1020 | `configs/private-docker-host/root/promtail/config.yml` |
+| `dmz-docker-host` | 100020 | `configs/dmz_docker-host/root/promtail/config.yml` |
+
+**Label schema** — every log line gets the following Loki labels:
+
+| Label | Value | Example |
+|---|---|---|
+| `job` | `{instance}/{service_name}` | `dmz-docker-host/jellyfin` |
+| `instance` | hostname of the Docker host | `private-docker-host` |
+| `service_name` | Docker Compose service name | `authelia` |
+| `container_name` | Docker container name | `/authelia` |
+| `stream` | `stdout` or `stderr` | `stdout` |
+| `severity` | `critical` for key services, absent otherwise | `critical` |
+
+The `job` label combining `instance/service_name` gives a unique identifier per service per host, useful for filtering in Grafana. The `instance`, `service_name`, and `container_name` labels are required by the [Loki v3 logging dashboard](https://grafana.com/grafana/dashboards/24574).
+
+**Discovery** — Promtail uses Docker service discovery (`docker_sd_configs`) via the Docker socket (`/var/run/docker.sock`). Service name is extracted from the `com.docker.compose.service` container label set automatically by Docker Compose.
+
+**Retention** — Loki is configured for 7-day retention. Older logs are compacted and deleted by the Loki compactor.
+
+**Alerting from logs** — Loki ruler evaluates alert rules in `configs/monitoring/loki/loki-alerts.yml` and fires to Alertmanager on pattern matches (errors, OOM kills, auth failures, backup failures, TLS expiry).
 
 ---
 
