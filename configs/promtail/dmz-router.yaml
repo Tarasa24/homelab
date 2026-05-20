@@ -20,6 +20,20 @@ scrape_configs:
           instance: dmz-router
           stream: stdout
           __path__: /var/log/nginx/access.log
+    pipeline_stages:
+      - json:
+          expressions:
+            status: status
+            request_method: request_method
+            request_uri: request_uri
+            remote_addr: remote_addr
+            server_name: server_name
+            request_time: request_time
+            upstream_response_time: upstream_response_time
+      - labels:
+          status:
+          request_method:
+          server_name:
 
   - job_name: nginx_error
     static_configs:
