@@ -18,6 +18,7 @@ scrape_configs:
           service_name: nginx
           container_name: nginx
           instance: dmz-router
+          host: dmz-router
           stream: stdout
           __path__: /var/log/nginx/access.log
     pipeline_stages:
@@ -44,6 +45,7 @@ scrape_configs:
           service_name: nginx
           container_name: nginx
           instance: dmz-router
+          host: dmz-router
           stream: stderr
           __path__: /var/log/nginx/error.log
 
@@ -56,6 +58,7 @@ scrape_configs:
           service_name: nginx
           container_name: nginx
           instance: dmz-router
+          host: dmz-router
           stream: stdout
           __path__: /var/log/nginx/stream.log
 
