@@ -16,6 +16,7 @@ scrape_configs:
         labels:
           job: dmz-router/nginx
           service_name: nginx
+          container_name: nginx
           instance: dmz-router
           stream: stdout
           __path__: /var/log/nginx/access.log
@@ -27,6 +28,7 @@ scrape_configs:
         labels:
           job: dmz-router/nginx
           service_name: nginx
+          container_name: nginx
           instance: dmz-router
           stream: stderr
           __path__: /var/log/nginx/error.log
@@ -38,6 +40,7 @@ scrape_configs:
         labels:
           job: dmz-router/nginx
           service_name: nginx
+          container_name: nginx
           instance: dmz-router
           stream: stdout
           __path__: /var/log/nginx/stream.log
@@ -49,6 +52,7 @@ scrape_configs:
         labels:
           job: dmz-router/syslog
           service_name: syslog
+          container_name: syslog
           instance: dmz-router
           stream: stdout
           __path__: /var/log/messages

@@ -16,6 +16,7 @@ scrape_configs:
         labels:
           job: backup/syslog
           service_name: syslog
+          container_name: syslog
           instance: backup
           stream: stdout
           __path__: /var/log/messages

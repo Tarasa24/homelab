@@ -16,6 +16,7 @@ scrape_configs:
         labels:
           job: dns/technitium-dns
           service_name: technitium-dns
+          container_name: technitium-dns
           instance: dns
           stream: stdout
           __path__: /opt/technitium-dns/config/logs/*.log
@@ -27,6 +28,7 @@ scrape_configs:
         labels:
           job: dns/syslog
           service_name: syslog
+          container_name: syslog
           instance: dns
           stream: stdout
           __path__: /var/log/messages
