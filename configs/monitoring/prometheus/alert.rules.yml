@@ -1,90 +1,96 @@
 groups:
   - name: node_alerts
     rules:
-       - alert: HighCpuUsage
-         expr: 100 - (avg by(instance) (rate(node_cpu_seconds_total{mode="idle"}[5m])) * 100) > 85
-         for: 5m
-         labels:
-           severity: warning
-           alerttype: infrastructure
-         annotations:
-           summary: "High CPU usage on {{ $labels.instance }}"
-           description: "CPU usage is {{ $value }}% on {{ $labels.instance }}"
+      - alert: NodeDown
+        expr: up{job="node"} == 0
+        for: 2m
+        labels:
+          severity: critical
+          alerttype: infrastructure
+        annotations:
+          summary: "Node {{ $labels.instance }} is down"
+          description: "{{ $labels.instance }} has been unreachable for more than 2 minutes"
 
-       - alert: HighMemoryUsage
-         expr: (node_memory_MemTotal_bytes - node_memory_MemAvailable_bytes) / node_memory_MemTotal_bytes * 100 > 85
-         for: 5m
-         labels:
-           severity: warning
-           alerttype: storage
-         annotations:
-           summary: "High memory usage on {{ $labels.instance }}"
-           description: "Memory usage is {{ $value }}% on {{ $labels.instance }}"
+      - alert: HighCpuUsage
+        expr: 100 - (avg by(instance) (rate(node_cpu_seconds_total{mode="idle"}[5m])) * 100) > 85
+        for: 10m
+        labels:
+          severity: warning
+          alerttype: infrastructure
+        annotations:
+          summary: "High CPU on {{ $labels.instance }}"
+          description: "CPU usage is {{ $value | printf \"%.1f\" }}% on {{ $labels.instance }}"
 
-       - alert: HighDiskUsage
-         expr: (node_filesystem_size_bytes{fstype!="tmpfs"} - node_filesystem_free_bytes{fstype!="tmpfs"}) / node_filesystem_size_bytes{fstype!="tmpfs"} * 100 > 85
-         for: 10m
-         labels:
-           severity: warning
-           alerttype: storage
-         annotations:
-           summary: "High disk usage on {{ $labels.instance }} {{ $labels.mountpoint }}"
-           description: "Disk usage is {{ $value }}% on {{ $labels.instance }} {{ $labels.mountpoint }}"
+      - alert: HighMemoryUsage
+        expr: (node_memory_MemTotal_bytes - node_memory_MemAvailable_bytes) / node_memory_MemTotal_bytes * 100 > 90
+        for: 10m
+        labels:
+          severity: warning
+          alerttype: infrastructure
+        annotations:
+          summary: "High memory on {{ $labels.instance }}"
+          description: "Memory usage is {{ $value | printf \"%.1f\" }}% on {{ $labels.instance }}"
 
-       - alert: NodeDown
-         expr: up == 0
-         for: 2m
-         labels:
-           severity: critical
-           alerttype: infrastructure
-         annotations:
-           summary: "Node {{ $labels.instance }} is down"
-           description: "{{ $labels.instance }} has been down for more than 2 minutes"
+      - alert: DiskSpaceLow
+        expr: (node_filesystem_avail_bytes{fstype!~"tmpfs|overlay"} / node_filesystem_size_bytes{fstype!~"tmpfs|overlay"}) * 100 < 15
+        for: 10m
+        labels:
+          severity: warning
+          alerttype: storage
+        annotations:
+          summary: "Low disk space on {{ $labels.instance }} {{ $labels.mountpoint }}"
+          description: "Only {{ $value | printf \"%.1f\" }}% free on {{ $labels.instance }}:{{ $labels.mountpoint }}"
+
+      - alert: DiskSpaceCritical
+        expr: (node_filesystem_avail_bytes{fstype!~"tmpfs|overlay"} / node_filesystem_size_bytes{fstype!~"tmpfs|overlay"}) * 100 < 5
+        for: 5m
+        labels:
+          severity: critical
+          alerttype: storage
+        annotations:
+          summary: "Critical disk space on {{ $labels.instance }} {{ $labels.mountpoint }}"
+          description: "Only {{ $value | printf \"%.1f\" }}% free on {{ $labels.instance }}:{{ $labels.mountpoint }}"
+
+      - alert: DiskReadingErrors
+        expr: rate(node_disk_read_errors_total[15m]) > 0
+        for: 5m
+        labels:
+          severity: warning
+          alerttype: storage
+        annotations:
+          summary: "Disk read errors on {{ $labels.instance }}"
+          description: "Device {{ $labels.device }} on {{ $labels.instance }} is reporting read errors"
 
   - name: service_alerts
     rules:
-       - alert: ServiceDown
-         expr: up{job!="node", job!="prometheus"} == 0
-         for: 3m
-         labels:
-           severity: critical
-           alerttype: service
-         annotations:
-           summary: "Service {{ $labels.job }} on {{ $labels.instance }} is down"
-           description: "{{ $labels.job }} on {{ $labels.instance }} has been down for more than 3 minutes"
+      - alert: DockerDaemonDown
+        expr: up{job="docker"} == 0
+        for: 3m
+        labels:
+          severity: critical
+          alerttype: service
+        annotations:
+          summary: "Docker daemon unreachable on {{ $labels.instance }}"
+          description: "Docker metrics endpoint on {{ $labels.instance }} has been down for 3 minutes"
 
-  - name: network_alerts
+  - name: prometheus_alerts
     rules:
-       - alert: HighNetworkTraffic
-         expr: rate(node_network_receive_bytes_total[5m]) > 10000000
-         for: 5m
-         labels:
-           severity: warning
-           alerttype: infrastructure
-         annotations:
-           summary: "High network traffic on {{ $labels.instance }} {{ $labels.device }}"
-           description: "Network receive rate is {{ $value }} bytes/sec on {{ $labels.instance }}"
+      - alert: PrometheusTargetMissing
+        expr: up == 0
+        for: 5m
+        labels:
+          severity: warning
+          alerttype: infrastructure
+        annotations:
+          summary: "Prometheus target missing: {{ $labels.instance }}"
+          description: "Scrape target {{ $labels.job }}/{{ $labels.instance }} has been down for 5 minutes"
 
-  - name: external_service_alerts
-    rules:
-       - alert: ExternalServiceDown
-         expr: 'probe_success{job="blackbox"} == 0'
-         for: 5m
-         labels:
-           severity: critical
-           alerttype: external
-           external: "true"
-         annotations:
-           summary: "External service {{ $labels.instance }} is down"
-           description: "Blackbox probe failed for {{ $labels.instance }}"
-
-       - alert: ExternalServiceHighLatency
-         expr: 'probe_duration_seconds{job="blackbox"} > 5'
-         for: 5m
-         labels:
-           severity: warning
-           alerttype: external
-           external: "true"
-         annotations:
-           summary: "External service {{ $labels.instance }} has high latency"
-           description: "Response time is {{ $value }}s for {{ $labels.instance }}"
+      - alert: PrometheusStorageFull
+        expr: (prometheus_tsdb_storage_blocks_bytes / prometheus_tsdb_head_chunks_storage_size_bytes) > 0.9
+        for: 10m
+        labels:
+          severity: warning
+          alerttype: storage
+        annotations:
+          summary: "Prometheus storage nearly full"
+          description: "Prometheus TSDB is over 90% of its storage limit"

@@ -1,77 +1,73 @@
 global:
   resolve_timeout: 5m
-  # Slack/email/etc. can be configured here if needed
 
 route:
-  receiver: 'default'
-  group_by: ['severity', 'alerttype', 'instance']
+  receiver: 'critical-receiver'
+  group_by: ['alertname', 'alerttype', 'instance']
   group_wait: 30s
   group_interval: 5m
-  repeat_interval: 24h
-  
+  repeat_interval: 12h
+
   routes:
-    # Critical infrastructure alerts → critical topic
-    - match:
-        severity: critical
-        alerttype: infrastructure
-      receiver: 'critical-receiver'
-      continue: true
-    
-    # Critical service alerts → critical topic
-    - match:
-        severity: critical
-        alerttype: service
-      receiver: 'critical-receiver'
-      continue: true
-    
-    # Storage warnings → storage topic
-    - match:
-        alerttype: storage
+    # Storage alerts → storage topic
+    - matchers:
+        - alerttype = storage
       receiver: 'storage-receiver'
-      continue: true
-    
-    # Service degradation → services topic
-    - match:
-        alerttype: service
+      continue: false
+
+    # Infrastructure warnings (non-critical) → services topic
+    - matchers:
+        - severity = warning
+        - alerttype = infrastructure
       receiver: 'services-receiver'
-      continue: true
-    
-    # External service alerts → external topic
-    - match:
-        external: 'true'
-      receiver: 'external-receiver'
-      continue: true
+      continue: false
+
+    # Everything critical → critical topic
+    - matchers:
+        - severity = critical
+      receiver: 'critical-receiver'
+      continue: false
 
 receivers:
-  - name: 'default'
-    webhook_configs:
-      - url: 'http://localhost:5001/'
-
   - name: 'critical-receiver'
     webhook_configs:
-      - url: 'http://alertmanager:{{ ntfy_alertmanager_password }}@10.1.0.24:8080/homelab-critical'
+      - url: 'http://10.1.0.24:8080/homelab-critical'
         send_resolved: true
+        http_config:
+          basic_auth:
+            username: alertmanager
+            password: '{{ ntfy_alertmanager_password }}'
 
   - name: 'storage-receiver'
     webhook_configs:
-      - url: 'http://alertmanager:{{ ntfy_alertmanager_password }}@10.1.0.24:8080/homelab-storage'
+      - url: 'http://10.1.0.24:8080/homelab-storage'
         send_resolved: true
+        http_config:
+          basic_auth:
+            username: alertmanager
+            password: '{{ ntfy_alertmanager_password }}'
 
   - name: 'services-receiver'
     webhook_configs:
-      - url: 'http://alertmanager:{{ ntfy_alertmanager_password }}@10.1.0.24:8080/homelab-services'
+      - url: 'http://10.1.0.24:8080/homelab-services'
         send_resolved: true
-
-  - name: 'external-receiver'
-    webhook_configs:
-      - url: 'http://alertmanager:{{ ntfy_alertmanager_password }}@10.1.0.24:8080/homelab-external'
-        send_resolved: true
+        http_config:
+          basic_auth:
+            username: alertmanager
+            password: '{{ ntfy_alertmanager_password }}'
 
 inhibit_rules:
-  # Don't alert on service down if the node is already down
-  - source_match:
-      severity: 'critical'
-      alerttype: 'infrastructure'
-    target_match:
-      alerttype: 'service'
+  # Suppress target missing warnings when node is already down
+  - source_matchers:
+      - alertname = NodeDown
+    target_matchers:
+      - alertname = PrometheusTargetMissing
+    equal: ['instance']
+
+  # Suppress service alerts when the node hosting them is down
+  - source_matchers:
+      - severity = critical
+      - alerttype = infrastructure
+    target_matchers:
+      - alerttype = service
     equal: ['instance']
