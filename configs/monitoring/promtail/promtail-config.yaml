@@ -20,6 +20,9 @@ scrape_configs:
       # Extract container name
       - source_labels: ['__meta_docker_container_name']
         target_label: 'container'
+      # Static host label
+      - target_label: 'host'
+        replacement: 'monitoring'
       # Add environment label (dmz or lan)
       - source_labels: ['__meta_docker_container_label_environment']
         target_label: 'environment'

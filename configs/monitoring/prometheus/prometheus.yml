@@ -44,24 +44,3 @@ scrape_configs:
          - '10.0.50.120:9323'  # DMZ docker-host
     metrics_path: /metrics
 
-  # Blackbox exporter for external service monitoring
-  - job_name: 'blackbox'
-    scrape_interval: 120s
-    metrics_path: /probe
-    params:
-      module: [http_2xx]
-    static_configs:
-      - targets:
-         - 'https://jellyfin.homelab.tarasa24.dev'
-         - 'https://immich.homelab.tarasa24.dev'
-         - 'https://cal.homelab.tarasa24.dev'
-    relabel_configs:
-      - source_labels: [__address__]
-        target_label: __param_target
-      - source_labels: [__param_target]
-        target_label: instance
-      - target_label: __address__
-        replacement: blackbox-exporter:9115
-
-  # Additional service targets can be added here
-  # See MONITORING_SETUP.md for configuration examples

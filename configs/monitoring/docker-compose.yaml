@@ -118,15 +118,6 @@ services:
       - prometheus
       - loki
 
-  # Optional: blackbox exporter for external service monitoring
-  blackbox-exporter:
-    image: prom/blackbox-exporter:latest
-    container_name: blackbox-exporter
-    restart: unless-stopped
-    volumes:
-      - ./prometheus/blackbox.yml:/etc/blackbox_exporter/config.yml:ro
-    networks:
-      - monitoring
 
 networks:
   monitoring:
