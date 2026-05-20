@@ -14,25 +14,18 @@ scrape_configs:
     docker_sd_configs:
       - host: unix:///var/run/docker.sock
     relabel_configs:
-      # Extract service name from container label
       - source_labels: ['__meta_docker_container_label_com_docker_compose_service']
-        target_label: 'job'
-      # Extract container name
+        target_label: '__service__'
       - source_labels: ['__meta_docker_container_name']
         target_label: 'container'
-      # Static host label
       - target_label: 'host'
         replacement: 'monitoring'
-      # Add environment label (dmz or lan)
-      - source_labels: ['__meta_docker_container_label_environment']
-        target_label: 'environment'
-        regex: '(.*)'
-        replacement: '${1}'
-      # Tag critical services; others get no severity label
-      - source_labels: ['job']
+      - source_labels: ['host', '__service__']
+        separator: '/'
+        target_label: 'job'
+      - source_labels: ['__service__']
         target_label: 'severity'
-        regex: '(traefik|jellyfin|immich|authelia|vaultwarden|backup|prometheus|alertmanager|loki)'
+        regex: '(prometheus|alertmanager|loki|grafana)'
         replacement: 'critical'
-      # Add stream label (stdout/stderr)
       - source_labels: ['__meta_docker_container_log_stream']
         target_label: 'stream'
