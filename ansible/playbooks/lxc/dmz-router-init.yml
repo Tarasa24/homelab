@@ -128,6 +128,48 @@
             creates: "/etc/letsencrypt/renewal/{{ item }}.conf"
           with_items: "{{ certificates }}"
 
+    - name: Setup GeoIP2
+      block:
+        - name: Install nginx GeoIP2 module and libmaxminddb
+          ansible.builtin.package:
+            name: [nginx-mod-http-geoip2, libmaxminddb]
+            state: present
+
+        - name: Create GeoIP2 database directory
+          ansible.builtin.file:
+            path: /etc/nginx/geoip
+            state: directory
+            owner: root
+            group: root
+            mode: '0755'
+
+        - name: Download GeoLite2-Country database
+          ansible.builtin.get_url:
+            url: "https://download.maxmind.com/app/geoip_download?edition_id=GeoLite2-Country&license_key={{ lookup('file', '../../../secrets/dmz_router/maxmind/license_key') }}&suffix=tar.gz"
+            dest: /tmp/GeoLite2-Country.tar.gz
+            mode: '0644'
+
+        - name: Extract GeoLite2-Country database
+          ansible.builtin.shell: |
+            tar -xzf /tmp/GeoLite2-Country.tar.gz -C /tmp/
+            find /tmp -name 'GeoLite2-Country.mmdb' -exec cp {} /etc/nginx/geoip/GeoLite2-Country.mmdb \;
+          args:
+            creates: /etc/nginx/geoip/GeoLite2-Country.mmdb
+
+        - name: Setup monthly GeoIP2 database refresh cron
+          ansible.builtin.cron:
+            name: "Refresh GeoLite2-Country database"
+            job: >
+              wget -q -O /tmp/GeoLite2-Country.tar.gz
+              'https://download.maxmind.com/app/geoip_download?edition_id=GeoLite2-Country&license_key={{ lookup('file', '../../../secrets/dmz_router/maxmind/license_key') }}&suffix=tar.gz'
+              && tar -xzf /tmp/GeoLite2-Country.tar.gz -C /tmp/
+              && find /tmp -name 'GeoLite2-Country.mmdb' -exec cp {} /etc/nginx/geoip/GeoLite2-Country.mmdb \;
+              && nginx -s reload
+            minute: "0"
+            hour: "3"
+            day: "1"
+            state: present
+
     - name: Setup nginx
       block:
         - name: Install nginx
