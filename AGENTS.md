@@ -29,17 +29,21 @@ homelab/
 │   │   ├── linode/      # Linode bastion host playbook
 │   │   └── all/         # Cross-host playbooks (e.g. trigger borg backup on all hosts)
 │   ├── roles/
-│   │   ├── docker/      # Install Docker + docker-compose on Alpine
-│   │   ├── borgmatic/   # Install borgmatic, copy SSH key, restore from backup, set up cron
-│   │   └── lxc_python3/ # Install Python 3 inside an LXC (needed for Ansible modules)
+│   │   ├── docker/        # Install Docker + docker-compose on Alpine; enables metrics on :9323
+│   │   ├── borgmatic/     # Install borgmatic, copy SSH key, restore from backup, set up cron
+│   │   ├── lxc_python3/   # Install Python 3 inside an LXC (needed for Ansible modules)
+│   │   ├── node_exporter/ # Install prometheus-node-exporter (OpenRC on Alpine, systemd on Debian)
+│   │   └── promtail/      # Install loki-promtail, deploy host-specific config from configs/promtail/
 │   └── plugins/
 │       └── connection/pct_ssh.py  # Custom Ansible connection plugin: SSH → PVE host → pct exec into LXC
 ├── configs/             # Application/service configuration files deployed by Ansible
 │   ├── dmz_router/      # nginx, dnsmasq, WireGuard configs for the DMZ router LXC
 │   ├── dmz_docker-host/ # Docker Compose stacks for public-facing DMZ services
+│   ├── dmz_bitcoin-node/ # bitcoind + electrs service files and bitcoin.conf
 │   ├── private-docker-host/ # Docker Compose stacks for internal LAN services
-│   ├── monitoring/      # Prometheus/Thanos/Loki/Grafana stack
+│   ├── monitoring/      # Prometheus/Loki/Grafana/Alertmanager/Uptime Kuma stack
 │   ├── backup/          # borgmatic and resticprofile backup job configs
+│   ├── promtail/        # Host-specific Promtail configs (backup, dns, dmz-router)
 │   └── linode/          # WireGuard server config + nftables for the Linode bastion
 ├── secrets/             # git-crypt encrypted secrets (keys, credentials, API tokens)
 │   ├── wireguard/       # WireGuard private/public keys and preshared key
@@ -73,7 +77,7 @@ Static allocations:
 
 | IP | VM/LXC ID | Role |
 |---|---|---|
-| `10.0.1.1` | 1001 | DNS (T-DNS / Pi-hole) |
+| `10.0.1.1` | 1001 | DNS (Technitium DNS) |
 | `10.0.1.2` | 1002 | DMZ Router |
 | `10.0.1.3` | 1003 | Backup server |
 | `10.0.1.4` | 1004 | Monitoring (Prometheus/Grafana/Loki) |
@@ -85,10 +89,24 @@ Static allocations:
 ### DMZ subnet (`10.1.0.x`)
 | IP | VM/LXC ID | Role |
 |---|---|---|
-| `10.1.0.1` | — | DMZ Router (LAN-side interface) |
+| `10.1.0.1` | — | DMZ Router (DMZ-side interface) |
+| `10.1.0.2` | 10002 | DMZ mail (reserved/unused) |
 | `10.1.0.3` | 10003 | Bitcoin node |
 | `10.1.0.20` | 100020 | DMZ docker-host (public-facing services) |
 | `10.1.0.100` | 1000100 | DMZ Tailscale connector |
+
+### Monitoring VLAN 50 (`10.0.50.x`)
+Out-of-band monitoring network — all nodes with the `mon` NIC get a VLAN 50 interface for Prometheus scraping. No DHCP; all static.
+
+| IP | Host |
+|---|---|
+| `10.0.50.1` | dns |
+| `10.0.50.2` | dmz-router |
+| `10.0.50.3` | backup |
+| `10.0.50.4` | monitoring |
+| `10.0.50.20` | private-docker-host |
+| `10.0.50.103` | dmz-bitcoin-node |
+| `10.0.50.120` | dmz-docker-host |
 
 ### Linode (cloud)
 - `45.79.249.185` — Debian VPS acting as WireGuard server / public-IP bastion for the DMZ.
