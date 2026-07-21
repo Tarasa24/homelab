@@ -49,7 +49,7 @@ services:
 
   immich-database:
     container_name: immich_postgres
-    image: docker.io/tensorchord/pgvecto-rs:pg14-v0.2.0@sha256:90724186f0a3517cf6914295b5ab410db9ce23190a2d9d0b9dd6463e3fa298f0
+    image: ghcr.io/immich-app/postgres:14-vectorchord0.4.3-pgvectors0.2.0@sha256:bcf63357191b76a916ae5eb93464d65c07511da41e3bf7a8416db519b40b1c23
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
@@ -71,6 +71,7 @@ services:
       postgres
       -c shared_preload_libraries=vectors.so
       -c 'search_path="$$user", public, vectors'
+      -c shared_preload_libraries=vchord.so,vectors.so
       -c logging_collector=on
       -c max_wal_size=2GB
       -c shared_buffers=512MB
