@@ -122,11 +122,17 @@
             content: "{{ certbot_linode_credentials }}"
             dest: /etc/letsencrypt/linode.ini
             mode: "0600"
+        - name: Check if certificates should be generated (they dont exist or are expired)
+          ansible.builtin.command: certbot certificates --cert-name {{ item }}
+          register: certbot_certificates
+          ignore_errors: true
+          with_items: "{{ certificates }}"
         - name: Certbot - Generate SSL certificates
           ansible.builtin.command: certbot certonly --dns-linode --dns-linode-credentials /etc/letsencrypt/linode.ini --dns-linode-propagation-seconds 60 --email {{ certbot_email }} --agree-tos --no-eff-email --cert-name {{ item }} -d {{ item }} # --test-cert
           args:
             creates: "/etc/letsencrypt/renewal/{{ item }}.conf"
           with_items: "{{ certificates }}"
+          when: certbot_certificates.results[loop.index0].rc != 0 or 'Certificate not yet due for renewal' in certbot_certificates.results[loop.index0].stderr
 
     - name: Setup GeoIP2
       block:
