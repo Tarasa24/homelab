@@ -1,0 +1,95 @@
+services:
+  ghostfolio_app:
+    image: docker.io/ghostfolio/ghostfolio:latest  # Uses the latest Ghostfolio Docker image.
+    container_name: ghostfolio                # Names the container for easier management.
+    restart: always                          # Restarts the container automatically on failure.
+    cap_drop:
+      - ALL                                  # Drops all Linux capabilities.
+    security_opt:
+      - no-new-privileges:true               # Prevents privilege escalation inside the container.
+    env_file:
+      - ./ghostfolio/config/.env             # Loads environment variables from the shared .env file.
+    networks:
+      - ghostfolio                            # Connects to the specified Docker network.
+      - default
+    ports:
+      - "10.0.1.26:3333:3333"                # Exposes Ghostfolio on port 3333.
+    depends_on:
+      ghostfolio_db:
+        condition: service_healthy            # Waits for Postgres to be healthy before starting.
+      ghostfolio_redis:
+        condition: service_healthy            # Waits for Redis to be healthy before starting.
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:3333/api/v1/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    labels:
+      - "traefik.enable=true"
+      - "traefik.docker.network=root_default"
+      - "traefik.http.routers.ghostfolio.rule=Host(`ghostfolio.lan.tarasa24.dev`)"
+      - "traefik.http.routers.ghostfolio.entrypoints=https"
+      - "traefik.http.routers.ghostfolio.tls=true"
+      - "traefik.http.routers.ghostfolio.middlewares=hsts@file"
+      - "traefik.http.services.ghostfolio.loadbalancer.server.port=3333"
+
+  ghostfolio_db:
+    image: postgres:15-alpine                # Uses the Postgres 15 Alpine image.
+    container_name: gf-postgres              # Names the container for easier management.
+    hostname: postgres                       # Sets the hostname inside the container (matches DATABASE_URL).
+    restart: always                          # Restarts the container automatically on failure.
+    cap_drop:
+      - ALL                                  # Drops all Linux capabilities.
+    cap_add:
+      - CHOWN                                # Allows changing file ownership (needed by Postgres init).
+      - DAC_OVERRIDE                         # Allows bypassing file permission checks (needed by Postgres init).
+      - FOWNER                               # Allows bypassing owner checks (needed by Postgres init).
+      - SETGID                               # Allows setting group IDs (needed by Postgres init).
+      - SETUID                               # Allows setting user IDs (needed by Postgres init).
+    security_opt:
+      - no-new-privileges:true               # Prevents privilege escalation inside the container.
+    user: postgres                           # Runs the container as the postgres user.
+    env_file:
+      - ./ghostfolio/config/.env             # Loads environment variables from the shared .env file.
+    networks:
+      - ghostfolio                            # Connects to the specified Docker network.
+    volumes:
+      - ghostfolio_db:/var/lib/postgresql/data  # Stores database data persistently.
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  ghostfolio_redis:
+    image: redis:alpine                      # Uses the latest Redis Alpine image.
+    container_name: gf-redis                 # Names the container for easier management.
+    hostname: redis                          # Sets the hostname inside the container (matches REDIS_HOST).
+    restart: always                          # Restarts the container automatically on failure.
+    user: '999:1000'                         # Matches the uid:gid that owns /data in the redis image; root would fail without DAC_OVERRIDE (dropped below).
+    cap_drop:
+      - ALL                                  # Drops all Linux capabilities.
+    cap_add:
+      - SETGID                               # Allows setting group IDs (needed by Redis).
+      - SETUID                               # Allows setting user IDs (needed by Redis).
+    security_opt:
+      - no-new-privileges:true               # Prevents privilege escalation inside the container.
+    command: sh -c 'redis-server --requirepass "$$REDIS_PASSWORD"'  # Enables password authentication for Redis (resolved at container runtime from env_file, not compose-level interpolation).
+    env_file:
+      - ./ghostfolio/config/.env             # Loads environment variables from the shared .env file.
+    networks:
+      - ghostfolio                            # Connects to the specified Docker network.
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "$$REDIS_PASSWORD", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  ghostfolio_db:
+    external: true
+    name: root_ghostfolio_db
+
+networks:
+  ghostfolio:
+    driver: bridge

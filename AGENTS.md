@@ -184,6 +184,8 @@ Virtual NICs `eth0:0` through `eth0:9` (`10.0.1.21–30`) are assigned at boot v
 | `arr_stack/` | `10.0.1.23` | WireGuard + qBittorrent, Sonarr, Radarr, Prowlarr, Bazarr, FlareSolverr |
 | `firefly_iii/` | `10.0.1.24` | Firefly III personal finance |
 | `unifi-controller/` | `10.0.1.25` | Unifi network controller |
+| (root compose) | `10.0.1.20` | Promtail (log shipper) |
+| `ghostfolio/` | `10.0.1.26` | Ghostfolio portfolio tracker (Postgres + Redis) |
 | (root compose) | `10.0.1.20` | Prometheus (scraping agent) + Promtail (log shipper) |
 
 The `arr_stack` services run inside a WireGuard network namespace (all share the `wireguard` container's network via `network_mode: service:wireguard`).
