@@ -71,6 +71,12 @@ ruler:
   # loki-data volume; keeping them separate avoids that entirely.
   rule_path: /loki/rules-tmp
   alertmanager_url: http://alertmanager:9093
+  # Required. Loki's ruler defaults to Alertmanager's v1 alert API, which was
+  # removed in Alertmanager 0.27; against 0.33 every notification came back
+  # "410 Gone" and no log-based alert was ever deliverable, even though the
+  # rules themselves evaluated and fired correctly. Verified by tailing the
+  # loki container log for notifier.go errors.
+  enable_alertmanager_v2: true
   external_labels:
     cluster: 'homelab'
     environment: 'production'
