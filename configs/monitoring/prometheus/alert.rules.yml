@@ -424,6 +424,42 @@ groups:
           description: "cAdvisor has not seen container unifi-db on private-docker-host for 10 minutes"
 
       - alert: ContainerDown
+        expr: absent_over_time(container_last_seen{name="ghostfolio"}[10m])
+        for: 5m
+        labels:
+          severity: critical
+          alerttype: service
+          host: private-docker-host
+          container: ghostfolio
+        annotations:
+          summary: "Container ghostfolio has disappeared"
+          description: "cAdvisor has not seen container ghostfolio on private-docker-host for 10 minutes"
+
+      - alert: ContainerDown
+        expr: absent_over_time(container_last_seen{name="gf-postgres"}[10m])
+        for: 5m
+        labels:
+          severity: critical
+          alerttype: service
+          host: private-docker-host
+          container: gf-postgres
+        annotations:
+          summary: "Container gf-postgres has disappeared"
+          description: "cAdvisor has not seen container gf-postgres (ghostfolio database) on private-docker-host for 10 minutes"
+
+      - alert: ContainerDown
+        expr: absent_over_time(container_last_seen{name="gf-redis"}[10m])
+        for: 5m
+        labels:
+          severity: critical
+          alerttype: service
+          host: private-docker-host
+          container: gf-redis
+        annotations:
+          summary: "Container gf-redis has disappeared"
+          description: "cAdvisor has not seen container gf-redis (ghostfolio cache) on private-docker-host for 10 minutes"
+
+      - alert: ContainerDown
         expr: absent_over_time(container_last_seen{name="traefik"}[10m])
         for: 5m
         labels:

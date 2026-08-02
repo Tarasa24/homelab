@@ -9,6 +9,7 @@ source_directories:
   - /var/lib/docker/volumes/root_firefly_iii_db/_data
   - /var/lib/docker/volumes/root_unifi-controller-config/_data
   - /var/lib/docker/volumes/root_unifi-db/_data
+  - /var/lib/docker/volumes/root_ghostfolio_db/_data
 
 repositories:
   - path: ssh://backup@10.0.1.3/backup/repos/private-docker-host
@@ -34,13 +35,16 @@ before_backup:
   - cd /root && docker compose stop prowlarr sonarr radarr bazarr qbittorrent
   - cd /root && docker compose stop firefly_iii_db firefly_iii_app firefly_iii_importer firefly_iii_cron
   - cd /root && docker compose stop unifi-db unifi-controller
+  - cd /root && docker compose stop ghostfolio_db ghostfolio_app ghostfolio_redis
 after_backup:
   - cd /root && docker compose start vaultwarden
   - cd /root && docker compose start prowlarr sonarr radarr bazarr qbittorrent
   - cd /root && docker compose start firefly_iii_db firefly_iii_app firefly_iii_importer firefly_iii_cron
   - cd /root && docker compose start unifi-db unifi-controller
+  - cd /root && docker compose start ghostfolio_db ghostfolio_app ghostfolio_redis
 on_error:
   - cd /root && docker compose start vaultwarden
   - cd /root && docker compose start prowlarr sonarr radarr bazarr qbittorrent
   - cd /root && docker compose start firefly_iii_db firefly_iii_app firefly_iii_importer firefly_iii_cron
   - cd /root && docker compose start unifi-db unifi-controller
+  - cd /root && docker compose start ghostfolio_db ghostfolio_app ghostfolio_redis

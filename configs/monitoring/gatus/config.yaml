@@ -198,6 +198,24 @@ endpoints:
       host: private-docker-host
       path: internal
 
+  - name: "Ghostfolio"
+    group: "Internal"
+    url: "http://10.0.1.26:3333/api/v1/health"
+    interval: 60s
+    client:
+      timeout: 10s
+    conditions:
+      - "[STATUS] == 200"
+    ui:
+      hide-url: true
+      hide-hostname: true
+      hide-port: true
+      hide-conditions: true
+      hide-errors: true
+    extra-labels:
+      host: private-docker-host
+      path: internal
+
   - name: "Unifi Controller"
     group: "Internal"
     url: "https://10.0.1.25:8443/"
