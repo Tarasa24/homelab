@@ -36,9 +36,17 @@ route:
       continue: false
 
 receivers:
+  # ntfy is reached over its PUBLIC URL, not the DMZ address 10.1.0.24:8080.
+  # The monitoring LXC sits on the LAN with its default gateway at the home
+  # router and has no route into the DMZ (10.1.0.0/24), so the internal address
+  # silently timed out on every notification - alerting was never deliverable.
+  # This path egresses the WAN and re-enters via the Linode bastion, which means
+  # alert delivery depends on the home uplink; that is acceptable because push
+  # to a phone requires internet regardless. The alternative, a static route
+  # into the DMZ, would weaken the isolation the DMZ exists to provide.
   - name: 'critical-receiver'
     webhook_configs:
-      - url: 'http://10.1.0.24:8080/homelab-critical'
+      - url: 'https://ntfy.homelab.tarasa24.dev/homelab-critical'
         send_resolved: true
         http_config:
           basic_auth:
@@ -47,7 +55,7 @@ receivers:
 
   - name: 'storage-receiver'
     webhook_configs:
-      - url: 'http://10.1.0.24:8080/homelab-storage'
+      - url: 'https://ntfy.homelab.tarasa24.dev/homelab-storage'
         send_resolved: true
         http_config:
           basic_auth:
@@ -56,7 +64,7 @@ receivers:
 
   - name: 'services-receiver'
     webhook_configs:
-      - url: 'http://10.1.0.24:8080/homelab-services'
+      - url: 'https://ntfy.homelab.tarasa24.dev/homelab-services'
         send_resolved: true
         http_config:
           basic_auth:

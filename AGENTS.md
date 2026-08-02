@@ -282,6 +282,18 @@ and `gatus_uptime`. Neither exists in the shipped binary. The real metrics are
 Verify against the live `/metrics` output after any Gatus upgrade — a renamed
 metric silently disables `ExternalServiceDown`.
 
+**Alert delivery path**: Alertmanager reaches ntfy over its *public* URL
+(`https://ntfy.homelab.tarasa24.dev/<topic>`), not the DMZ address
+`10.1.0.24:8080`. The monitoring LXC is on the LAN with its default gateway at
+the home router and has no route into `10.1.0.0/24`, so the internal address
+times out on every notification — and because a TCP connect timeout takes about
+two minutes, `alertmanager_notifications_failed_total` reads zero for a while
+before the failure lands. Do not trust that counter immediately after sending;
+confirm against the ntfy topic itself or the Alertmanager log. Delivery therefore
+depends on the home uplink, which is acceptable since push to a phone needs
+internet anyway; routing the LAN into the DMZ instead would weaken the isolation
+the DMZ exists to provide.
+
 **The `host` label contract**: every node, docker and cadvisor scrape target
 carries a static `host` label, and every Gatus endpoint sets one via
 `extra-labels`. Alertmanager's inhibit rule matches on `host` to suppress service
