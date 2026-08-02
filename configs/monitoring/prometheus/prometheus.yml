@@ -26,21 +26,55 @@ scrape_configs:
     scrape_interval: 60s
     static_configs:
       # Static IP assignments for VLAN 50 monitoring network
-      - targets:
-        - '10.0.50.1:9100'  # DNS (T-DNS / Pi-hole)
-        - '10.0.50.2:9100'  # DMZ Router
-        - '10.0.50.3:9100'  # Backup server
-        - '10.0.50.4:9100'  # Monitoring (self)
-        - '10.0.50.20:9100' # Private docker-host
-        - '10.0.50.120:9100' # DMZ docker-host
-        - '10.0.50.103:9100' # DMZ bitcoin node
+      - targets: ['10.0.50.1:9100']  # DNS (T-DNS / Pi-hole)
+        labels:
+          host: dns
+      - targets: ['10.0.50.2:9100']  # DMZ Router
+        labels:
+          host: dmz-router
+      - targets: ['10.0.50.3:9100']  # Backup server
+        labels:
+          host: backup
+      - targets: ['10.0.50.4:9100']  # Monitoring (self)
+        labels:
+          host: monitoring
+      - targets: ['10.0.50.20:9100'] # Private docker-host
+        labels:
+          host: private-docker-host
+      - targets: ['10.0.50.120:9100'] # DMZ docker-host
+        labels:
+          host: dmz-docker-host
+      - targets: ['10.0.50.103:9100'] # DMZ bitcoin node
+        labels:
+          host: dmz-bitcoin-node
 
 # Docker metrics from docker hosts
   - job_name: 'docker'
     scrape_interval: 60s
     static_configs:
-      - targets:
-         - '10.0.50.20:9323'  # Private docker-host
-         - '10.0.50.120:9323'  # DMZ docker-host
+      - targets: ['10.0.50.20:9323']  # Private docker-host
+        labels:
+          host: private-docker-host
+      - targets: ['10.0.50.120:9323']  # DMZ docker-host
+        labels:
+          host: dmz-docker-host
     metrics_path: /metrics
+
+# cAdvisor: per-container metrics from docker hosts
+  - job_name: 'cadvisor'
+    scrape_interval: 60s
+    static_configs:
+      - targets: ['10.0.50.20:8081']  # Private docker-host
+        labels:
+          host: private-docker-host
+      - targets: ['10.0.50.120:8081']  # DMZ docker-host
+        labels:
+          host: dmz-docker-host
+
+# Gatus: synthetic probing / availability metrics
+  - job_name: 'gatus'
+    scrape_interval: 60s
+    metrics_path: /metrics
+    static_configs:
+      - targets: ['gatus:8080']
 

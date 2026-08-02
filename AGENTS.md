@@ -41,7 +41,7 @@ homelab/
 │   ├── dmz_docker-host/ # Docker Compose stacks for public-facing DMZ services
 │   ├── dmz_bitcoin-node/ # bitcoind + electrs service files and bitcoin.conf
 │   ├── private-docker-host/ # Docker Compose stacks for internal LAN services
-│   ├── monitoring/      # Prometheus/Loki/Grafana/Alertmanager/Uptime Kuma stack
+│   ├── monitoring/      # Prometheus/Loki/Grafana/Alertmanager/Gatus stack
 │   ├── backup/          # borgmatic and resticprofile backup job configs
 │   ├── promtail/        # Host-specific Promtail configs (backup, dns, dmz-router)
 │   └── linode/          # WireGuard server config + nftables for the Linode bastion
@@ -122,7 +122,7 @@ All containers use Alpine Linux unless noted. Templates are downloaded by Terraf
 | `lxc_dns` | `lxc_dns.tf` | Alpine | DNS server; provisioned via `local-exec` in Terraform |
 | `lxc_dmz_router` | `lxc_dmz_router.tf` | Alpine | Two NICs (LAN + DMZ bridge `vmbr1`); WireGuard + nginx + dnsmasq + Certbot |
 | `lxc_backup` | `lxc_backup.tf` | Alpine | Borg server + resticprofile; USB-SSD backup mount |
-| `lxc_monitoring` | `lxc_monitoring.tf` | Alpine | Docker; Prometheus/Loki/Grafana/Alertmanager/Uptime Kuma; state in named Docker volumes |
+| `lxc_monitoring` | `lxc_monitoring.tf` | Alpine | Docker; Prometheus/Loki/Grafana/Alertmanager/Gatus; state in named Docker volumes |
 | `vm_homeassistant` | `vm_homeassistant.tf` | HAOS (qcow2) | Full VM; 4 GB RAM; OVMF/UEFI; q35 machine type |
 | `lxc_private-docker-host` | `lxc_private-docker-host.tf` | Alpine | Docker; internal services; SSL certs + media shares mounted |
 | `lxc_homelab_tailscale_connector` | `lxc_homelab_tailscale_connector.tf` | Alpine | Cloned from Tailscale connector template |
@@ -202,7 +202,8 @@ Virtual NICs `eth0:0` through `eth0:9` (`10.0.1.21–30`) are assigned at boot v
 | `arr_stack/` | `10.0.1.23` | WireGuard + qBittorrent, Sonarr, Radarr, Prowlarr, Bazarr, FlareSolverr |
 | `firefly_iii/` | `10.0.1.24` | Firefly III personal finance |
 | `unifi-controller/` | `10.0.1.25` | Unifi network controller |
-| (root compose) | `10.0.1.20` | Prometheus (scraping agent) + Promtail (log shipper) |
+| (root compose) | `10.0.1.20` | Promtail (log shipper) |
+| `cadvisor/` | `10.0.50.20` | cAdvisor per-container metrics on `:8081` (VLAN 50) |
 
 The `arr_stack` services run inside a WireGuard network namespace (all share the `wireguard` container's network via `network_mode: service:wireguard`).
 
@@ -220,7 +221,8 @@ Internet-accessible services, isolated in the DMZ. Has GPU passthrough (`/dev/dr
 | Immich | Photo management; `/immich` from USB-HDD |
 | Radicale | CalDAV/CardDAV server |
 | ntfy | Push notification server (`10.1.0.24`); exposed at `ntfy.homelab.tarasa24.dev` |
-| Prometheus + Promtail | Local metrics/log scraping agents |
+| Promtail | Log shipper to Loki |
+| cAdvisor | Per-container metrics on `10.0.50.120:8081` (VLAN 50) |
 
 ---
 
@@ -234,11 +236,57 @@ Metrics and log storage on a dedicated container. All state in named Docker volu
 | Loki | Log aggregation; 7d retention; receives logs from all Promtail agents |
 | Alertmanager | Routes alerts from Prometheus and Loki ruler to ntfy |
 | Grafana | Dashboards; configured manually (no provisioning); datasources added via UI |
-| Uptime Kuma | Uptime monitoring; configured manually via UI |
+| Gatus | Availability probing + public status page; fully config-as-code |
 
 Grafana datasources (add manually after first deploy):
 - **Prometheus** — `http://prometheus:9090` (set as default)
 - **Loki** — `http://loki:3100`
+
+### Availability Monitoring (Gatus + cAdvisor)
+
+Service availability is covered by two complementary signals. Neither alone is
+sufficient, and they are designed to be read together.
+
+**Gatus** (`configs/monitoring/gatus/config.yaml`) — HTTP probing and the public
+status page at `status.homelab.tarasa24.dev`. Replaces both the removed
+blackbox-exporter and Uptime Kuma, and unlike Uptime Kuma it is entirely
+config-as-code. Endpoints are split into three groups:
+
+| Group | Path probed | Purpose |
+|---|---|---|
+| `Public` | public DNS → Linode → WireGuard → nginx → service | True end-user experience. Includes the home WAN uplink, so a failure does not isolate the fault. |
+| `Internal` | direct to `10.0.1.x` over the LAN | Bypasses the WAN entirely. If Public fails but Internal passes, the fault is in the WAN/Linode/WireGuard/nginx path, not the service. |
+| `Infrastructure` | compose service names on the monitoring network | The monitoring stack checking itself. |
+
+Gatus does **not** alert directly. It sets `metrics: true`, Prometheus scrapes it
+as job `gatus`, and Alertmanager owns routing to ntfy — one alert pipeline with
+one set of grouping, inhibition and resolved-notification semantics.
+
+**cAdvisor** (`configs/{dmz_docker-host,private-docker-host}/cadvisor/`) —
+per-container metrics on both Docker hosts, published on the VLAN 50 IP
+(`10.0.50.20:8081`, `10.0.50.120:8081`) and scraped as job `cadvisor`. This is
+the only source of per-container up/down state: the Docker daemon metrics on
+`:9323` are engine-level aggregates and stay green when an individual container
+dies. cAdvisor is required because the monitoring LXC has no route into the DMZ
+(`10.1.0.0/24`), so DMZ services cannot be probed directly over the LAN.
+
+Runs `privileged: true` with read-only mounts inside an unprivileged LXC; some
+cgroup metrics may be unavailable in that environment. `CAdvisorDown` fires if it
+stops reporting, because container-level alerting is blind while it is down.
+
+**Metric names caveat**: the Gatus documentation describes `gatus_check_result_total`
+and `gatus_uptime`. Neither exists in the shipped binary. The real metrics are
+`gatus_results_endpoint_success` (1/0 gauge), `gatus_results_total`,
+`gatus_results_certificate_expiration_seconds` and `gatus_results_duration_seconds`.
+Verify against the live `/metrics` output after any Gatus upgrade — a renamed
+metric silently disables `ExternalServiceDown`.
+
+**The `host` label contract**: every node, docker and cadvisor scrape target
+carries a static `host` label, and every Gatus endpoint sets one via
+`extra-labels`. Alertmanager's inhibit rule matches on `host` to suppress service
+alerts when the machine hosting them is already down. Do not add a `host` label to
+the `gatus` scrape job — it would collide with the per-endpoint value and
+Prometheus would rename the latter to `exported_host`, breaking the inhibit rules.
 
 ### Log Collection (Loki / Promtail)
 

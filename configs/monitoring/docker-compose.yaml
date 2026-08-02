@@ -82,20 +82,21 @@ services:
     depends_on:
       - loki
 
-  uptime-kuma:
-    image: louislam/uptime-kuma:latest
-    container_name: uptime-kuma
+  gatus:
+    image: ghcr.io/twin/gatus:stable
+    container_name: gatus
     restart: unless-stopped
-    environment:
-      - PUID=1000
-      - PGID=1000
-      - UPTIME_KUMA_DATA_DIR=/app/data
     volumes:
-      - uptime-kuma-data:/app/data
+      - ./gatus/config.yaml:/config/config.yaml:ro
+      - gatus-data:/data
     ports:
-      - "0.0.0.0:3001:3001"
+      - "0.0.0.0:8080:8080"
     networks:
       - monitoring
+    # No healthcheck: the Gatus image is distroless (no shell, no wget, no curl),
+    # so any CMD healthcheck would fail permanently and pin the container to
+    # "unhealthy". Liveness is covered externally instead - Prometheus scrapes it
+    # as job "gatus" and the GatusDown rule fires on up{job="gatus"} == 0.
 
   grafana:
     image: grafana/grafana-oss:latest
@@ -126,6 +127,6 @@ networks:
 volumes:
   prometheus-data:
   loki-data:
-  uptime-kuma-data:
+  gatus-data:
   grafana-data:
   alertmanager-data:

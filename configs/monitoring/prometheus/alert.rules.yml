@@ -94,3 +94,353 @@ groups:
         annotations:
           summary: "Prometheus storage nearly full"
           description: "Prometheus TSDB is over 90% of its storage limit"
+
+  - name: availability_alerts
+    rules:
+      # gatus_results_endpoint_success is a 1/0 gauge written on every probe, which
+      # is the most direct "is it up right now" signal Gatus exposes.
+      # Labels carried: name, group, host, path, key, type. `host` and `path` come
+      # from the per-endpoint extra-labels in gatus/config.yaml; `host` is what the
+      # alertmanager inhibit rules match on.
+      #
+      # NOTE: the Gatus docs describe metrics named gatus_check_result_total and
+      # gatus_uptime. Those do NOT exist in the shipped binary - the real names were
+      # confirmed against `ghcr.io/twin/gatus:stable` /metrics output. Re-verify
+      # these names after any Gatus upgrade, because a renamed metric silently
+      # disables this alert.
+      - alert: ExternalServiceDown
+        expr: gatus_results_endpoint_success == 0
+        # 60s probe + 60s scrape + 2m hold => roughly 3-4 minutes to page.
+        for: 2m
+        labels:
+          severity: critical
+          alerttype: service
+        annotations:
+          summary: "{{ $labels.name }} ({{ $labels.group }}) is down"
+          description: "Gatus probe for {{ $labels.name }} in group {{ $labels.group }} has been failing for more than 2 minutes on {{ $labels.host }} via the {{ $labels.path }} path"
+
+      # Only emitted for TLS endpoints. All public vhosts share one wildcard cert,
+      # so this will fire once per public endpoint - grouped by alertname in
+      # alertmanager, so it still arrives as a single notification.
+      - alert: TLSCertificateExpiringSoon
+        expr: gatus_results_certificate_expiration_seconds > 0 and gatus_results_certificate_expiration_seconds < 604800
+        for: 1h
+        labels:
+          severity: warning
+          alerttype: service
+        annotations:
+          summary: "TLS certificate for {{ $labels.name }} expires in under 7 days"
+          description: "The certificate served for {{ $labels.name }} ({{ $labels.group }}) expires in {{ $value | humanizeDuration }}; check that certbot renewal on the DMZ router is working"
+
+      - alert: GatusDown
+        expr: up{job="gatus"} == 0
+        for: 3m
+        labels:
+          severity: critical
+          alerttype: infrastructure
+          # Set here rather than on the scrape target: a "host" label on the
+          # gatus job would collide with the per-endpoint host from Gatus
+          # extra-labels and Prometheus would rename the latter to exported_host,
+          # breaking the alertmanager inhibit rules keyed on host.
+          host: monitoring
+        annotations:
+          summary: "Gatus is down"
+          description: "Prometheus has been unable to scrape Gatus for more than 3 minutes; service availability probing is blind"
+
+  - name: container_alerts
+    rules:
+      - alert: CAdvisorDown
+        expr: up{job="cadvisor"} == 0
+        for: 3m
+        labels:
+          severity: critical
+          alerttype: infrastructure
+        annotations:
+          summary: "cAdvisor unreachable on {{ $labels.instance }}"
+          description: "cAdvisor metrics endpoint on {{ $labels.instance }} has been down for 3 minutes; container-level alerting is blind while this is firing"
+
+      - alert: ContainerDown
+        expr: absent_over_time(container_last_seen{name="ntfy"}[10m])
+        for: 5m
+        labels:
+          severity: critical
+          alerttype: service
+          host: dmz-docker-host
+          container: ntfy
+        annotations:
+          summary: "Container ntfy has disappeared"
+          description: "cAdvisor has not seen container ntfy on dmz-docker-host for 10 minutes"
+
+      - alert: ContainerDown
+        expr: absent_over_time(container_last_seen{name="radicale"}[10m])
+        for: 5m
+        labels:
+          severity: critical
+          alerttype: service
+          host: dmz-docker-host
+          container: radicale
+        annotations:
+          summary: "Container radicale has disappeared"
+          description: "cAdvisor has not seen container radicale on dmz-docker-host for 10 minutes"
+
+      - alert: ContainerDown
+        expr: absent_over_time(container_last_seen{name="jellyfin"}[10m])
+        for: 5m
+        labels:
+          severity: critical
+          alerttype: service
+          host: dmz-docker-host
+          container: jellyfin
+        annotations:
+          summary: "Container jellyfin has disappeared"
+          description: "cAdvisor has not seen container jellyfin on dmz-docker-host for 10 minutes"
+
+      - alert: ContainerDown
+        expr: absent_over_time(container_last_seen{name="immich_server"}[10m])
+        for: 5m
+        labels:
+          severity: critical
+          alerttype: service
+          host: dmz-docker-host
+          container: immich_server
+        annotations:
+          summary: "Container immich_server has disappeared"
+          description: "cAdvisor has not seen container immich_server on dmz-docker-host for 10 minutes"
+
+      - alert: ContainerDown
+        expr: absent_over_time(container_last_seen{name="immich_redis"}[10m])
+        for: 5m
+        labels:
+          severity: critical
+          alerttype: service
+          host: dmz-docker-host
+          container: immich_redis
+        annotations:
+          summary: "Container immich_redis has disappeared"
+          description: "cAdvisor has not seen container immich_redis on dmz-docker-host for 10 minutes"
+
+      - alert: ContainerDown
+        expr: absent_over_time(container_last_seen{name="immich_postgres"}[10m])
+        for: 5m
+        labels:
+          severity: critical
+          alerttype: service
+          host: dmz-docker-host
+          container: immich_postgres
+        annotations:
+          summary: "Container immich_postgres has disappeared"
+          description: "cAdvisor has not seen container immich_postgres on dmz-docker-host for 10 minutes"
+
+      - alert: ContainerDown
+        expr: absent_over_time(container_last_seen{name="immich_machine_learning"}[10m])
+        for: 5m
+        labels:
+          severity: critical
+          alerttype: service
+          host: dmz-docker-host
+          container: immich_machine_learning
+        annotations:
+          summary: "Container immich_machine_learning has disappeared"
+          description: "cAdvisor has not seen container immich_machine_learning on dmz-docker-host for 10 minutes"
+
+      - alert: ContainerDown
+        expr: absent_over_time(container_last_seen{name="authelia"}[10m])
+        for: 5m
+        labels:
+          severity: critical
+          alerttype: service
+          host: private-docker-host
+          container: authelia
+        annotations:
+          summary: "Container authelia has disappeared"
+          description: "cAdvisor has not seen container authelia on private-docker-host for 10 minutes"
+
+      - alert: ContainerDown
+        expr: absent_over_time(container_last_seen{name="wireguard"}[10m])
+        for: 5m
+        labels:
+          severity: critical
+          alerttype: service
+          host: private-docker-host
+          container: wireguard
+        annotations:
+          summary: "Container wireguard has disappeared"
+          description: "cAdvisor has not seen container wireguard on private-docker-host for 10 minutes"
+
+      - alert: ContainerDown
+        expr: absent_over_time(container_last_seen{name="prowlarr"}[10m])
+        for: 5m
+        labels:
+          severity: critical
+          alerttype: service
+          host: private-docker-host
+          container: prowlarr
+        annotations:
+          summary: "Container prowlarr has disappeared"
+          description: "cAdvisor has not seen container prowlarr on private-docker-host for 10 minutes"
+
+      - alert: ContainerDown
+        expr: absent_over_time(container_last_seen{name="flaresolverr"}[10m])
+        for: 5m
+        labels:
+          severity: critical
+          alerttype: service
+          host: private-docker-host
+          container: flaresolverr
+        annotations:
+          summary: "Container flaresolverr has disappeared"
+          description: "cAdvisor has not seen container flaresolverr on private-docker-host for 10 minutes"
+
+      - alert: ContainerDown
+        expr: absent_over_time(container_last_seen{name="sonarr"}[10m])
+        for: 5m
+        labels:
+          severity: critical
+          alerttype: service
+          host: private-docker-host
+          container: sonarr
+        annotations:
+          summary: "Container sonarr has disappeared"
+          description: "cAdvisor has not seen container sonarr on private-docker-host for 10 minutes"
+
+      - alert: ContainerDown
+        expr: absent_over_time(container_last_seen{name="radarr"}[10m])
+        for: 5m
+        labels:
+          severity: critical
+          alerttype: service
+          host: private-docker-host
+          container: radarr
+        annotations:
+          summary: "Container radarr has disappeared"
+          description: "cAdvisor has not seen container radarr on private-docker-host for 10 minutes"
+
+      - alert: ContainerDown
+        expr: absent_over_time(container_last_seen{name="bazarr"}[10m])
+        for: 5m
+        labels:
+          severity: critical
+          alerttype: service
+          host: private-docker-host
+          container: bazarr
+        annotations:
+          summary: "Container bazarr has disappeared"
+          description: "cAdvisor has not seen container bazarr on private-docker-host for 10 minutes"
+
+      - alert: ContainerDown
+        expr: absent_over_time(container_last_seen{name="qbittorrent"}[10m])
+        for: 5m
+        labels:
+          severity: critical
+          alerttype: service
+          host: private-docker-host
+          container: qbittorrent
+        annotations:
+          summary: "Container qbittorrent has disappeared"
+          description: "cAdvisor has not seen container qbittorrent on private-docker-host for 10 minutes"
+
+      - alert: ContainerDown
+        expr: absent_over_time(container_last_seen{name="firefly_iii_app"}[10m])
+        for: 5m
+        labels:
+          severity: critical
+          alerttype: service
+          host: private-docker-host
+          container: firefly_iii_app
+        annotations:
+          summary: "Container firefly_iii_app has disappeared"
+          description: "cAdvisor has not seen container firefly_iii_app on private-docker-host for 10 minutes"
+
+      - alert: ContainerDown
+        expr: absent_over_time(container_last_seen{name="firefly_iii_db"}[10m])
+        for: 5m
+        labels:
+          severity: critical
+          alerttype: service
+          host: private-docker-host
+          container: firefly_iii_db
+        annotations:
+          summary: "Container firefly_iii_db has disappeared"
+          description: "cAdvisor has not seen container firefly_iii_db on private-docker-host for 10 minutes"
+
+      - alert: ContainerDown
+        expr: absent_over_time(container_last_seen{name="firefly_iii_importer"}[10m])
+        for: 5m
+        labels:
+          severity: critical
+          alerttype: service
+          host: private-docker-host
+          container: firefly_iii_importer
+        annotations:
+          summary: "Container firefly_iii_importer has disappeared"
+          description: "cAdvisor has not seen container firefly_iii_importer on private-docker-host for 10 minutes"
+
+      - alert: ContainerDown
+        expr: absent_over_time(container_last_seen{name="firefly_iii_cron"}[10m])
+        for: 5m
+        labels:
+          severity: critical
+          alerttype: service
+          host: private-docker-host
+          container: firefly_iii_cron
+        annotations:
+          summary: "Container firefly_iii_cron has disappeared"
+          description: "cAdvisor has not seen container firefly_iii_cron on private-docker-host for 10 minutes"
+
+      - alert: ContainerDown
+        expr: absent_over_time(container_last_seen{name="vaultwarden"}[10m])
+        for: 5m
+        labels:
+          severity: critical
+          alerttype: service
+          host: private-docker-host
+          container: vaultwarden
+        annotations:
+          summary: "Container vaultwarden has disappeared"
+          description: "cAdvisor has not seen container vaultwarden on private-docker-host for 10 minutes"
+
+      - alert: ContainerDown
+        expr: absent_over_time(container_last_seen{name="unifi-controller"}[10m])
+        for: 5m
+        labels:
+          severity: critical
+          alerttype: service
+          host: private-docker-host
+          container: unifi-controller
+        annotations:
+          summary: "Container unifi-controller has disappeared"
+          description: "cAdvisor has not seen container unifi-controller on private-docker-host for 10 minutes"
+
+      - alert: ContainerDown
+        expr: absent_over_time(container_last_seen{name="unifi-db"}[10m])
+        for: 5m
+        labels:
+          severity: critical
+          alerttype: service
+          host: private-docker-host
+          container: unifi-db
+        annotations:
+          summary: "Container unifi-db has disappeared"
+          description: "cAdvisor has not seen container unifi-db on private-docker-host for 10 minutes"
+
+      - alert: ContainerDown
+        expr: absent_over_time(container_last_seen{name="traefik"}[10m])
+        for: 5m
+        labels:
+          severity: critical
+          alerttype: service
+          host: private-docker-host
+          container: traefik
+        annotations:
+          summary: "Container traefik has disappeared"
+          description: "cAdvisor has not seen container traefik on private-docker-host for 10 minutes"
+
+      - alert: ContainerRestartLoop
+        expr: changes(container_start_time_seconds{name!=""}[15m]) > 2
+        for: 5m
+        labels:
+          severity: warning
+          alerttype: service
+        annotations:
+          summary: "Container {{ $labels.name }} is restart-looping"
+          description: "Container {{ $labels.name }} has restarted more than twice in the last 15 minutes"

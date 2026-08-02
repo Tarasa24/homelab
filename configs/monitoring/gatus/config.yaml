@@ -1,0 +1,404 @@
+# Gatus - service availability probing + public status page.
+# Replaces the removed blackbox-exporter and Uptime Kuma.
+#
+# Alerting is deliberately NOT configured here: Gatus exposes Prometheus metrics
+# (metrics: true), Prometheus scrapes them as job "gatus", and Alertmanager owns
+# routing to ntfy. This keeps a single alert pipeline with one set of grouping,
+# inhibition and resolved-notification semantics.
+#
+# This page is served publicly and unauthenticated at status.homelab.tarasa24.dev.
+# Public endpoints may show their hostname (it is already public DNS). Internal
+# endpoints hide url/hostname/port/errors so that a failed probe cannot leak
+# internal topology (e.g. "dial tcp 10.0.1.22:80: connection refused") to
+# anonymous visitors.
+
+web:
+  port: 8080
+
+storage:
+  type: sqlite
+  path: /data/gatus.db
+
+metrics: true
+
+ui:
+  title: "Homelab Status"
+  header: "Homelab Status"
+  description: "Live availability of homelab services."
+
+endpoints:
+  # ---------------------------------------------------------------------------
+  # Public - the real end-user path:
+  # public DNS -> Linode bastion -> WireGuard -> dmz-router nginx -> service.
+  # A failure here means users are affected, but it does NOT isolate the fault:
+  # the home WAN uplink is part of this path. Correlate with the Internal group
+  # and with cAdvisor ContainerDown alerts to tell "service died" from
+  # "uplink died".
+  # ---------------------------------------------------------------------------
+  - name: "Jellyfin"
+    group: "Public"
+    url: "https://jellyfin.homelab.tarasa24.dev/health"
+    interval: 60s
+    client:
+      timeout: 10s
+    conditions:
+      # Certificate expiry is deliberately NOT asserted as a condition here.
+      # Gatus exports gatus_results_certificate_expiration_seconds for every TLS
+      # endpoint, and the TLSCertificateExpiringSoon Prometheus rule alerts on it.
+      # Folding it into a condition would paint Jellyfin as "down" on the public
+      # status page over a cert that is merely approaching renewal.
+      - "[STATUS] == 200"
+    ui:
+      hide-conditions: true
+      hide-errors: true
+    extra-labels:
+      host: dmz-docker-host
+      path: external
+
+  - name: "Immich"
+    group: "Public"
+    url: "https://immich.homelab.tarasa24.dev/api/server/ping"
+    interval: 60s
+    client:
+      timeout: 10s
+    conditions:
+      - "[STATUS] == 200"
+    ui:
+      hide-conditions: true
+      hide-errors: true
+    extra-labels:
+      host: dmz-docker-host
+      path: external
+
+  - name: "ntfy"
+    group: "Public"
+    url: "https://ntfy.homelab.tarasa24.dev/v1/health"
+    interval: 60s
+    client:
+      timeout: 10s
+    conditions:
+      - "[STATUS] == 200"
+    ui:
+      hide-conditions: true
+      hide-errors: true
+    extra-labels:
+      host: dmz-docker-host
+      path: external
+
+  - name: "Calendar & Contacts"
+    group: "Public"
+    url: "https://cal.homelab.tarasa24.dev/"
+    interval: 60s
+    client:
+      ignore-redirect: true
+      timeout: 10s
+    conditions:
+      # Auth-gated behind Authelia; a redirect or 401 still proves that nginx,
+      # the TLS termination and Authelia are all alive.
+      - "[STATUS] == any(200, 301, 302, 401)"
+    ui:
+      hide-conditions: true
+      hide-errors: true
+    extra-labels:
+      host: dmz-docker-host
+      path: external
+
+  - name: "Authelia"
+    group: "Public"
+    url: "https://auth.homelab.tarasa24.dev/api/health"
+    interval: 60s
+    client:
+      timeout: 10s
+    conditions:
+      - "[STATUS] == any(200, 401)"
+    ui:
+      hide-conditions: true
+      hide-errors: true
+    extra-labels:
+      host: private-docker-host
+      path: external
+
+  # ---------------------------------------------------------------------------
+  # Internal - LAN services probed directly over the 10.0.0.0/22, bypassing the
+  # WAN entirely. If a Public probe fails but its Internal counterpart passes,
+  # the fault is in the WAN/Linode/WireGuard/nginx path, not the service.
+  # All network detail is hidden from the public page.
+  # ---------------------------------------------------------------------------
+  - name: "Traefik"
+    group: "Internal"
+    # Traefik runs with --api.insecure=true on :8080, so /api/overview is a
+    # reliable liveness check. /ping is NOT enabled in this deployment.
+    url: "http://10.0.1.20:8080/api/overview"
+    interval: 60s
+    client:
+      timeout: 10s
+    conditions:
+      - "[STATUS] == 200"
+    ui:
+      hide-url: true
+      hide-hostname: true
+      hide-port: true
+      hide-conditions: true
+      hide-errors: true
+    extra-labels:
+      host: private-docker-host
+      path: internal
+
+  - name: "Authelia (LAN)"
+    group: "Internal"
+    url: "http://10.0.1.21:9091/api/health"
+    interval: 60s
+    client:
+      timeout: 10s
+    conditions:
+      - "[STATUS] == any(200, 401)"
+    ui:
+      hide-url: true
+      hide-hostname: true
+      hide-port: true
+      hide-conditions: true
+      hide-errors: true
+    extra-labels:
+      host: private-docker-host
+      path: internal
+
+  - name: "Vaultwarden"
+    group: "Internal"
+    url: "http://10.0.1.22:80/alive"
+    interval: 60s
+    client:
+      timeout: 10s
+    conditions:
+      - "[STATUS] == 200"
+    ui:
+      hide-url: true
+      hide-hostname: true
+      hide-port: true
+      hide-conditions: true
+      hide-errors: true
+    extra-labels:
+      host: private-docker-host
+      path: internal
+
+  - name: "Firefly III"
+    group: "Internal"
+    url: "http://10.0.1.24:8051/"
+    interval: 60s
+    client:
+      timeout: 10s
+    conditions:
+      - "[STATUS] == any(200, 301, 302, 401)"
+    ui:
+      hide-url: true
+      hide-hostname: true
+      hide-port: true
+      hide-conditions: true
+      hide-errors: true
+    extra-labels:
+      host: private-docker-host
+      path: internal
+
+  - name: "Unifi Controller"
+    group: "Internal"
+    url: "https://10.0.1.25:8443/"
+    interval: 60s
+    client:
+      # Unifi serves its own self-signed cert on :8443.
+      insecure: true
+      timeout: 10s
+    conditions:
+      - "[STATUS] == any(200, 301, 302, 401)"
+    ui:
+      hide-url: true
+      hide-hostname: true
+      hide-port: true
+      hide-conditions: true
+      hide-errors: true
+    extra-labels:
+      host: private-docker-host
+      path: internal
+
+  - name: "Sonarr"
+    group: "Internal"
+    url: "http://10.0.1.23:8989/ping"
+    interval: 60s
+    client:
+      timeout: 10s
+    conditions:
+      - "[STATUS] == 200"
+    ui:
+      hide-url: true
+      hide-hostname: true
+      hide-port: true
+      hide-conditions: true
+      hide-errors: true
+    extra-labels:
+      host: private-docker-host
+      path: internal
+
+  - name: "Radarr"
+    group: "Internal"
+    url: "http://10.0.1.23:7878/ping"
+    interval: 60s
+    client:
+      timeout: 10s
+    conditions:
+      - "[STATUS] == 200"
+    ui:
+      hide-url: true
+      hide-hostname: true
+      hide-port: true
+      hide-conditions: true
+      hide-errors: true
+    extra-labels:
+      host: private-docker-host
+      path: internal
+
+  - name: "Prowlarr"
+    group: "Internal"
+    url: "http://10.0.1.23:9696/ping"
+    interval: 60s
+    client:
+      timeout: 10s
+    conditions:
+      - "[STATUS] == 200"
+    ui:
+      hide-url: true
+      hide-hostname: true
+      hide-port: true
+      hide-conditions: true
+      hide-errors: true
+    extra-labels:
+      host: private-docker-host
+      path: internal
+
+  - name: "Bazarr"
+    group: "Internal"
+    url: "http://10.0.1.23:6767/ping"
+    interval: 60s
+    client:
+      timeout: 10s
+    conditions:
+      - "[STATUS] == 200"
+    ui:
+      hide-url: true
+      hide-hostname: true
+      hide-port: true
+      hide-conditions: true
+      hide-errors: true
+    extra-labels:
+      host: private-docker-host
+      path: internal
+
+  - name: "qBittorrent"
+    group: "Internal"
+    url: "http://10.0.1.23:8080/"
+    interval: 60s
+    client:
+      timeout: 10s
+    conditions:
+      - "[STATUS] == any(200, 301, 302, 401)"
+    ui:
+      hide-url: true
+      hide-hostname: true
+      hide-port: true
+      hide-conditions: true
+      hide-errors: true
+    extra-labels:
+      host: private-docker-host
+      path: internal
+
+  - name: "Home Assistant"
+    group: "Internal"
+    url: "http://10.0.1.5:8123/"
+    interval: 60s
+    client:
+      timeout: 10s
+    conditions:
+      - "[STATUS] == any(200, 301, 302, 401)"
+    ui:
+      hide-url: true
+      hide-hostname: true
+      hide-port: true
+      hide-conditions: true
+      hide-errors: true
+    extra-labels:
+      host: homeassistant
+      path: internal
+
+  # ---------------------------------------------------------------------------
+  # Infrastructure - the monitoring stack itself, probed over the compose
+  # network by service name. Note Gatus does not probe itself: if Gatus is down
+  # the GatusDown Prometheus rule (up{job="gatus"} == 0) covers it.
+  # ---------------------------------------------------------------------------
+  - name: "Prometheus"
+    group: "Infrastructure"
+    url: "http://prometheus:9090/-/healthy"
+    interval: 60s
+    client:
+      timeout: 10s
+    conditions:
+      - "[STATUS] == 200"
+    ui:
+      hide-url: true
+      hide-hostname: true
+      hide-port: true
+      hide-conditions: true
+      hide-errors: true
+    extra-labels:
+      host: monitoring
+      path: internal
+
+  - name: "Loki"
+    group: "Infrastructure"
+    url: "http://loki:3100/ready"
+    interval: 60s
+    client:
+      timeout: 10s
+    conditions:
+      - "[STATUS] == 200"
+    ui:
+      hide-url: true
+      hide-hostname: true
+      hide-port: true
+      hide-conditions: true
+      hide-errors: true
+    extra-labels:
+      host: monitoring
+      path: internal
+
+  - name: "Alertmanager"
+    group: "Infrastructure"
+    url: "http://alertmanager:9093/-/healthy"
+    interval: 60s
+    client:
+      timeout: 10s
+    conditions:
+      - "[STATUS] == 200"
+    ui:
+      hide-url: true
+      hide-hostname: true
+      hide-port: true
+      hide-conditions: true
+      hide-errors: true
+    extra-labels:
+      host: monitoring
+      path: internal
+
+  - name: "Grafana"
+    group: "Infrastructure"
+    url: "http://grafana:3000/api/health"
+    interval: 60s
+    client:
+      timeout: 10s
+    conditions:
+      - "[STATUS] == 200"
+    ui:
+      hide-url: true
+      hide-hostname: true
+      hide-port: true
+      hide-conditions: true
+      hide-errors: true
+    extra-labels:
+      host: monitoring
+      path: internal
