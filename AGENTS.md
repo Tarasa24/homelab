@@ -330,7 +330,29 @@ The `job` label combining `instance/service_name` gives a unique identifier per 
 
 **Retention** — Loki is configured for 7-day retention. Older logs are compacted and deleted by the Loki compactor.
 
-**Alerting from logs** — Loki ruler evaluates alert rules in `configs/monitoring/loki/loki-alerts.yml` and fires to Alertmanager on pattern matches (errors, OOM kills, auth failures, backup failures, TLS expiry).
+**Alerting from logs** — Loki ruler evaluates alert rules in
+`configs/monitoring/loki/rules/fake/loki-alerts.yml` and fires to Alertmanager on
+pattern matches (errors, OOM kills, auth failures, backup failures, TLS expiry).
+
+The `fake` subdirectory is required, not a placeholder: `auth_enabled: false`
+means Loki uses the single tenant `fake`, and the local ruler backend reads rules
+from `<storage.local.directory>/<tenant>/`. `rule_path` (scratch space the ruler
+writes during evaluation) and `storage.local.directory` (where rule files are
+read from) are deliberately different paths, so the read-only rules bind mount
+does not have to be nested inside the `loki-data` named volume.
+
+Two failure modes to avoid when editing these rules:
+
+- **Self-reference.** Loki's ruler logs the text of every query it evaluates, and
+  Promtail ships Loki's own logs back into Loki, so a rule searching for
+  `oom.?kill` matches the ruler log line containing that pattern and fires
+  forever. Broad rules must exclude `monitoring/loki` and `monitoring/promtail`.
+- **Substring matches.** A bare `error` pattern matches `errors=0`, which Gatus
+  prints on every *successful* probe. Use `\b` word boundaries.
+
+These rules detect log *content* only. A down service emits no logs, so
+`count_over_time()` returns an empty vector and can never fire — down-detection
+belongs to Gatus and cAdvisor, not here.
 
 ---
 

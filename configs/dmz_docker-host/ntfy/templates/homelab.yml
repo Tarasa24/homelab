@@ -1,0 +1,55 @@
+# Custom ntfy message template for Alertmanager webhooks.
+#
+# Selected with ?template=homelab on the receiver URLs in
+# configs/monitoring/alertmanager/config.yml.j2.
+#
+# Why not the built-in "alertmanager" template: it renders "Instance: <no value>"
+# and "Source: <no value>" for most of our alerts, because ContainerDown uses
+# absent_over_time() which drops every metric label (including instance), and it
+# omits the `host` and `container` labels that actually carry the useful context.
+# It also prints the receiver name, which is noise.
+#
+# Template files support only the title, message and priority keys, and are Go
+# templates evaluated against the Alertmanager webhook JSON body.
+#
+# Defensive notes:
+#   - `with` is used for optional labels: it skips cleanly when a key is missing
+#     or empty, instead of rendering "<no value>".
+#   - severity is compared via printf "%v" so a missing key cannot raise
+#     "incompatible types for comparison" and break rendering entirely.
+
+title: |-
+  {{- if eq .status "resolved" -}}
+  Resolved: {{ .groupLabels.alertname }}
+  {{- else if eq (printf "%v" .commonLabels.severity) "critical" -}}
+  {{ .groupLabels.alertname }}
+  {{- else -}}
+  {{ .groupLabels.alertname }}
+  {{- end -}}
+  {{- if gt (len .alerts) 1 }} ({{ len .alerts }} alerts){{ end -}}
+
+message: |-
+  {{- range .alerts }}
+  {{ .annotations.summary }}
+  {{- with .annotations.description }}
+  {{ . }}
+  {{- end }}
+  {{- with .labels.host }}
+  host: {{ . }}
+  {{- end }}
+  {{- with .labels.container }}
+  container: {{ . }}
+  {{- end }}
+  {{- with .labels.group }}
+  group: {{ . }}
+  {{- end }}
+  {{ end -}}
+
+priority: |-
+  {{- if eq .status "resolved" -}}
+  2
+  {{- else if eq (printf "%v" .commonLabels.severity) "critical" -}}
+  5
+  {{- else -}}
+  4
+  {{- end -}}

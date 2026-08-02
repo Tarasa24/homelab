@@ -85,15 +85,15 @@ groups:
           summary: "Prometheus target missing: {{ $labels.instance }}"
           description: "Scrape target {{ $labels.job }}/{{ $labels.instance }} has been down for 5 minutes"
 
-      - alert: PrometheusStorageFull
-        expr: (prometheus_tsdb_storage_blocks_bytes / prometheus_tsdb_head_chunks_storage_size_bytes) > 0.9
-        for: 10m
-        labels:
-          severity: warning
-          alerttype: storage
-        annotations:
-          summary: "Prometheus storage nearly full"
-          description: "Prometheus TSDB is over 90% of its storage limit"
+      # PrometheusStorageFull was removed deliberately. Its expression divided
+      # prometheus_tsdb_storage_blocks_bytes by
+      # prometheus_tsdb_head_chunks_storage_size_bytes, which is not a fill ratio
+      # of anything - neither series relates to the configured retention limit -
+      # so it fired on a healthy, nearly empty TSDB and cried wolf continuously.
+      # Retention is already bounded by --storage.tsdb.retention.size=5GB, and
+      # actual disk pressure is covered by DiskSpaceLow/DiskSpaceCritical on the
+      # monitoring host. If a real TSDB-size alert is ever wanted, base it on
+      # prometheus_tsdb_storage_blocks_bytes against that 5GB cap explicitly.
 
   - name: availability_alerts
     rules:

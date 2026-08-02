@@ -64,7 +64,12 @@ compactor:
 
 ruler:
   enable_api: true
-  rule_path: /loki/rules
+  # rule_path is scratch space the ruler writes to while evaluating, so it must
+  # live on the writable named volume. storage.local.directory is where rule
+  # FILES are read from, and is a read-only bind mount of the repo. Pointing both
+  # at the same path is what previously required nesting a bind mount inside the
+  # loki-data volume; keeping them separate avoids that entirely.
+  rule_path: /loki/rules-tmp
   alertmanager_url: http://alertmanager:9093
   external_labels:
     cluster: 'homelab'
@@ -72,4 +77,6 @@ ruler:
   storage:
     type: local
     local:
-      directory: /loki/rules
+      # Loki appends the tenant id, so actual rules are read from
+      # /etc/loki/rules/fake/ (tenant is "fake" because auth_enabled is false).
+      directory: /etc/loki/rules

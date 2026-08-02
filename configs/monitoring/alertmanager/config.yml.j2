@@ -36,6 +36,13 @@ route:
       continue: false
 
 receivers:
+  # ?template=homelab selects the custom ntfy message template shipped in
+  # configs/dmz_docker-host/ntfy/templates/homelab.yml. Without it ntfy renders
+  # the raw Alertmanager JSON body as the notification text, which is unreadable
+  # on a phone. The built-in ?template=alertmanager is not used because it prints
+  # "<no value>" for instance/source on our alerts and drops the host/container
+  # labels that carry the context.
+  #
   # ntfy is reached over its PUBLIC URL, not the DMZ address 10.1.0.24:8080.
   # The monitoring LXC sits on the LAN with its default gateway at the home
   # router and has no route into the DMZ (10.1.0.0/24), so the internal address
@@ -46,7 +53,7 @@ receivers:
   # into the DMZ, would weaken the isolation the DMZ exists to provide.
   - name: 'critical-receiver'
     webhook_configs:
-      - url: 'https://ntfy.homelab.tarasa24.dev/homelab-critical'
+      - url: 'https://ntfy.homelab.tarasa24.dev/homelab-critical?template=homelab'
         send_resolved: true
         http_config:
           basic_auth:
@@ -55,7 +62,7 @@ receivers:
 
   - name: 'storage-receiver'
     webhook_configs:
-      - url: 'https://ntfy.homelab.tarasa24.dev/homelab-storage'
+      - url: 'https://ntfy.homelab.tarasa24.dev/homelab-storage?template=homelab'
         send_resolved: true
         http_config:
           basic_auth:
@@ -64,7 +71,7 @@ receivers:
 
   - name: 'services-receiver'
     webhook_configs:
-      - url: 'https://ntfy.homelab.tarasa24.dev/homelab-services'
+      - url: 'https://ntfy.homelab.tarasa24.dev/homelab-services?template=homelab'
         send_resolved: true
         http_config:
           basic_auth:
