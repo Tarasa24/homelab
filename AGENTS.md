@@ -294,6 +294,31 @@ depends on the home uplink, which is acceptable since push to a phone needs
 internet anyway; routing the LAN into the DMZ instead would weaken the isolation
 the DMZ exists to provide.
 
+**Nightly backup maintenance window**: borgmatic runs from cron at 02:00 UTC on
+every host and its `before_backup` hooks stop containers so their volumes can be
+copied cold. Those services genuinely go down, and the monitoring is correct to
+notice — on 2026-08-03 Docker restarted them at 02:02–02:03 UTC but probes did
+not recover until roughly 02:12, because this hardware is slow to bring apps back
+to a responsive state.
+
+Alertmanager therefore defines a `nightly-backup` time interval (01:55–03:00 UTC)
+and two routes ahead of the normal ones that mute exactly the expected noise:
+`ExternalServiceDown`, `ContainerDown`, `ContainerCrashLoop` and
+`ContainerErrors`. Everything else stays live during the window, so a real
+incident during a backup is still paged. Those two routes deliver to the same
+receivers the alerts would otherwise reach, so behaviour outside the window is
+unchanged — verified with `amtool config routes test`.
+
+Muting delays rather than discards: an alert still firing when the window closes
+notifies then, so a service that fails to come back is still reported. The window
+is defined in UTC on purpose — the containers and their crontabs run UTC, so a
+UTC window does not drift when local time changes for DST.
+
+The deeper fix is to stop taking services down at all: borgmatic supports
+database dump hooks (`postgresql_databases`, `mariadb_databases`) which snapshot
+data live and would let most `before_backup`/`after_backup` stop/start pairs be
+removed. Until then the mute window is the pragmatic mitigation.
+
 **The `host` label contract**: every node, docker and cadvisor scrape target
 carries a static `host` label, and every Gatus endpoint sets one via
 `extra-labels`. Alertmanager's inhibit rule matches on `host` to suppress service

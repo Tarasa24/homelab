@@ -1,6 +1,23 @@
 global:
   resolve_timeout: 5m
 
+time_intervals:
+  # borgmatic runs from cron at 02:00 UTC on every host (see the borgmatic
+  # role). The window is defined in UTC deliberately: the containers and their
+  # crontabs run UTC, so a UTC window does not drift when local time changes
+  # for DST, whereas a local-time window would.
+  #
+  # Observed 2026-08-03: backup began 02:00, services responsive again ~02:12.
+  # The window is padded well beyond that because backup duration grows with
+  # the data set and this host is slow to spin services back up. Tighten it if
+  # backups stay consistently short.
+  - name: nightly-backup
+    time_intervals:
+      - times:
+          - start_time: '01:55'
+            end_time: '03:00'
+        location: 'UTC'
+
 route:
   receiver: 'critical-receiver'
   group_by: ['alertname', 'alerttype', 'instance']
@@ -9,6 +26,37 @@ route:
   repeat_interval: 12h
 
   routes:
+    # --- Nightly backup maintenance window -------------------------------
+    # borgmatic stops containers before backing up their volumes (see the
+    # before_backup hooks in configs/backup/borg/*.yaml), so services really
+    # are down and the monitoring is correct to notice. On this hardware the
+    # apps also need several minutes to become responsive again after Docker
+    # reports them started: on 2026-08-03 containers were started at
+    # 02:02-02:03 UTC but probes only recovered around 02:12 UTC.
+    #
+    # These two routes are matched first and suppress only the expected
+    # service-down noise. Everything else - NodeDown, CAdvisorDown, GatusDown,
+    # OOMKill, AuthenticationFailureSpike, disk alerts - stays live during the
+    # window, so a genuine incident during backup is still paged.
+    #
+    # Muting delays rather than loses: an alert still firing when the window
+    # closes notifies at that point, so a service that fails to come back is
+    # still reported.
+    - matchers:
+        - alertname =~ "ExternalServiceDown|ContainerDown|ContainerCrashLoop"
+      receiver: 'critical-receiver'
+      mute_time_intervals:
+        - nightly-backup
+      continue: false
+
+    - matchers:
+        - alertname = "ContainerErrors"
+      receiver: 'services-receiver'
+      mute_time_intervals:
+        - nightly-backup
+      continue: false
+    # ---------------------------------------------------------------------
+
     # Storage alerts → storage topic
     - matchers:
         - alerttype = storage
