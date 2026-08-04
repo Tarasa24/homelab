@@ -31,8 +31,15 @@ groups:
           summary: "High memory on {{ $labels.instance }}"
           description: "Memory usage is {{ $value | printf \"%.1f\" }}% on {{ $labels.instance }}"
 
+      # /media and /immich are the USB-attached bulk-storage mounts (all of them
+      # are the same physical disk, /dev/sdc1, surfaced into several LXCs), and
+      # they are expected to run close to full - that is what cold storage is
+      # for. They are excluded here so the warning does not repeat nightly for a
+      # condition that is known and not actionable. They are deliberately NOT
+      # excluded from DiskSpaceCritical below, so a disk that is genuinely about
+      # to fill up and break Jellyfin/Immich writes is still reported once.
       - alert: DiskSpaceLow
-        expr: (node_filesystem_avail_bytes{fstype!~"tmpfs|overlay"} / node_filesystem_size_bytes{fstype!~"tmpfs|overlay"}) * 100 < 15
+        expr: (node_filesystem_avail_bytes{fstype!~"tmpfs|overlay",mountpoint!~"/media|/immich|/mnt/USB.*"} / node_filesystem_size_bytes{fstype!~"tmpfs|overlay",mountpoint!~"/media|/immich|/mnt/USB.*"}) * 100 < 15
         for: 10m
         labels:
           severity: warning

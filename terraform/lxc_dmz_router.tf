@@ -206,4 +206,15 @@ resource "proxmox_virtual_environment_firewall_rules" "lxc_dmz_router" {
     iface   = "net0"
     source  = "10.0.0.0/22"
   }
+
+  # net2 is the mon NIC; without this, input_policy=DROP blocked all scrapes.
+  rule {
+    type    = "in"
+    action  = "ACCEPT"
+    comment = "Allow Prometheus to scrape node_exporter over the monitoring VLAN"
+    iface   = "net2"
+    source  = "10.0.50.0/24"
+    dport   = 9100
+    proto   = "tcp"
+  }
 }
