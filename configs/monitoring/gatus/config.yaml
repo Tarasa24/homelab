@@ -118,6 +118,25 @@ endpoints:
       host: private-docker-host
       path: external
 
+  # Electrum is an intentionally internet-facing service (nginx stream on 50002
+  # terminates TLS and proxies to electrs in the DMZ), so it belongs in the
+  # public group alongside the other user-facing endpoints. A TCP connect is the
+  # right check here: the Electrum protocol is not HTTP.
+  - name: "Electrum Server"
+    group: "Public"
+    url: "tcp://electrum.homelab.tarasa24.dev:50002"
+    interval: 60s
+    client:
+      timeout: 10s
+    conditions:
+      - "[CONNECTED] == true"
+    ui:
+      hide-conditions: true
+      hide-errors: true
+    extra-labels:
+      host: dmz-bitcoin-node
+      path: external
+
   # ---------------------------------------------------------------------------
   # Internal - LAN services probed directly over the 10.0.0.0/22, bypassing the
   # WAN entirely. If a Public probe fails but its Internal counterpart passes,
@@ -221,6 +240,27 @@ endpoints:
       hide-errors: true
     extra-labels:
       host: dns
+      path: internal
+
+  # bitcoind's P2P port is reachable over the monitoring VLAN, unlike electrs
+  # which binds its DMZ address only. Probed internally so a failure here points
+  # at the daemon rather than at the public path.
+  - name: "Bitcoin Node"
+    group: "Internal"
+    url: "tcp://10.0.50.103:8333"
+    interval: 60s
+    client:
+      timeout: 10s
+    conditions:
+      - "[CONNECTED] == true"
+    ui:
+      hide-url: true
+      hide-hostname: true
+      hide-port: true
+      hide-conditions: true
+      hide-errors: true
+    extra-labels:
+      host: dmz-bitcoin-node
       path: internal
 
   - name: "Ghostfolio"

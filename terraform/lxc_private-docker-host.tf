@@ -50,16 +50,16 @@ resource "proxmox_virtual_environment_container" "lxc_private-docker-host" {
   unprivileged = true
 
   network_interface {
-    name = "eth0"
-    bridge = "vmbr0"
+    name     = "eth0"
+    bridge   = "vmbr0"
     firewall = true
   }
 
 
   network_interface {
-    name    = "mon"
-    bridge  = "vmbr0"
-    vlan_id = var.vlan_ids["monitoring"]
+    name     = "mon"
+    bridge   = "vmbr0"
+    vlan_id  = var.vlan_ids["monitoring"]
     firewall = true
   }
 

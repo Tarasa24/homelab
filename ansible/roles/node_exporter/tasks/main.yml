@@ -71,9 +71,10 @@
     content: |
       [Service]
       ExecStart=
-      ExecStart=/usr/bin/prometheus-node-exporter --web.listen-address=:9100 --collector.textfile.directory=/var/lib/node_exporter/textfile_collector
+      ExecStart=/usr/bin/prometheus-node-exporter --web.listen-address=:9100 --collector.textfile.directory=/var/lib/node_exporter/textfile_collector --collector.systemd --collector.systemd.unit-include={{ node_exporter_systemd_units }}
       Restart=always
   when: init_system == "systemd"
+  notify: restart node_exporter
 
 - name: Start and enable node_exporter (Systemd)
   ansible.builtin.service:

@@ -332,6 +332,64 @@ database dump hooks (`postgresql_databases`, `mariadb_databases`) which snapshot
 data live and would let most `before_backup`/`after_backup` stop/start pairs be
 removed. Until then the mute window is the pragmatic mitigation.
 
+### Known monitoring gaps (accepted)
+
+These are deliberate trade-offs, not oversights. Recorded so a future change does
+not assume coverage that does not exist.
+
+**ntfy is a single point of failure in the alert path.** Two distinct failure
+modes follow from it:
+
+1. *ntfy itself is down.* Gatus detects it, but the alert saying so is delivered
+   through ntfy, so it never arrives.
+2. *Anything upstream is down* — Prometheus, Alertmanager, Loki, the monitoring
+   LXC, the WAN, or the Proxmox host — and **nothing fires at all**. Silence is
+   indistinguishable from everything being healthy. This is the more dangerous
+   mode, and this repo has been bitten by it: alerts were undeliverable for
+   months while every counter reported success.
+
+Accepted for a homelab. The conventional fixes, if this ever matters:
+
+- **Dead man's switch** for mode 2 — an always-firing `Watchdog` alert
+  (`expr: vector(1)`) routed to an external service (healthchecks.io, Better
+  Stack) that notifies when it *stops* hearing from you. It has to live outside
+  this infrastructure to be meaningful.
+- **Second receiver** for mode 1 — Alertmanager delivers to every receiver in a
+  matched route, so adding `email_configs` alongside the ntfy webhook gives
+  genuinely parallel delivery. A second ntfy instance in the DMZ would not help:
+  same host, same failure domain.
+
+**Not covered by any probe**: the Tailscale connectors (1100, 1000100), and the
+Linode bastion, which is only covered indirectly because the Gatus `Public` group
+traverses it.
+
+**Non-Docker hosts use the systemd collector.** cAdvisor only covers the two
+Docker hosts. The Bitcoin node runs `bitcoind` and `electrs` as plain systemd
+units on Debian, so service-level down-detection comes from
+`node_systemd_unit_state` via `--collector.systemd`, driven by the
+`node_exporter_systemd_units` allowlist in the role defaults. That allowlist is
+not optional: Debian's build enables the systemd collector by default and emits a
+series per unit per state, and a `SystemdUnitDown` rule without a `name` selector
+matches every oneshot unit that is legitimately inactive (`apt-daily.service`,
+`e2scrub_all.service`, …) — 134 pending alerts, in practice. Both the collector
+flag and the alert rule are scoped.
+
+The allowlist regex uses `[.]` rather than `\.` because systemd processes escape
+sequences in `ExecStart`. The role also notifies a restart handler when the
+override changes; `state: started` alone is a no-op on a running service, so a
+changed override would otherwise sit on disk unapplied until the next reboot.
+
+`electrs` binds its DMZ address only and is unreachable over the monitoring VLAN,
+so the systemd collector is the only way to see it at all. `bitcoind`'s P2P port
+does listen on all addresses and is additionally probed by Gatus over VLAN 50,
+and the public Electrum endpoint (`:50002`, TLS-terminated by the nginx stream)
+is probed as a `Public` endpoint.
+
+**Container-level coverage depends on explicit `container_name`.** The
+`ContainerDown` rules are generated per container name; a service defined without
+one gets a Docker-generated name like `root-promtail-1` and is deliberately
+skipped, so it has no down-detection.
+
 **The `host` label contract**: every node, docker and cadvisor scrape target
 carries a static `host` label, and every Gatus endpoint sets one via
 `extra-labels`. Alertmanager's inhibit rule matches on `host` to suppress service

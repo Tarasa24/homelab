@@ -1,0 +1,10 @@
+---
+# The start task below uses state: started, which is a no-op when the service is
+# already running. Without this handler a changed systemd override is written to
+# disk but never applied, so the running process keeps its old flags until
+# something else restarts it - which then surfaces as a surprise at reboot.
+- name: restart node_exporter
+  ansible.builtin.service:
+    name: "{{ node_exporter_service_name }}"
+    state: restarted
+    daemon_reload: true

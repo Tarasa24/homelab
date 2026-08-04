@@ -1,0 +1,18 @@
+---
+# Units exposed by the systemd collector (systemd hosts only - Alpine LXCs use
+# OpenRC and are unaffected).
+#
+# This is how non-Docker hosts get service-level down-detection. cAdvisor covers
+# containers on the two Docker hosts, but the Bitcoin node runs bitcoind and
+# electrs as plain systemd units on Debian, so nothing knew whether they were
+# alive - only that the host was. electrs additionally binds its DMZ address
+# only, so it cannot be reached over the monitoring VLAN and could not be probed
+# even if we wanted to.
+#
+# Uses [.] rather than \\. because systemd processes escape sequences in
+# ExecStart, so a backslash here risks being mangled and breaking startup at the
+# next reboot - a failure that would not show up until then.
+#
+# Deliberately an allowlist: the systemd collector emits a series per unit per
+# state, so scraping everything would be a lot of useless cardinality.
+node_exporter_systemd_units: "(bitcoind|electrs|pve-cluster|pvedaemon|pveproxy|pvestatd|pve-firewall|ssh)[.]service"
