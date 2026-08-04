@@ -37,6 +37,7 @@
   # the guests. The role detects Debian and uses the systemd path.
   roles:
     - role: node_exporter
+    - role: promtail
 
   tasks:
     - name: Create mount points

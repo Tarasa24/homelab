@@ -1,0 +1,35 @@
+apiVersion: 1
+
+# Datasources as code. These were previously added by hand through the UI, which
+# meant they lived only in the grafana-data volume - the same untracked-manual
+# problem that made Uptime Kuma impossible to reason about. Provisioning is
+# idempotent and matched by NAME, so it also repairs a datasource someone edited
+# in the UI.
+#
+# Deliberately no explicit `uid`: these datasources already existed, created by
+# hand, with Grafana-assigned UIDs. Declaring a different uid here makes
+# provisioning look the datasource up by that uid, fail with "data source not
+# found", and crash-loop Grafana on startup. Matching by name updates them in
+# place instead. Only pin a uid once the datasource is provisioned from scratch.
+#
+# Both are reached over the compose network by service name, so no host IPs and
+# nothing that breaks if the LXC is renumbered.
+datasources:
+  - name: Prometheus
+    type: prometheus
+    access: proxy
+    url: http://prometheus:9090
+    isDefault: true
+    editable: false
+    jsonData:
+      # Matches the global scrape_interval in prometheus.yml; lets Grafana pick
+      # sane step sizes instead of guessing.
+      timeInterval: 60s
+
+  - name: Loki
+    type: loki
+    access: proxy
+    url: http://loki:3100
+    editable: false
+    jsonData:
+      maxLines: 5000

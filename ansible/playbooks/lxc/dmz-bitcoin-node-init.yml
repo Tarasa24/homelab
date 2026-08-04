@@ -8,6 +8,7 @@
   roles:
     - role: lxc_python3
     - role: node_exporter
+    - role: promtail
     # - role: borgmatic
 
   tasks:

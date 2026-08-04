@@ -411,11 +411,34 @@ Logs are collected from all Docker hosts via a Promtail agent running as a conta
 | `dmz-router` | 1002 | `configs/promtail/dmz-router.yaml` |
 | `backup` | 1003 | `configs/promtail/backup.yaml` |
 | `dns` | 1001 | `configs/promtail/dns.yaml` |
+| `pve` (hypervisor) | — | `configs/promtail/pve.yaml` |
+| `dmz-bitcoin-node` | 10003 | `configs/promtail/dmz-bitcoin-node.yaml` |
 
 The three Docker hosts run Promtail as a container with Docker service
 discovery. `dmz-router`, `backup` and `dns` instead run it as a native Alpine
 package via the `promtail` role, tailing static file paths — there is no Docker
 daemon on those hosts.
+
+`pve` and `dmz-bitcoin-node` are Debian and run systemd, and Promtail is not
+packaged in bookworm, so the role installs the upstream release binary plus a
+systemd unit and scrapes **journald** rather than files. That is the only log
+source that matters on those two: kernel messages, LXC/VM start and stop and
+storage errors on the hypervisor, and `bitcoind`/`electrs` output on the Bitcoin
+node — which is where the "why" lives when `SystemdUnitDown` fires.
+
+Journal scraping has a cardinality trap. Every login creates a fresh
+`session-<N>.scope`, and a per-unit stream label therefore grows without bound;
+the relabel rules drop those and the `user@<N>.service` units explicitly. Entries
+with no unit at all (kernel, early boot) default to `service_name=kernel`,
+otherwise they produce a bare `<instance>/` job label.
+
+**Grafana datasources are provisioned as code** in
+`configs/monitoring/grafana/provisioning/`, so Prometheus and Loki exist on a
+fresh deploy instead of being added by hand. They are matched by **name** and
+carry no explicit `uid`: the datasources already existed with Grafana-assigned
+UIDs, and declaring a different one makes provisioning look them up by that uid,
+fail with "data source not found", and crash-loop Grafana at startup. Only pin a
+uid on a datasource provisioned from scratch.
 
 Two things about that role are load-bearing. It sets `use: openrc` explicitly,
 because these playbooks run with `gather_facts: false` and Ansible cannot then

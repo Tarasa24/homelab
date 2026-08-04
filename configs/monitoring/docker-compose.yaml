@@ -112,6 +112,9 @@ services:
     volumes:
       - grafana-data:/var/lib/grafana
       - ./grafana/config.ini:/etc/grafana/grafana.ini:ro
+      # Datasources as code. Without this they exist only inside grafana-data,
+      # so a lost volume silently takes the dashboards' data sources with it.
+      - ./grafana/provisioning:/etc/grafana/provisioning:ro
     ports:
       - "0.0.0.0:3000:3000"
     networks:
