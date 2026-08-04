@@ -34,6 +34,17 @@ resource "proxmox_virtual_environment_firewall_rules" "cluster_level_firewall_ru
     dport   = 22
     proto   = "tcp"
   }
+
+  # Scoped to the monitoring container only; input_policy is DROP so without
+  # this the PVE host's node_exporter is unreachable.
+  rule {
+    type    = "in"
+    action  = "ACCEPT"
+    comment = "Allow Prometheus to scrape node_exporter on the PVE host"
+    source  = "10.0.1.4"
+    dport   = 9100
+    proto   = "tcp"
+  }
 }
 
 resource "proxmox_virtual_environment_cluster_firewall" "cluster_level_firewall_options" {

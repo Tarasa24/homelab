@@ -108,6 +108,19 @@ Out-of-band monitoring network — all nodes with the `mon` NIC get a VLAN 50 in
 | `10.0.50.103` | dmz-bitcoin-node |
 | `10.0.50.120` | dmz-docker-host |
 
+The Proxmox host itself is the exception: it owns `vmbr0` and has no address on
+VLAN 50, so it is scraped on the LAN at `10.0.0.2:9100`. That needs an explicit
+allow in `terraform/firewall_base.tf` because the datacenter input policy is
+DROP. It carries `host="pve"`, so every existing node rule (NodeDown, CPU,
+memory, disk) covers the hypervisor without further change.
+
+**Known drift:** `/etc/network/interfaces` on the PVE host declares
+`gateway 10.0.0.1`, but the running kernel had no default route, so the host
+could reach the LAN yet had no internet — `apt` could not fetch anything and
+`resolv.conf` pointed at an unreachable `1.1.1.1`. The route was restored at
+runtime; since the gateway is already declared, a reboot re-applies it. Worth
+checking after any network change on the host.
+
 ### Linode (cloud)
 - `45.79.249.185` — Debian VPS acting as WireGuard server / public-IP bastion for the DMZ.
 

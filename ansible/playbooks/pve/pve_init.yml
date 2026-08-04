@@ -32,6 +32,12 @@
       "/mnt/USB-SSD/monitoring-cold/loki"
     ]
 
+  # The hypervisor itself was the last unmonitored machine: every LXC and VM
+  # runs on it, so disk/RAM/CPU pressure here surfaces only as symptoms inside
+  # the guests. The role detects Debian and uses the systemd path.
+  roles:
+    - role: node_exporter
+
   tasks:
     - name: Create mount points
       ansible.builtin.file:
