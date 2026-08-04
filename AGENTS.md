@@ -395,9 +395,24 @@ Two failure modes to avoid when editing these rules:
 - **Substring matches.** A bare `error` pattern matches `errors=0`, which Gatus
   prints on every *successful* probe. Use `\b` word boundaries.
 
-These rules detect log *content* only. A down service emits no logs, so
+Most of these rules detect log *content* only. A down service emits no logs, so
 `count_over_time()` returns an empty vector and can never fire — down-detection
-belongs to Gatus and cAdvisor, not here.
+for services belongs to Gatus and cAdvisor, not here.
+
+The exception is `LogShippingStopped`, which uses `absent_over_time()` on the
+per-host `instance` label to detect a host that has stopped shipping altogether.
+Promtail dying is otherwise completely silent — an absence of logs is
+indistinguishable from a quiet host — and that is how `backup` and `dns` shipped
+nothing between the 2026-05-31 reboot and 2026-08-04. It deliberately does not
+scrape Promtail's own `:9080`, which would need another firewall rule on the DMZ
+router; the 2h window is sized off the quietest host (`backup`, ~21 syslog lines
+per hour).
+
+`NginxErrorRateHigh` uses the `status` and `server_name` stream labels directly,
+so no parsing is needed. `TraefikErrorRateHigh` must parse JSON, and Traefik
+mixes plain-text startup lines into the same stream, so it needs `| __error__=""`
+to drop unparseable lines — without it the query errors on every evaluation. The
+field is `DownstreamStatus` (what the client received), not `OriginStatus`.
 
 ---
 

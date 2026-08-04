@@ -198,6 +198,31 @@ endpoints:
       host: private-docker-host
       path: internal
 
+  # DNS is the one dependency whose failure breaks the entire LAN, including
+  # name resolution for the other probes, so it is checked directly rather than
+  # inferred. Queries a public name so the check covers recursion too - a
+  # resolver that cannot recurse is no more useful than one that is down.
+  - name: "DNS"
+    group: "Internal"
+    url: "10.0.1.1"
+    interval: 60s
+    dns:
+      query-name: "google.com"
+      query-type: "A"
+    client:
+      timeout: 10s
+    conditions:
+      - "[DNS_RCODE] == NOERROR"
+    ui:
+      hide-url: true
+      hide-hostname: true
+      hide-port: true
+      hide-conditions: true
+      hide-errors: true
+    extra-labels:
+      host: dns
+      path: internal
+
   - name: "Ghostfolio"
     group: "Internal"
     url: "http://10.0.1.26:3333/api/v1/health"
