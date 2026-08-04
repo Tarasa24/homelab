@@ -337,6 +337,26 @@ Logs are collected from all Docker hosts via a Promtail agent running as a conta
 | `monitoring` | 1004 | `configs/monitoring/promtail/promtail-config.yaml` |
 | `private-docker-host` | 1020 | `configs/private-docker-host/root/promtail/config.yml` |
 | `dmz-docker-host` | 100020 | `configs/dmz_docker-host/root/promtail/config.yml` |
+| `dmz-router` | 1002 | `configs/promtail/dmz-router.yaml` |
+| `backup` | 1003 | `configs/promtail/backup.yaml` |
+| `dns` | 1001 | `configs/promtail/dns.yaml` |
+
+The three Docker hosts run Promtail as a container with Docker service
+discovery. `dmz-router`, `backup` and `dns` instead run it as a native Alpine
+package via the `promtail` role, tailing static file paths — there is no Docker
+daemon on those hosts.
+
+Two things about that role are load-bearing. It sets `use: openrc` explicitly,
+because these playbooks run with `gather_facts: false` and Ansible cannot then
+detect the init system, so the `rc-update` that registers Promtail in the default
+runlevel is skipped silently. That is precisely how `backup` and `dns` ended up
+shipping nothing: Promtail had been started by hand, ran until the 2026-05-31
+reboot, and never came back. It also resolves its config from `role_path` rather
+than a playbook-relative path, so the role works from any playbook.
+
+`ansible_hostname` must be set in the inventory for every host using the role
+(the config file is chosen by host name). Without it the role's `src` templates
+to an empty path and the task fails.
 
 **Label schema** — every log line gets the following Loki labels:
 

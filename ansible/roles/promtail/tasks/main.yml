@@ -7,17 +7,27 @@
     state: present
     update_cache: true
 
+# src is resolved from role_path rather than a playbook-relative path so the
+# role works no matter which playbook includes it. The previous
+# "../../../configs/..." only resolved correctly for playbooks living in
+# ansible/playbooks/lxc/.
 - name: Deploy promtail config
   ansible.builtin.copy:
-    src: "../../../configs/promtail/{{ ansible_hostname }}.yaml"
+    src: "{{ role_path }}/../../../configs/promtail/{{ promtail_config_name }}.yaml"
     dest: /etc/loki/promtail-local-config.yaml
     owner: root
     group: root
     mode: '0644'
   notify: restart promtail
 
+# use: openrc is explicit because these are Alpine containers run with
+# gather_facts: false, so Ansible cannot auto-detect the init system and the
+# rc-update that registers promtail in the default runlevel can be skipped
+# silently. That is exactly what happened on backup and dns: promtail was
+# started by hand, ran until the 2026-05-31 reboot, and never came back.
 - name: Enable and start promtail
   ansible.builtin.service:
     name: loki-promtail
     enabled: true
     state: started
+    use: openrc

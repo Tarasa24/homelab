@@ -1,0 +1,6 @@
+---
+# Which file under configs/promtail/ to deploy. Defaults to the host's name so
+# existing playbooks keep working, but is overridable and, unlike a bare
+# ansible_hostname reference, fails loudly rather than silently templating to an
+# empty path when facts are not gathered and no inventory var is set.
+promtail_config_name: "{{ ansible_hostname | mandatory }}"

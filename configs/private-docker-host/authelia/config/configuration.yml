@@ -38,7 +38,12 @@ session:
   cookies:
     - domain: "homelab.tarasa24.dev"
       authelia_url: "https://auth.homelab.tarasa24.dev"
-      default_redirection_url: "https://www.homelab.tarasa24.dev"
+      # Where a user lands after logging in directly at the portal with no rd=
+      # parameter. This previously pointed at www.homelab.tarasa24.dev, for
+      # which no nginx vhost exists, so a successful login dumped the user on a
+      # host that does not resolve. The public status page is a valid, no-auth
+      # landing spot; change this when a real dashboard exists.
+      default_redirection_url: "https://status.homelab.tarasa24.dev"
 
 regulation:
   max_retries: 3
