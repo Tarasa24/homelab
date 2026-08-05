@@ -1,5 +1,4 @@
-# Runs inside an unprivileged LXC (nesting=true). Some cgroup metrics
-# (e.g. per-disk IO) may be unavailable compared to a bare-metal host.
+# Runs in an unprivileged LXC, so some cgroup metrics are unavailable.
 services:
   cadvisor:
     image: gcr.io/cadvisor/cadvisor:v0.49.1

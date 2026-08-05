@@ -1,39 +1,24 @@
 # Loki ruler alert rules.
 #
-# Path matters: with auth_enabled=false Loki uses the single tenant "fake", and
-# the local ruler storage backend expects rules under <directory>/<tenant>/.
-# This file therefore has to live in a "fake" subdirectory. Previously the file
-# sat at configs/monitoring/loki/loki-alerts.yml and was never mounted into the
-# container at all, so the ruler ran with zero rules and every log alert below
-# was inert.
+# Path matters: auth_enabled=false means tenant "fake", and the local ruler
+# backend reads from <directory>/<tenant>/, so this must live in fake/.
+# The `job` label is "<instance>/<service_name>"; selectors matching a bare
+# service name match nothing.
 #
-# The `job` label is "<instance>/<service_name>" (set in the promtail configs),
-# e.g. "private-docker-host/authelia". Selectors that match a bare service name
-# match nothing - that silently disabled two of these rules.
+# Two traps guarded against below:
+#   - Self-reference: the ruler logs its own query text and promtail ships it
+#     back, so broad rules must exclude monitoring/loki and monitoring/promtail.
+#   - Substring matches: a bare `error` matches Gatus's "errors=0" success
+#     output, hence the \b word boundaries.
 #
-# Two traps these rules previously fell into, both now guarded against:
-#
-#   1. Self-reference. Loki's ruler logs the text of every query it evaluates,
-#      and promtail ships Loki's own logs back into Loki. A rule searching for
-#      "oom.?kill" therefore matched the ruler log line containing that very
-#      pattern, and OOMKill fired permanently against job="monitoring/loki".
-#      Every broad rule below excludes monitoring/loki and monitoring/promtail.
-#
-#   2. Substring matches. A bare `error` pattern matches "errors=0", which Gatus
-#      prints on every successful probe, so a healthy service tripped
-#      ContainerErrors. Patterns now use \b word boundaries.
-#
-# Scope note: these are log-CONTENT rules. They cannot detect a service being
-# down, because a dead service emits no log lines and count_over_time() then
-# returns an empty vector. Down-detection is Gatus (ExternalServiceDown) and
-# cAdvisor (ContainerDown); do not try to duplicate it here.
+# These are log-CONTENT rules. A down service emits nothing, so they cannot
+# detect it - that is Gatus and cAdvisor's job. LogShippingStopped is the one
+# exception, using absent_over_time.
 
 groups:
   - name: loki_alerts
     rules:
-      # Broad error-rate canary across every stream. Threshold is deliberately
-      # high: several services log routine errors, and a low bar here is the
-      # classic source of alert fatigue. Tune per-service if one job dominates.
+      # Threshold is deliberately high; several services log routine errors.
       - alert: ContainerErrors
         expr: |
           sum by (job) (
@@ -60,7 +45,6 @@ groups:
           summary: "{{ $labels.job }} may be crash looping"
           description: "{{ $labels.job }} logged more than 50 fatal/panic lines in 5 minutes"
 
-      # Was {job="authelia"}, which never matched anything.
       - alert: AuthenticationFailureSpike
         expr: |
           sum by (job) (
@@ -100,9 +84,6 @@ groups:
           summary: "OOM kill detected in {{ $labels.job }}"
           description: "An out-of-memory kill appeared in the logs of {{ $labels.job }} - check container memory limits"
 
-      # Was {job=~"(traefik|nginx|dmz-router)"}, which never matched anything.
-      # Real proxy job today is "dmz-router/nginx"; the regex also tolerates a
-      # traefik stream appearing later.
       - alert: TLSCertExpiryWarningInLogs
         expr: |
           sum by (job) (
@@ -116,10 +97,8 @@ groups:
           summary: "TLS certificate expiry warning in {{ $labels.job }} logs"
           description: "The proxy logged a certificate expiry warning - check certbot renewal on the DMZ router"
 
-      # Proxy 5xx rates. nginx promotes `status` and `server_name` to stream
-      # labels (see configs/promtail/dmz-router.yaml), so this is a cheap label
-      # filter with no parsing. Grouping by server_name makes the alert name the
-      # affected site directly.
+      # nginx promotes `status` and `server_name` to stream labels, so no
+      # parsing is needed here.
       - alert: NginxErrorRateHigh
         expr: |
           sum by (server_name) (
@@ -134,10 +113,9 @@ groups:
           summary: "{{ $labels.server_name }} is returning 5xx errors"
           description: "More than 10 5xx responses in 5 minutes for {{ $labels.server_name }} - the backend behind the DMZ router is likely failing"
 
-      # Traefik logs JSON access lines but also plain-text startup lines, so the
-      # json parser errors on those; | __error__="" drops them instead of
-      # failing the whole query. The field is DownstreamStatus (what the client
-      # got), not OriginStatus.
+      # Traefik mixes plain-text startup lines into the JSON stream, so
+      # | __error__="" is required or the query errors on every evaluation.
+      # The field is DownstreamStatus (what the client got), not OriginStatus.
       - alert: TraefikErrorRateHigh
         expr: |
           sum(
@@ -152,17 +130,9 @@ groups:
           summary: "Traefik is returning 5xx errors on the LAN"
           description: "More than 5 5xx responses in 5 minutes through Traefik - an internal service behind it is likely failing"
 
-      # Log shipping health. Promtail dying is silent by design - the absence of
-      # logs looks identical to a quiet host - and that is exactly how backup and
-      # dns shipped nothing from the 2026-05-31 reboot until 2026-08-04 without
-      # anyone noticing. absent_over_time on the per-host `instance` label
-      # catches it regardless of cause (agent dead, config broken, network gone),
-      # and does not depend on scraping promtail's own port, which would need a
-      # firewall rule on the DMZ router.
-      #
-      # The 2h window is sized off the quietest host: backup only emits ~21
-      # syslog lines an hour. absent_over_time drops all labels, so each rule
-      # carries its host statically, same pattern as ContainerDown.
+      # Promtail dying is otherwise silent - an absence of logs looks identical
+      # to a quiet host. The 2h window is sized off the quietest host (backup,
+      # ~21 lines/hour). absent_over_time drops all labels, hence static hosts.
       - alert: LogShippingStopped
         expr: absent_over_time({instance="backup"}[2h])
         for: 10m

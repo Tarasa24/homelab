@@ -47,10 +47,8 @@ scrape_configs:
       - targets: ['10.0.50.103:9100'] # DMZ bitcoin node
         labels:
           host: dmz-bitcoin-node
-      # The hypervisor. Scraped on the LAN rather than VLAN 50 because the PVE
-      # host owns vmbr0 and has no address on the monitoring VLAN itself. Needs
-      # the cluster firewall rule in terraform/firewall_base.tf, since the
-      # datacenter input policy is DROP.
+      # On the LAN, not VLAN 50: the host owns vmbr0 and has no address there.
+      # Needs the cluster firewall rule in terraform/firewall_base.tf.
       - targets: ['10.0.0.2:9100']   # Proxmox host
         labels:
           host: pve

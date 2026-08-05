@@ -22,9 +22,7 @@ services:
       - NTFY_VISITOR_AUTH_FAILURE_LIMIT_REPLENISH=1m
     volumes:
       - ntfy-data:/var/lib/ntfy
-      # Custom Alertmanager message template, selected with ?template=homelab.
-      # ntfy reads templates from /etc/ntfy/templates and requires the .yml
-      # (not .yaml) extension.
+      # Templates must use the .yml extension, not .yaml.
       - ./ntfy/templates:/etc/ntfy/templates:ro
     ports:
       - "10.1.0.24:8080:8080"

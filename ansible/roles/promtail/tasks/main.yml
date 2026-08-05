@@ -9,9 +9,6 @@
     init_system: "{{ 'systemd' if ansible_distribution in ['Debian', 'Ubuntu'] else 'openrc' }}"
     promtail_service_name: "{{ 'promtail' if ansible_distribution in ['Debian', 'Ubuntu'] else 'loki-promtail' }}"
 
-# ---------------------------------------------------------------------------
-# Alpine: packaged
-# ---------------------------------------------------------------------------
 - name: Install promtail (Alpine)
   community.general.apk:
     name:
@@ -21,11 +18,7 @@
     update_cache: true
   when: init_system == "openrc"
 
-# ---------------------------------------------------------------------------
 # Debian: not packaged in bookworm, so install the upstream release binary.
-# This is what lets the hypervisor and the Bitcoin node ship logs at all; both
-# run systemd and neither has Docker, so the container and apk paths are out.
-# ---------------------------------------------------------------------------
 - name: Install unzip (Debian)
   ansible.builtin.apt:
     name: unzip
@@ -94,7 +87,6 @@
       ExecStart=/usr/local/bin/promtail -config.file=/etc/promtail/config.yaml
       Restart=always
       RestartSec=10
-      # Reads the journal, which is root-only.
       User=root
 
       [Install]
@@ -110,11 +102,7 @@
     mode: '0755'
   when: init_system == "systemd"
 
-# ---------------------------------------------------------------------------
-# Shared config + service
-# ---------------------------------------------------------------------------
-# src is resolved from role_path rather than a playbook-relative path so the
-# role works no matter which playbook includes it.
+# src resolves from role_path so the role works from any playbook.
 - name: Deploy promtail config
   ansible.builtin.copy:
     src: "{{ role_path }}/../../../configs/promtail/{{ promtail_config_name }}.yaml"
@@ -124,11 +112,9 @@
     mode: '0644'
   notify: restart promtail
 
-# use: openrc is explicit for Alpine because these playbooks run with
-# gather_facts: false, so Ansible cannot auto-detect the init system and the
-# rc-update that registers promtail in the default runlevel can be skipped
-# silently. That is exactly what happened on backup and dns: promtail was
-# started by hand, ran until the 2026-05-31 reboot, and never came back.
+# use: openrc is explicit: with gather_facts: false Ansible cannot detect the
+# init system and silently skips the rc-update, so promtail would not survive a
+# reboot.
 - name: Enable and start promtail (Alpine)
   ansible.builtin.service:
     name: loki-promtail

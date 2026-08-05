@@ -35,8 +35,7 @@ resource "proxmox_virtual_environment_firewall_rules" "cluster_level_firewall_ru
     proto   = "tcp"
   }
 
-  # Scoped to the monitoring container only; input_policy is DROP so without
-  # this the PVE host's node_exporter is unreachable.
+  # input_policy is DROP, so without this node_exporter here is unreachable.
   rule {
     type    = "in"
     action  = "ACCEPT"

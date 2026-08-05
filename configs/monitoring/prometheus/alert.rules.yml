@@ -31,13 +31,9 @@ groups:
           summary: "High memory on {{ $labels.instance }}"
           description: "Memory usage is {{ $value | printf \"%.1f\" }}% on {{ $labels.instance }}"
 
-      # /media and /immich are the USB-attached bulk-storage mounts (all of them
-      # are the same physical disk, /dev/sdc1, surfaced into several LXCs), and
-      # they are expected to run close to full - that is what cold storage is
-      # for. They are excluded here so the warning does not repeat nightly for a
-      # condition that is known and not actionable. They are deliberately NOT
-      # excluded from DiskSpaceCritical below, so a disk that is genuinely about
-      # to fill up and break Jellyfin/Immich writes is still reported once.
+      # /media and /immich are USB bulk storage (one disk, surfaced into several
+      # LXCs) and are expected to run close to full. Excluded here only;
+      # DiskSpaceCritical still covers them.
       - alert: DiskSpaceLow
         expr: (node_filesystem_avail_bytes{fstype!~"tmpfs|overlay",mountpoint!~"/media|/immich|/mnt/USB.*"} / node_filesystem_size_bytes{fstype!~"tmpfs|overlay",mountpoint!~"/media|/immich|/mnt/USB.*"}) * 100 < 15
         for: 10m
@@ -92,29 +88,15 @@ groups:
           summary: "Prometheus target missing: {{ $labels.instance }}"
           description: "Scrape target {{ $labels.job }}/{{ $labels.instance }} has been down for 5 minutes"
 
-      # PrometheusStorageFull was removed deliberately. Its expression divided
-      # prometheus_tsdb_storage_blocks_bytes by
-      # prometheus_tsdb_head_chunks_storage_size_bytes, which is not a fill ratio
-      # of anything - neither series relates to the configured retention limit -
-      # so it fired on a healthy, nearly empty TSDB and cried wolf continuously.
-      # Retention is already bounded by --storage.tsdb.retention.size=5GB, and
-      # actual disk pressure is covered by DiskSpaceLow/DiskSpaceCritical on the
-      # monitoring host. If a real TSDB-size alert is ever wanted, base it on
-      # prometheus_tsdb_storage_blocks_bytes against that 5GB cap explicitly.
+      # PrometheusStorageFull removed: its expression was not a fill ratio of
+      # anything and fired on a healthy TSDB. Retention is bounded by
+      # --storage.tsdb.retention.size and disk pressure by DiskSpaceLow.
 
   - name: availability_alerts
     rules:
-      # gatus_results_endpoint_success is a 1/0 gauge written on every probe, which
-      # is the most direct "is it up right now" signal Gatus exposes.
-      # Labels carried: name, group, host, path, key, type. `host` and `path` come
-      # from the per-endpoint extra-labels in gatus/config.yaml; `host` is what the
-      # alertmanager inhibit rules match on.
-      #
-      # NOTE: the Gatus docs describe metrics named gatus_check_result_total and
-      # gatus_uptime. Those do NOT exist in the shipped binary - the real names were
-      # confirmed against `ghcr.io/twin/gatus:stable` /metrics output. Re-verify
-      # these names after any Gatus upgrade, because a renamed metric silently
-      # disables this alert.
+      # The Gatus docs describe gatus_check_result_total and gatus_uptime;
+      # neither exists in the shipped binary. Re-verify against live /metrics
+      # after any upgrade - a renamed metric silently disables this alert.
       - alert: ExternalServiceDown
         expr: gatus_results_endpoint_success == 0
         # 60s probe + 60s scrape + 2m hold => roughly 3-4 minutes to page.
@@ -126,9 +108,8 @@ groups:
           summary: "{{ $labels.name }} ({{ $labels.group }}) is down"
           description: "Gatus probe for {{ $labels.name }} in group {{ $labels.group }} has been failing for more than 2 minutes on {{ $labels.host }} via the {{ $labels.path }} path"
 
-      # Only emitted for TLS endpoints. All public vhosts share one wildcard cert,
-      # so this will fire once per public endpoint - grouped by alertname in
-      # alertmanager, so it still arrives as a single notification.
+      # All public vhosts share one wildcard cert, so this fires once per
+      # endpoint; alertmanager groups them into a single notification.
       - alert: TLSCertificateExpiringSoon
         expr: gatus_results_certificate_expiration_seconds > 0 and gatus_results_certificate_expiration_seconds < 604800
         for: 1h
@@ -145,10 +126,9 @@ groups:
         labels:
           severity: critical
           alerttype: infrastructure
-          # Set here rather than on the scrape target: a "host" label on the
-          # gatus job would collide with the per-endpoint host from Gatus
-          # extra-labels and Prometheus would rename the latter to exported_host,
-          # breaking the alertmanager inhibit rules keyed on host.
+          # Set here, not on the scrape target: a host label on the gatus job
+          # would collide with the per-endpoint one and be renamed
+          # exported_host, breaking the inhibit rules.
           host: monitoring
         annotations:
           summary: "Gatus is down"
@@ -156,22 +136,10 @@ groups:
 
   - name: systemd_alerts
     rules:
-      # Service-level coverage for the hosts that do not run Docker. cAdvisor
-      # gives per-container up/down on the two Docker hosts, but the Bitcoin
-      # node runs bitcoind and electrs as plain systemd units on Debian, so
-      # until now only the host was monitored, not the services on it. electrs
-      # binds its DMZ address only and is unreachable over the monitoring VLAN,
-      # so the systemd collector is the only way to see it at all.
-      #
-      # The unit allowlist is node_exporter_systemd_units in the role defaults.
-      # Note this cannot detect a unit that has been removed entirely - the
-      # series simply disappears - only one that is present and not active.
-      # The name selector is load-bearing, not decorative. A bare
-      # node_systemd_unit_state{state="active"} == 0 matches every unit that is
-      # legitimately inactive - oneshot services behind timers like
-      # apt-daily.service, e2scrub_all.service, systemd-tmpfiles-clean.service -
-      # which produced 134 pending alerts the first time this was deployed.
-      # Only long-running units we actually care about belong here.
+      # Service-level coverage for the non-Docker hosts. The name selector is
+      # load-bearing: without it this matches every oneshot unit that is
+      # legitimately inactive (apt-daily, e2scrub_all, ...) - 134 pending alerts
+      # in practice. Cannot detect a unit removed entirely, only one not active.
       - alert: SystemdUnitDown
         expr: node_systemd_unit_state{state="active", name=~"(bitcoind|electrs|pve-cluster|pvedaemon|pveproxy|pvestatd|pve-firewall)\\.service"} == 0
         for: 5m

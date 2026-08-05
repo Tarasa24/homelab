@@ -64,18 +64,12 @@ compactor:
 
 ruler:
   enable_api: true
-  # rule_path is scratch space the ruler writes to while evaluating, so it must
-  # live on the writable named volume. storage.local.directory is where rule
-  # FILES are read from, and is a read-only bind mount of the repo. Pointing both
-  # at the same path is what previously required nesting a bind mount inside the
-  # loki-data volume; keeping them separate avoids that entirely.
+  # Scratch space the ruler writes to; kept separate from storage.local.directory
+  # below so the read-only rules mount need not nest inside the loki-data volume.
   rule_path: /loki/rules-tmp
   alertmanager_url: http://alertmanager:9093
-  # Required. Loki's ruler defaults to Alertmanager's v1 alert API, which was
-  # removed in Alertmanager 0.27; against 0.33 every notification came back
-  # "410 Gone" and no log-based alert was ever deliverable, even though the
-  # rules themselves evaluated and fired correctly. Verified by tailing the
-  # loki container log for notifier.go errors.
+  # Required: the ruler defaults to Alertmanager's v1 API, removed in 0.27, so
+  # every notification returned 410 Gone while the rules looked healthy.
   enable_alertmanager_v2: true
   external_labels:
     cluster: 'homelab'
@@ -83,6 +77,5 @@ ruler:
   storage:
     type: local
     local:
-      # Loki appends the tenant id, so actual rules are read from
-      # /etc/loki/rules/fake/ (tenant is "fake" because auth_enabled is false).
+      # Loki appends the tenant id: rules are read from /etc/loki/rules/fake/.
       directory: /etc/loki/rules

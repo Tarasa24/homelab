@@ -1,16 +1,9 @@
-# Gatus - service availability probing + public status page.
-# Replaces the removed blackbox-exporter and Uptime Kuma.
+# Service availability probing + the public status page at
+# status.homelab.tarasa24.dev. Alerting is not configured here on purpose:
+# Prometheus scrapes the metrics and Alertmanager owns routing to ntfy.
 #
-# Alerting is deliberately NOT configured here: Gatus exposes Prometheus metrics
-# (metrics: true), Prometheus scrapes them as job "gatus", and Alertmanager owns
-# routing to ntfy. This keeps a single alert pipeline with one set of grouping,
-# inhibition and resolved-notification semantics.
-#
-# This page is served publicly and unauthenticated at status.homelab.tarasa24.dev.
-# Public endpoints may show their hostname (it is already public DNS). Internal
-# endpoints hide url/hostname/port/errors so that a failed probe cannot leak
-# internal topology (e.g. "dial tcp 10.0.1.22:80: connection refused") to
-# anonymous visitors.
+# The page is public, so internal endpoints hide url/hostname/port/errors - a
+# failed probe would otherwise leak internal topology in its error string.
 
 web:
   port: 8080
@@ -27,14 +20,8 @@ ui:
   description: "Live availability of homelab services."
 
 endpoints:
-  # ---------------------------------------------------------------------------
-  # Public - the real end-user path:
-  # public DNS -> Linode bastion -> WireGuard -> dmz-router nginx -> service.
-  # A failure here means users are affected, but it does NOT isolate the fault:
-  # the home WAN uplink is part of this path. Correlate with the Internal group
-  # and with cAdvisor ContainerDown alerts to tell "service died" from
-  # "uplink died".
-  # ---------------------------------------------------------------------------
+  # Public - the real end-user path via Linode/WireGuard/nginx. Includes the WAN
+  # uplink, so a failure here does not isolate the fault; compare with Internal.
   - name: "Jellyfin"
     group: "Public"
     url: "https://jellyfin.homelab.tarasa24.dev/health"
@@ -42,11 +29,9 @@ endpoints:
     client:
       timeout: 10s
     conditions:
-      # Certificate expiry is deliberately NOT asserted as a condition here.
-      # Gatus exports gatus_results_certificate_expiration_seconds for every TLS
-      # endpoint, and the TLSCertificateExpiringSoon Prometheus rule alerts on it.
-      # Folding it into a condition would paint Jellyfin as "down" on the public
-      # status page over a cert that is merely approaching renewal.
+      # Cert expiry is not a condition here: TLSCertificateExpiringSoon alerts
+      # on the exported metric instead, so a renewal-due cert does not paint
+      # this endpoint as down on the public page.
       - "[STATUS] == 200"
     ui:
       hide-conditions: true
@@ -118,10 +103,7 @@ endpoints:
       host: private-docker-host
       path: external
 
-  # Electrum is an intentionally internet-facing service (nginx stream on 50002
-  # terminates TLS and proxies to electrs in the DMZ), so it belongs in the
-  # public group alongside the other user-facing endpoints. A TCP connect is the
-  # right check here: the Electrum protocol is not HTTP.
+  # TCP connect, not HTTP - the Electrum protocol is not HTTP.
   - name: "Electrum Server"
     group: "Public"
     url: "tcp://electrum.homelab.tarasa24.dev:50002"
@@ -137,16 +119,11 @@ endpoints:
       host: dmz-bitcoin-node
       path: external
 
-  # ---------------------------------------------------------------------------
-  # Internal - LAN services probed directly over the 10.0.0.0/22, bypassing the
-  # WAN entirely. If a Public probe fails but its Internal counterpart passes,
-  # the fault is in the WAN/Linode/WireGuard/nginx path, not the service.
-  # All network detail is hidden from the public page.
-  # ---------------------------------------------------------------------------
+  # Internal - probed directly over the LAN, bypassing the WAN. If Public fails
+  # but Internal passes, the fault is in the WAN/nginx path, not the service.
   - name: "Traefik"
     group: "Internal"
-    # Traefik runs with --api.insecure=true on :8080, so /api/overview is a
-    # reliable liveness check. /ping is NOT enabled in this deployment.
+    # /ping is not enabled here; the insecure API on :8080 is.
     url: "http://10.0.1.20:8080/api/overview"
     interval: 60s
     client:
@@ -217,10 +194,7 @@ endpoints:
       host: private-docker-host
       path: internal
 
-  # DNS is the one dependency whose failure breaks the entire LAN, including
-  # name resolution for the other probes, so it is checked directly rather than
-  # inferred. Queries a public name so the check covers recursion too - a
-  # resolver that cannot recurse is no more useful than one that is down.
+  # Queries a public name so the check covers recursion, not just liveness.
   - name: "DNS"
     group: "Internal"
     url: "10.0.1.1"
@@ -242,9 +216,7 @@ endpoints:
       host: dns
       path: internal
 
-  # bitcoind's P2P port is reachable over the monitoring VLAN, unlike electrs
-  # which binds its DMZ address only. Probed internally so a failure here points
-  # at the daemon rather than at the public path.
+  # Reachable over VLAN 50, unlike electrs which binds its DMZ address only.
   - name: "Bitcoin Node"
     group: "Internal"
     url: "tcp://10.0.50.103:8333"
@@ -409,11 +381,8 @@ endpoints:
       host: homeassistant
       path: internal
 
-  # ---------------------------------------------------------------------------
-  # Infrastructure - the monitoring stack itself, probed over the compose
-  # network by service name. Note Gatus does not probe itself: if Gatus is down
-  # the GatusDown Prometheus rule (up{job="gatus"} == 0) covers it.
-  # ---------------------------------------------------------------------------
+  # Infrastructure - the monitoring stack itself, over the compose network.
+  # Gatus does not probe itself; the GatusDown Prometheus rule covers that.
   - name: "Prometheus"
     group: "Infrastructure"
     url: "http://prometheus:9090/-/healthy"

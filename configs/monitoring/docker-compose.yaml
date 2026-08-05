@@ -94,10 +94,8 @@ services:
       - "0.0.0.0:8080:8080"
     networks:
       - monitoring
-    # No healthcheck: the Gatus image is distroless (no shell, no wget, no curl),
-    # so any CMD healthcheck would fail permanently and pin the container to
-    # "unhealthy". Liveness is covered externally instead - Prometheus scrapes it
-    # as job "gatus" and the GatusDown rule fires on up{job="gatus"} == 0.
+    # No healthcheck: the image is distroless, so any CMD check fails
+    # permanently. Liveness is covered by the GatusDown Prometheus rule.
 
   grafana:
     image: grafana/grafana-oss:latest
@@ -112,8 +110,6 @@ services:
     volumes:
       - grafana-data:/var/lib/grafana
       - ./grafana/config.ini:/etc/grafana/grafana.ini:ro
-      # Datasources as code. Without this they exist only inside grafana-data,
-      # so a lost volume silently takes the dashboards' data sources with it.
       - ./grafana/provisioning:/etc/grafana/provisioning:ro
     ports:
       - "0.0.0.0:3000:3000"

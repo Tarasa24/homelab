@@ -6,14 +6,12 @@ positions:
   filename: /var/lib/promtail/positions.yaml
 
 clients:
-  # VLAN 50, consistent with the other DMZ hosts. This container has a mon NIC
-  # at 10.0.50.103, so it reaches Loki over the out-of-band monitoring segment
-  # rather than through the DMZ router.
+  # VLAN 50, consistent with the other DMZ hosts.
   - url: http://10.0.50.4:3100/loki/api/v1/push
 
 scrape_configs:
-  # bitcoind and electrs run as systemd units and log to the journal, so this is
-  # where the "why" lives when SystemdUnitDown fires for either of them.
+  # bitcoind and electrs log to the journal; this is the "why" behind
+  # SystemdUnitDown.
   - job_name: journal
     journal:
       max_age: 12h
@@ -22,15 +20,11 @@ scrape_configs:
         instance: dmz-bitcoin-node
         stream: stdout
     relabel_configs:
-      # Per-session systemd scopes (session-1234.scope) and per-user manager
-      # units are created fresh for every login, so keeping them would grow the
-      # number of Loki streams without bound - the classic cardinality trap.
+      # Fresh per login, so keeping them grows Loki streams without bound.
       - source_labels: ['__journal__systemd_unit']
         regex: '(session-\d+\.scope|user@\d+\.service|user-runtime-dir@\d+\.service)'
         action: drop
-      # Default first, then override when the entry actually has a unit. Kernel
-      # and early-boot messages carry no unit at all; without the default they
-      # would produce a bare "<instance>/" job label.
+      # Default first, then override: kernel/early-boot entries carry no unit.
       - target_label: 'service_name'
         replacement: 'kernel'
       - target_label: 'container_name'

@@ -3,11 +3,8 @@ services:
     image: "traefik:v3.1.4"
     container_name: "traefik"
     command:
-      # Traefik logged nothing after startup, so promtail had no stream to ship
-      # and there was no request-level visibility for anything behind it.
-      # Access log goes to stdout by default, which is where promtail's docker
-      # service discovery reads. JSON matches the nginx access log format on the
-      # DMZ router, so both are queryable the same way in Loki.
+      # Access log to stdout, where promtail's docker SD reads. JSON matches
+      # the nginx access log format so both query the same way in Loki.
       - "--log.level=INFO"
       - "--accesslog=true"
       - "--accesslog.format=json"

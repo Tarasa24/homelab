@@ -2,15 +2,8 @@ global:
   resolve_timeout: 5m
 
 time_intervals:
-  # borgmatic runs from cron at 02:00 UTC on every host (see the borgmatic
-  # role). The window is defined in UTC deliberately: the containers and their
-  # crontabs run UTC, so a UTC window does not drift when local time changes
-  # for DST, whereas a local-time window would.
-  #
-  # Observed 2026-08-03: backup began 02:00, services responsive again ~02:12.
-  # The window is padded well beyond that because backup duration grows with
-  # the data set and this host is slow to spin services back up. Tighten it if
-  # backups stay consistently short.
+  # borgmatic runs from cron at 02:00 UTC. UTC on purpose: the crontabs are UTC,
+  # so this does not drift with DST. Padded well past the observed ~12min run.
   - name: nightly-backup
     time_intervals:
       - times:
@@ -26,22 +19,9 @@ route:
   repeat_interval: 12h
 
   routes:
-    # --- Nightly backup maintenance window -------------------------------
-    # borgmatic stops containers before backing up their volumes (see the
-    # before_backup hooks in configs/backup/borg/*.yaml), so services really
-    # are down and the monitoring is correct to notice. On this hardware the
-    # apps also need several minutes to become responsive again after Docker
-    # reports them started: on 2026-08-03 containers were started at
-    # 02:02-02:03 UTC but probes only recovered around 02:12 UTC.
-    #
-    # These two routes are matched first and suppress only the expected
-    # service-down noise. Everything else - NodeDown, CAdvisorDown, GatusDown,
-    # OOMKill, AuthenticationFailureSpike, disk alerts - stays live during the
-    # window, so a genuine incident during backup is still paged.
-    #
-    # Muting delays rather than loses: an alert still firing when the window
-    # closes notifies at that point, so a service that fails to come back is
-    # still reported.
+    # Backup window. borgmatic stops containers, so these alerts are expected
+    # noise; everything else stays live. Muting delays rather than loses - an
+    # alert still firing at 03:00 notifies then.
     - matchers:
         - alertname =~ "ExternalServiceDown|ContainerDown|ContainerCrashLoop"
       receiver: 'critical-receiver'
@@ -49,10 +29,7 @@ route:
         - nightly-backup
       continue: false
 
-    # The proxy error-rate rules belong here for the same reason: while borgmatic
-    # has a backend stopped, nginx and Traefik correctly return 5xx for it.
-    # TraefikErrorRateHigh fired at 02:09 UTC on 2026-08-04, inside the window,
-    # because it was added after these routes were first written.
+    # Proxy 5xx is the same expected noise while a backend is stopped.
     - matchers:
         - alertname =~ "ContainerErrors|TraefikErrorRateHigh|NginxErrorRateHigh"
       receiver: 'services-receiver'
@@ -88,21 +65,9 @@ route:
       continue: false
 
 receivers:
-  # ?template=homelab selects the custom ntfy message template shipped in
-  # configs/dmz_docker-host/ntfy/templates/homelab.yml. Without it ntfy renders
-  # the raw Alertmanager JSON body as the notification text, which is unreadable
-  # on a phone. The built-in ?template=alertmanager is not used because it prints
-  # "<no value>" for instance/source on our alerts and drops the host/container
-  # labels that carry the context.
-  #
-  # ntfy is reached over its PUBLIC URL, not the DMZ address 10.1.0.24:8080.
-  # The monitoring LXC sits on the LAN with its default gateway at the home
-  # router and has no route into the DMZ (10.1.0.0/24), so the internal address
-  # silently timed out on every notification - alerting was never deliverable.
-  # This path egresses the WAN and re-enters via the Linode bastion, which means
-  # alert delivery depends on the home uplink; that is acceptable because push
-  # to a phone requires internet regardless. The alternative, a static route
-  # into the DMZ, would weaken the isolation the DMZ exists to provide.
+  # Public URL, not the DMZ address 10.1.0.24:8080 - the monitoring LXC has no
+  # route into 10.1.0.0/24, so that silently timed out on every notification.
+  # ?template=homelab renders readable text instead of raw Alertmanager JSON.
   - name: 'critical-receiver'
     webhook_configs:
       - url: 'https://ntfy.homelab.tarasa24.dev/homelab-critical?template=homelab'
@@ -138,12 +103,9 @@ inhibit_rules:
       - alertname = PrometheusTargetMissing
     equal: ['instance']
 
-  # Suppress service alerts when the node hosting them is down.
-  # Node/docker/cadvisor targets and Gatus endpoints (via extra-labels) all
-  # carry a `host` label naming the LXC they run on/probe, so we compare on
-  # `host` rather than `instance` — `instance` differs between an infra alert
-  # (e.g. 10.0.50.120:9100) and the service alert it should suppress
-  # (e.g. a Gatus endpoint or a specific container), so it never matched.
+  # Compare on `host`, not `instance`: instance differs between an infra alert
+  # (10.0.50.120:9100) and the service alert it should suppress, so it never
+  # matched. Every target and Gatus endpoint carries a `host` label.
   - source_matchers:
       - severity = critical
       - alerttype = infrastructure

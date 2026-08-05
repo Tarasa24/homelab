@@ -6,15 +6,11 @@ positions:
   filename: /var/lib/promtail/positions.yaml
 
 clients:
-  # The LAN address, not the VLAN 50 one: the PVE host owns vmbr0 and has no
-  # interface on the monitoring VLAN, so 10.0.1.4 is the definitively routable
-  # path from here (it is inside the host's own 10.0.0.0/22).
+  # LAN address: this host has no interface on VLAN 50.
   - url: http://10.0.1.4:3100/loki/api/v1/push
 
 scrape_configs:
-  # systemd-journald is the only log source on a Proxmox host worth having:
-  # kernel messages, LXC/VM start and stop, storage and ZFS errors, and the
-  # pve* daemons all land there. There are no plain log files to tail.
+  # journald is the only log source here; there are no files to tail.
   - job_name: journal
     journal:
       max_age: 12h
@@ -23,15 +19,11 @@ scrape_configs:
         instance: pve
         stream: stdout
     relabel_configs:
-      # Per-session systemd scopes (session-1234.scope) and per-user manager
-      # units are created fresh for every login, so keeping them would grow the
-      # number of Loki streams without bound - the classic cardinality trap.
+      # Fresh per login, so keeping them grows Loki streams without bound.
       - source_labels: ['__journal__systemd_unit']
         regex: '(session-\d+\.scope|user@\d+\.service|user-runtime-dir@\d+\.service)'
         action: drop
-      # Default first, then override when the entry actually has a unit. Kernel
-      # and early-boot messages carry no unit at all; without the default they
-      # would produce a bare "<instance>/" job label.
+      # Default first, then override: kernel/early-boot entries carry no unit.
       - target_label: 'service_name'
         replacement: 'kernel'
       - target_label: 'container_name'

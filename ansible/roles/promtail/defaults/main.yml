@@ -1,11 +1,7 @@
 ---
-# Which file under configs/promtail/ to deploy. Defaults to the host's name so
-# existing playbooks keep working, but is overridable and, unlike a bare
-# ansible_hostname reference, fails loudly rather than silently templating to an
-# empty path when facts are not gathered and no inventory var is set.
+# Which file under configs/promtail/ to deploy. `mandatory` so a missing
+# hostname fails loudly instead of templating to an empty path.
 promtail_config_name: "{{ ansible_hostname | mandatory }}"
 
-# Only used on Debian hosts, where promtail is not packaged and the upstream
-# release binary is installed instead. Kept close to the Loki server version
-# (2.9.2) and to the 2.9.4 the Alpine package ships.
+# Debian only; kept close to the Loki server version.
 promtail_version: "2.9.4"
