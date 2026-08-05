@@ -49,8 +49,12 @@ route:
         - nightly-backup
       continue: false
 
+    # The proxy error-rate rules belong here for the same reason: while borgmatic
+    # has a backend stopped, nginx and Traefik correctly return 5xx for it.
+    # TraefikErrorRateHigh fired at 02:09 UTC on 2026-08-04, inside the window,
+    # because it was added after these routes were first written.
     - matchers:
-        - alertname = "ContainerErrors"
+        - alertname =~ "ContainerErrors|TraefikErrorRateHigh|NginxErrorRateHigh"
       receiver: 'services-receiver'
       mute_time_intervals:
         - nightly-backup
