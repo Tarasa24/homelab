@@ -37,6 +37,29 @@
     - role: promtail
 
   tasks:
+    # Guards the host's default route. Was an untracked script on the host that
+    # bounced vmbr0 with `ip link`, dropping the ifupdown-configured gateway
+    # permanently; see configs/pve/net-watchdog.sh.
+    - name: Deploy net-watchdog script
+      ansible.builtin.copy:
+        src: "../../../configs/pve/net-watchdog.sh"
+        dest: /usr/local/bin/net-watchdog.sh
+        owner: root
+        group: root
+        mode: '0755'
+
+    - name: Remove any unmanaged net-watchdog crontab entry
+      ansible.builtin.shell: |
+        crontab -l 2>/dev/null | grep -v 'net-watchdog' | crontab - || true
+      changed_when: false
+
+    - name: Schedule net-watchdog
+      ansible.builtin.cron:
+        name: net-watchdog
+        job: /usr/local/bin/net-watchdog.sh
+        minute: "*"
+        state: present
+
     - name: Create mount points
       ansible.builtin.file:
         name: "/mnt/{{ item.key }}"
