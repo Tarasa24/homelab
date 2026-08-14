@@ -4,7 +4,7 @@ resource "proxmox_virtual_environment_container" "lxc_tailscale_connector_templa
   node_name = "pve"
   vm_id     = 3003
 
-  tags       = ["template", "alpine", "tailscale"]
+  tags         = ["template", "alpine", "tailscale"]
   unprivileged = true
 
   initialization {

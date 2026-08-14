@@ -1,0 +1,42 @@
+# ntfy message template for Alertmanager webhooks, selected with
+# ?template=homelab. The built-in "alertmanager" template renders "<no value>"
+# for instance/source on our alerts and drops the host/container labels.
+#
+# `with` skips missing labels instead of printing "<no value>"; severity is
+# compared via printf "%v" so a missing key cannot break rendering entirely.
+
+title: |-
+  {{- if eq .status "resolved" -}}
+  Resolved: {{ .groupLabels.alertname }}
+  {{- else if eq (printf "%v" .commonLabels.severity) "critical" -}}
+  {{ .groupLabels.alertname }}
+  {{- else -}}
+  {{ .groupLabels.alertname }}
+  {{- end -}}
+  {{- if gt (len .alerts) 1 }} ({{ len .alerts }} alerts){{ end -}}
+
+message: |-
+  {{- range .alerts }}
+  {{ .annotations.summary }}
+  {{- with .annotations.description }}
+  {{ . }}
+  {{- end }}
+  {{- with .labels.host }}
+  host: {{ . }}
+  {{- end }}
+  {{- with .labels.container }}
+  container: {{ . }}
+  {{- end }}
+  {{- with .labels.group }}
+  group: {{ . }}
+  {{- end }}
+  {{ end -}}
+
+priority: |-
+  {{- if eq .status "resolved" -}}
+  2
+  {{- else if eq (printf "%v" .commonLabels.severity) "critical" -}}
+  5
+  {{- else -}}
+  4
+  {{- end -}}

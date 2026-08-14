@@ -3,7 +3,11 @@ services:
     image: "traefik:v3.1.4"
     container_name: "traefik"
     command:
-      # - "--log.level=DEBUG"
+      # Access log to stdout, where promtail's docker SD reads. JSON matches
+      # the nginx access log format so both query the same way in Loki.
+      - "--log.level=INFO"
+      - "--accesslog=true"
+      - "--accesslog.format=json"
       - "--api.insecure=true"
       - "--providers.docker=true"
       - "--providers.docker.exposedbydefault=false"

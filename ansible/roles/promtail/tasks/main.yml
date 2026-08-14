@@ -1,0 +1,132 @@
+---
+- name: Gather OS facts
+  ansible.builtin.setup:
+    filter: ansible_distribution*
+  changed_when: false
+
+- name: Determine init system
+  ansible.builtin.set_fact:
+    init_system: "{{ 'systemd' if ansible_distribution in ['Debian', 'Ubuntu'] else 'openrc' }}"
+    promtail_service_name: "{{ 'promtail' if ansible_distribution in ['Debian', 'Ubuntu'] else 'loki-promtail' }}"
+
+- name: Install promtail (Alpine)
+  community.general.apk:
+    name:
+      - loki-promtail
+      - loki-promtail-openrc
+    state: present
+    update_cache: true
+  when: init_system == "openrc"
+
+# Debian: not packaged in bookworm, so install the upstream release binary.
+- name: Install unzip (Debian)
+  ansible.builtin.apt:
+    name: unzip
+    state: present
+    update_cache: true
+  when: init_system == "systemd"
+
+- name: Check installed promtail version (Debian)
+  ansible.builtin.command: /usr/local/bin/promtail --version
+  register: promtail_installed
+  changed_when: false
+  failed_when: false
+  when: init_system == "systemd"
+
+- name: Download and install promtail binary (Debian)
+  when:
+    - init_system == "systemd"
+    - promtail_version not in (promtail_installed.stdout | default(''))
+  block:
+    - name: Download promtail release
+      ansible.builtin.get_url:
+        url: "https://github.com/grafana/loki/releases/download/v{{ promtail_version }}/promtail-linux-amd64.zip"
+        dest: /tmp/promtail-linux-amd64.zip
+        mode: '0644'
+
+    - name: Unpack promtail
+      ansible.builtin.unarchive:
+        src: /tmp/promtail-linux-amd64.zip
+        dest: /usr/local/bin
+        remote_src: true
+        mode: '0755'
+
+    - name: Name the binary promtail
+      ansible.builtin.copy:
+        src: /usr/local/bin/promtail-linux-amd64
+        dest: /usr/local/bin/promtail
+        remote_src: true
+        mode: '0755'
+      notify: restart promtail
+
+    - name: Remove archive and unpacked name
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: absent
+      loop:
+        - /tmp/promtail-linux-amd64.zip
+        - /usr/local/bin/promtail-linux-amd64
+
+- name: Create promtail state directory (Debian)
+  ansible.builtin.file:
+    path: /var/lib/promtail
+    state: directory
+    mode: '0755'
+  when: init_system == "systemd"
+
+- name: Create promtail systemd unit (Debian)
+  ansible.builtin.copy:
+    dest: /etc/systemd/system/promtail.service
+    content: |
+      [Unit]
+      Description=Promtail log shipper
+      After=network-online.target
+      Wants=network-online.target
+
+      [Service]
+      ExecStart=/usr/local/bin/promtail -config.file=/etc/promtail/config.yaml
+      Restart=always
+      RestartSec=10
+      User=root
+
+      [Install]
+      WantedBy=multi-user.target
+    mode: '0644'
+  when: init_system == "systemd"
+  notify: restart promtail
+
+- name: Create promtail config directory (Debian)
+  ansible.builtin.file:
+    path: /etc/promtail
+    state: directory
+    mode: '0755'
+  when: init_system == "systemd"
+
+# src resolves from role_path so the role works from any playbook.
+- name: Deploy promtail config
+  ansible.builtin.copy:
+    src: "{{ role_path }}/../../../configs/promtail/{{ promtail_config_name }}.yaml"
+    dest: "{{ '/etc/promtail/config.yaml' if init_system == 'systemd' else '/etc/loki/promtail-local-config.yaml' }}"
+    owner: root
+    group: root
+    mode: '0644'
+  notify: restart promtail
+
+# use: openrc is explicit: with gather_facts: false Ansible cannot detect the
+# init system and silently skips the rc-update, so promtail would not survive a
+# reboot.
+- name: Enable and start promtail (Alpine)
+  ansible.builtin.service:
+    name: loki-promtail
+    enabled: true
+    state: started
+    use: openrc
+  when: init_system == "openrc"
+
+- name: Enable and start promtail (Debian)
+  ansible.builtin.service:
+    name: promtail
+    enabled: true
+    state: started
+    daemon_reload: true
+  when: init_system == "systemd"

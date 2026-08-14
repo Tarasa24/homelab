@@ -23,8 +23,14 @@ resource "proxmox_virtual_environment_container" "lxc_private-docker-host" {
 
     ip_config {
       ipv4 {
-        address = var.private-docker-host_ip.address
+        address = var.private-docker-host_ip.address # LAN IP (eth0)
         gateway = var.private-docker-host_ip.gateway
+      }
+    }
+
+    ip_config {
+      ipv4 {
+        address = "10.0.50.20/24" # Monitoring VLAN IP (mon)
       }
     }
 
@@ -44,7 +50,17 @@ resource "proxmox_virtual_environment_container" "lxc_private-docker-host" {
   unprivileged = true
 
   network_interface {
-    name = "eth0"
+    name     = "eth0"
+    bridge   = "vmbr0"
+    firewall = true
+  }
+
+
+  network_interface {
+    name     = "mon"
+    bridge   = "vmbr0"
+    vlan_id  = var.vlan_ids["monitoring"]
+    firewall = true
   }
 
   operating_system {
@@ -55,7 +71,7 @@ resource "proxmox_virtual_environment_container" "lxc_private-docker-host" {
 
   disk {
     datastore_id = "local-lvm"
-    size         = 64
+    size         = 68
   }
 
   mount_point {

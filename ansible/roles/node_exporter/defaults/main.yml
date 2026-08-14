@@ -1,0 +1,7 @@
+---
+# Units exposed by the systemd collector (systemd hosts only). An allowlist
+# because the collector emits a series per unit per state.
+#
+# Uses [.] rather than \. - systemd processes escape sequences in ExecStart, so
+# a backslash risks being mangled and only failing at the next reboot.
+node_exporter_systemd_units: "(bitcoind|electrs|pve-cluster|pvedaemon|pveproxy|pvestatd|pve-firewall|ssh)[.]service"

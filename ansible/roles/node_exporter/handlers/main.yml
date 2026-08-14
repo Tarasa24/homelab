@@ -1,0 +1,8 @@
+---
+# state: started is a no-op on a running service, so without this a changed
+# override sits on disk unapplied until something else restarts it.
+- name: restart node_exporter
+  ansible.builtin.service:
+    name: "{{ node_exporter_service_name }}"
+    state: restarted
+    daemon_reload: true

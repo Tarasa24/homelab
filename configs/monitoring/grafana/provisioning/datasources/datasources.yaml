@@ -1,0 +1,23 @@
+apiVersion: 1
+
+# No explicit `uid`: these datasources already exist with Grafana-assigned UIDs,
+# and pinning a different one makes provisioning fail with "data source not
+# found" and crash-loop Grafana at startup. Matched by name instead.
+datasources:
+  - name: Prometheus
+    type: prometheus
+    access: proxy
+    url: http://prometheus:9090
+    isDefault: true
+    editable: false
+    jsonData:
+      # Matches the global scrape_interval in prometheus.yml.
+      timeInterval: 60s
+
+  - name: Loki
+    type: loki
+    access: proxy
+    url: http://loki:3100
+    editable: false
+    jsonData:
+      maxLines: 5000
