@@ -2,19 +2,30 @@
 - name: Configure bitcoin node
   hosts: lxc_dmz_bitcoin_node
   gather_facts: true
+  # The container sees every block device on the PVE host, so a full fact
+  # payload is large enough to be truncated intermittently by the pct_ssh
+  # connection ("No end of json char found"). Only ansible_distribution and
+  # ansible_hostname are used here, both of which are in the min subset.
+  gather_subset: min
   vars:
     ansible_host: "{{ hostvars[inventory_hostname].ansible_host }}"
     lxc_host: "{{ hostvars[inventory_hostname].lxc_host }}"
   roles:
     - role: lxc_python3
     - role: node_exporter
+    # Pinned explicitly: this play gathers facts, and gathered facts outrank
+    # inventory host vars, so the real hostname (bitcoin-node) overrides the
+    # inventory's ansible_hostname and the role looks for the wrong config.
     - role: promtail
+      promtail_config_name: dmz-bitcoin-node
     # - role: borgmatic
 
   tasks:
     - name: Install dependencies
       ansible.builtin.apt:
-        pkg: [apt-transport-https, build-essential, clang, cmake, curl, git, gnupg, sudo, cargo]
+        # libclang-dev is required by bindgen, pulled in via rust-librocksdb-sys
+        # since electrs 0.11. The clang package alone does not provide libclang.
+        pkg: [apt-transport-https, build-essential, clang, libclang-dev, cmake, curl, git, gnupg, sudo, cargo]
         update_cache: yes
       retries: 3
 
@@ -40,32 +51,64 @@
         shell: /bin/bash
         home: /home/bitcoin
 
-    - name: Check if bitcoind and bitcoin-cli are installed
-      ansible.builtin.command: "which {{ item }}"
-      loop:
-        - bitcoind
-        - bitcoin-cli
+    - name: Set bitcoin version
+      ansible.builtin.set_fact:
+        bitcoin_version: "31.1"
+        arch: "x86_64-linux-gnu"
+
+    - name: Set electrs version
+      ansible.builtin.set_fact:
+        electrs_version: "v0.11.1"
+
+    # Unpinned on purpose: electrs 0.11 MSRV is 1.85 and we can't verify the
+    # current stable release from here, pinning risks landing below whatever
+    # a transitive dep bumps to next. Pin deliberately if that ever bites.
+    - name: Set rust toolchain
+      ansible.builtin.set_fact:
+        rust_toolchain: "stable"
+
+    # 2GB RAM container, bundled rocksdb is a memory-heavy C++ build, and
+    # bitcoind runs on the same box. -j nproc (4) risks OOM-killing the build
+    # or bitcoind itself with ~1.1GB available RAM and ~400MB free swap.
+    - name: Set electrs build parallelism
+      ansible.builtin.set_fact:
+        electrs_build_jobs: 1
+
+    - name: Check installed bitcoind version
+      ansible.builtin.command: "bitcoind --version"
       register: bitcoind_installed
+      changed_when: false
       ignore_errors: yes
     - name: Install bitcoin core
-      when: bitcoind_installed.results | selectattr('rc', 'ne', 0) | list | length > 0
+      when: bitcoind_installed.rc != 0 or ('v' + bitcoin_version + '.') not in bitcoind_installed.stdout
       block:
-        - name: Set bitcoin version
-          set_fact:
-            bitcoin_version: "28.1"
-            arch: "x86_64-linux-gnu"
+        # Egress from the DMZ goes over the WireGuard tunnel to the Linode
+        # bastion, which intermittently times out the TLS handshake. Retry
+        # rather than fail the whole play on a transient network blip.
         - name: Download bitcoin core
           ansible.builtin.get_url:
             url: "https://bitcoincore.org/bin/bitcoin-core-{{ bitcoin_version }}/bitcoin-{{ bitcoin_version }}-{{ arch }}.tar.gz"
             dest: /tmp/bitcoin-{{ bitcoin_version }}-{{ arch }}.tar.gz
+          register: bitcoin_download
+          until: bitcoin_download is succeeded
+          retries: 5
+          delay: 10
         - name: Download sums
           ansible.builtin.get_url:
             url: "https://bitcoincore.org/bin/bitcoin-core-{{ bitcoin_version }}/SHA256SUMS"
             dest: /tmp/SHA256SUMS
+          register: sums_download
+          until: sums_download is succeeded
+          retries: 5
+          delay: 10
         - name: Download sums signature
           ansible.builtin.get_url:
             url: "https://bitcoincore.org/bin/bitcoin-core-{{ bitcoin_version }}/SHA256SUMS.asc"
             dest: /tmp/SHA256SUMS.asc
+          register: sums_sig_download
+          until: sums_sig_download is succeeded
+          retries: 5
+          delay: 10
         - name: Clone bitcoin core keys
           ansible.builtin.git:
             repo: "https://github.com/bitcoin-core/guix.sigs.git"
@@ -84,6 +127,22 @@
           ansible.builtin.command:
             cmd: "tar -vxzf /tmp/bitcoin-{{ bitcoin_version }}-{{ arch }}.tar.gz"
             chdir: /tmp
+        # Overwriting a running executable fails with ETXTBSY ("Text file
+        # busy"), so the daemon must be stopped before the binaries are
+        # replaced. Stopping here also gives bitcoind a graceful shutdown to
+        # flush chainstate, avoiding a reindex on next start.
+        # electrs has Restart=on-failure and Wants=bitcoind.service. Stopping
+        # bitcoind first makes electrs exit, systemd restarts it, and that
+        # dependency pulls bitcoind straight back up, cancelling the stop job.
+        # electrs therefore has to go down first.
+        - name: Stop electrs service before bitcoind binary swap
+          ansible.builtin.systemd:
+            name: electrs
+            state: stopped
+        - name: Stop bitcoin service before binary swap
+          ansible.builtin.systemd:
+            name: bitcoind
+            state: stopped
         - name: Install bitcoin core
           ansible.builtin.shell: "cp -r /tmp/bitcoin-{{ bitcoin_version }}/bin/{bitcoin-cli,bitcoind} /usr/bin/"
           args:
@@ -97,27 +156,62 @@
           ansible.builtin.copy:
             src: ../../../configs/dmz_bitcoin-node/bitcoin.conf
             dest: /etc/bitcoin/bitcoin.conf
+        # Started inside the block, not at the end of the play: if a later
+        # task fails (e.g. the electrs build), bitcoind must not be left down.
+        - name: Start bitcoin service after binary swap
+          ansible.builtin.systemd:
+            name: bitcoind
+            state: started
+            daemon_reload: yes
+        - name: Start electrs service after bitcoind binary swap
+          ansible.builtin.systemd:
+            name: electrs
+            state: started
 
-    - name: Check if electrs is installed
-      ansible.builtin.command: "which electrs"
+    - name: Check installed electrs version
+      ansible.builtin.command: "electrs --version"
       register: electrs_installed
+      changed_when: false
       ignore_errors: yes
     - name: Install electrs
-      when: electrs_installed.rc != 0
+      when: electrs_installed.rc != 0 or electrs_version[1:] not in electrs_installed.stdout
       block:
+        - name: Check for rustup
+          ansible.builtin.stat:
+            path: /root/.cargo/bin/rustup
+          register: rustup_installed
+        - name: Install rustup toolchain
+          # apt cargo is 1.65 (below electrs 0.11 MSRV of 1.85), needed to build electrs
+          ansible.builtin.shell: "curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain {{ rust_toolchain }} --profile minimal"
+          args:
+            executable: /bin/bash
+          when: not rustup_installed.stat.exists
         - name: Clone electrs
           ansible.builtin.git:
             repo: "https://github.com/romanz/electrs.git"
             dest: /tmp/electrs
+            version: "{{ electrs_version }}"
+            force: yes
         - name: Build electrs
-          ansible.builtin.shell: "cargo build --release -j $(nproc)"
+          ansible.builtin.shell: "/root/.cargo/bin/cargo build --release -j {{ electrs_build_jobs }}"
           args:
             chdir: /tmp/electrs
             executable: /bin/bash
+        # Stopped only after the build succeeds, to keep the Electrum endpoint
+        # up for the duration of the compile. Same ETXTBSY reason as bitcoind.
+        - name: Stop electrs service before binary swap
+          ansible.builtin.systemd:
+            name: electrs
+            state: stopped
         - name: Install electrs
           ansible.builtin.shell: "cp /tmp/electrs/target/release/electrs /usr/bin/"
           args:
             executable: /bin/bash
+        - name: Start electrs service after binary swap
+          ansible.builtin.systemd:
+            name: electrs
+            state: started
+            daemon_reload: yes
 
     - name: Enable bitcoin service
       ansible.builtin.systemd:
