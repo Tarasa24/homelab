@@ -29,8 +29,14 @@ resource "proxmox_virtual_environment_container" "lxc_dmz-docker-host" {
 
     ip_config {
       ipv4 {
-        address = var.dmz-docker-host_ip.address
+        address = var.dmz-docker-host_ip.address # DMZ IP (dmz)
         gateway = var.dmz-docker-host_ip.gateway
+      }
+    }
+
+    ip_config {
+      ipv4 {
+        address = "10.0.50.120/24" # Monitoring VLAN IP (mon)
       }
     }
 
@@ -52,6 +58,13 @@ resource "proxmox_virtual_environment_container" "lxc_dmz-docker-host" {
   network_interface {
     name     = "dmz"
     bridge   = proxmox_virtual_environment_network_linux_bridge.dmz_bridge.name
+    firewall = true
+  }
+
+  network_interface {
+    name     = "mon"
+    bridge   = "vmbr0"
+    vlan_id  = var.vlan_ids["monitoring"]
     firewall = true
   }
 

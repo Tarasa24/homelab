@@ -1,31 +1,30 @@
-location:
-  source_directories:
-    - /opt/technitium-dns/config
-    - /opt/technitium-dns/wwwroot
-    - /opt/technitium-dns/logs
-  repositories:
-    - ssh://backup@10.0.1.3/backup/repos/dns
+source_directories:
+  - /opt/technitium-dns/config
+  - /opt/technitium-dns/wwwroot
+  - /opt/technitium-dns/logs
 
-storage:
-  compression: zlib,6
-  ssh_command: ssh -i /root/.ssh/id_ed25519 -o StrictHostKeyChecking=no
-  unknown_unencrypted_repo_access_is_ok: true
+repositories:
+  - path: ssh://backup@10.0.1.3/backup/repos/dns
 
-retention:
-  keep_daily: 7
-  keep_weekly: 4
-  keep_monthly: 6
-  keep_yearly: 2
-  prefix: "{hostname}-"
+compression: zlib,6
+ssh_command: ssh -i /root/.ssh/id_ed25519 -o StrictHostKeyChecking=no
+unknown_unencrypted_repo_access_is_ok: true
 
-consistency:
-  checks:
-    - repository
-    - archives
-  check_last: 3
+keep_daily: 7
+keep_weekly: 4
+keep_monthly: 6
+keep_yearly: 2
+archive_name_format: "{hostname}-{now}"
+match_archives: "{hostname}-*"
 
-hooks:
-  before_backup:
-    - rc-service technitium-dns stop
-  after_backup:
-    - rc-service technitium-dns start
+checks:
+  - name: repository
+  - name: archives
+check_last: 3
+
+before_backup:
+  - rc-service technitium-dns stop
+after_backup:
+  - rc-service technitium-dns start
+on_error:
+  - rc-service technitium-dns start

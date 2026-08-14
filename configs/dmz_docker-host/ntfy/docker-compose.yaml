@@ -1,0 +1,38 @@
+services:
+  ntfy:
+    image: binwiederhier/ntfy:latest
+    container_name: ntfy
+    command: serve
+    restart: unless-stopped
+    environment:
+      - NTFY_BASE_URL=https://ntfy.homelab.tarasa24.dev
+      - NTFY_LISTEN_HTTP=0.0.0.0:8080
+      - NTFY_AUTH_DEFAULT_ACCESS=deny-all
+      - NTFY_BEHIND_PROXY=true
+      - NTFY_CACHE_FILE=/var/lib/ntfy/cache.db
+      - NTFY_AUTH_FILE=/var/lib/ntfy/auth.db
+      # Disable self-registration and web push (not needed)
+      - NTFY_ENABLE_SIGNUP=false
+      - NTFY_ENABLE_LOGIN=true
+      - NTFY_ENABLE_RESERVATIONS=false
+      # Rate limiting - restrict publish/subscribe rates per visitor
+      - NTFY_VISITOR_REQUEST_LIMIT_BURST=60
+      - NTFY_VISITOR_REQUEST_LIMIT_REPLENISH=10s
+      - NTFY_VISITOR_AUTH_FAILURE_LIMIT_BURST=10
+      - NTFY_VISITOR_AUTH_FAILURE_LIMIT_REPLENISH=1m
+    volumes:
+      - ntfy-data:/var/lib/ntfy
+      # Templates must use the .yml extension, not .yaml.
+      - ./ntfy/templates:/etc/ntfy/templates:ro
+    ports:
+      - "10.1.0.24:8080:8080"
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+volumes:
+  ntfy-data:
+    external: true
+    name: root_ntfy-data

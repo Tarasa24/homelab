@@ -29,17 +29,21 @@ homelab/
 │   │   ├── linode/      # Linode bastion host playbook
 │   │   └── all/         # Cross-host playbooks (e.g. trigger borg backup on all hosts)
 │   ├── roles/
-│   │   ├── docker/      # Install Docker + docker-compose on Alpine
-│   │   ├── borgmatic/   # Install borgmatic, copy SSH key, restore from backup, set up cron
-│   │   └── lxc_python3/ # Install Python 3 inside an LXC (needed for Ansible modules)
+│   │   ├── docker/        # Install Docker + docker-compose on Alpine; enables metrics on :9323
+│   │   ├── borgmatic/     # Install borgmatic, copy SSH key, restore from backup, set up cron
+│   │   ├── lxc_python3/   # Install Python 3 inside an LXC (needed for Ansible modules)
+│   │   ├── node_exporter/ # Install prometheus-node-exporter (OpenRC on Alpine, systemd on Debian)
+│   │   └── promtail/      # Install loki-promtail, deploy host-specific config from configs/promtail/
 │   └── plugins/
 │       └── connection/pct_ssh.py  # Custom Ansible connection plugin: SSH → PVE host → pct exec into LXC
 ├── configs/             # Application/service configuration files deployed by Ansible
 │   ├── dmz_router/      # nginx, dnsmasq, WireGuard configs for the DMZ router LXC
 │   ├── dmz_docker-host/ # Docker Compose stacks for public-facing DMZ services
+│   ├── dmz_bitcoin-node/ # bitcoind + electrs service files and bitcoin.conf
 │   ├── private-docker-host/ # Docker Compose stacks for internal LAN services
-│   ├── monitoring/      # Prometheus/Thanos/Loki/Grafana stack
+│   ├── monitoring/      # Prometheus/Loki/Grafana/Alertmanager/Gatus stack
 │   ├── backup/          # borgmatic and resticprofile backup job configs
+│   ├── promtail/        # Host-specific Promtail configs (backup, dns, dmz-router)
 │   └── linode/          # WireGuard server config + nftables for the Linode bastion
 ├── secrets/             # git-crypt encrypted secrets (keys, credentials, API tokens)
 │   ├── wireguard/       # WireGuard private/public keys and preshared key
@@ -73,7 +77,7 @@ Static allocations:
 
 | IP | VM/LXC ID | Role |
 |---|---|---|
-| `10.0.1.1` | 1001 | DNS (T-DNS / Pi-hole) |
+| `10.0.1.1` | 1001 | DNS (Technitium DNS) |
 | `10.0.1.2` | 1002 | DMZ Router |
 | `10.0.1.3` | 1003 | Backup server |
 | `10.0.1.4` | 1004 | Monitoring (Prometheus/Grafana/Loki) |
@@ -85,10 +89,37 @@ Static allocations:
 ### DMZ subnet (`10.1.0.x`)
 | IP | VM/LXC ID | Role |
 |---|---|---|
-| `10.1.0.1` | — | DMZ Router (LAN-side interface) |
+| `10.1.0.1` | — | DMZ Router (DMZ-side interface) |
+| `10.1.0.2` | 10002 | DMZ mail (reserved/unused) |
 | `10.1.0.3` | 10003 | Bitcoin node |
 | `10.1.0.20` | 100020 | DMZ docker-host (public-facing services) |
 | `10.1.0.100` | 1000100 | DMZ Tailscale connector |
+
+### Monitoring VLAN 50 (`10.0.50.x`)
+Out-of-band monitoring network — all nodes with the `mon` NIC get a VLAN 50 interface for Prometheus scraping. No DHCP; all static.
+
+| IP | Host |
+|---|---|
+| `10.0.50.1` | dns |
+| `10.0.50.2` | dmz-router |
+| `10.0.50.3` | backup |
+| `10.0.50.4` | monitoring |
+| `10.0.50.20` | private-docker-host |
+| `10.0.50.103` | dmz-bitcoin-node |
+| `10.0.50.120` | dmz-docker-host |
+
+The Proxmox host itself is the exception: it owns `vmbr0` and has no address on
+VLAN 50, so it is scraped on the LAN at `10.0.0.2:9100`. That needs an explicit
+allow in `terraform/firewall_base.tf` because the datacenter input policy is
+DROP. It carries `host="pve"`, so every existing node rule (NodeDown, CPU,
+memory, disk) covers the hypervisor without further change.
+
+**Known drift:** `/etc/network/interfaces` on the PVE host declares
+`gateway 10.0.0.1`, but the running kernel had no default route, so the host
+could reach the LAN yet had no internet — `apt` could not fetch anything and
+`resolv.conf` pointed at an unreachable `1.1.1.1`. The route was restored at
+runtime; since the gateway is already declared, a reboot re-applies it. Worth
+checking after any network change on the host.
 
 ### Linode (cloud)
 - `45.79.249.185` — Debian VPS acting as WireGuard server / public-IP bastion for the DMZ.
@@ -104,7 +135,7 @@ All containers use Alpine Linux unless noted. Templates are downloaded by Terraf
 | `lxc_dns` | `lxc_dns.tf` | Alpine | DNS server; provisioned via `local-exec` in Terraform |
 | `lxc_dmz_router` | `lxc_dmz_router.tf` | Alpine | Two NICs (LAN + DMZ bridge `vmbr1`); WireGuard + nginx + dnsmasq + Certbot |
 | `lxc_backup` | `lxc_backup.tf` | Alpine | Borg server + resticprofile; USB-SSD backup mount |
-| `lxc_monitoring` | `lxc_monitoring.tf` | Alpine | Docker; Prometheus/Thanos/Loki/Grafana; cold storage on USB-SSD |
+| `lxc_monitoring` | `lxc_monitoring.tf` | Alpine | Docker; Prometheus/Loki/Grafana/Alertmanager/Gatus; state in named Docker volumes |
 | `vm_homeassistant` | `vm_homeassistant.tf` | HAOS (qcow2) | Full VM; 4 GB RAM; OVMF/UEFI; q35 machine type |
 | `lxc_private-docker-host` | `lxc_private-docker-host.tf` | Alpine | Docker; internal services; SSL certs + media shares mounted |
 | `lxc_homelab_tailscale_connector` | `lxc_homelab_tailscale_connector.tf` | Alpine | Cloned from Tailscale connector template |
@@ -120,7 +151,7 @@ All containers use Alpine Linux unless noted. Templates are downloaded by Terraf
 | Mount | UUID | Filesystem | Used for |
 |---|---|---|---|
 | `/mnt/USB-HDD` | `d10e88e6-...` | ext4 | Jellyfin media, Immich photos, LXC templates/images |
-| `/mnt/USB-SSD` | `c06ebfa7-...` | ext4 | SSL certs, backups, downloads, cache, monitoring cold storage |
+| `/mnt/USB-SSD` | `c06ebfa7-...` | ext4 | SSL certs, backups, downloads, cache |
 | `/mnt/USB-BITCOIN` | `fcadd3af-...` | xfs | Bitcoin blockchain data |
 | `/mnt/USB-BITCOIN-APPS` | `9fa5a1fb-...` | xfs | Bitcoin application data |
 
@@ -186,7 +217,7 @@ Virtual NICs `eth0:0` through `eth0:9` (`10.0.1.21–30`) are assigned at boot v
 | `unifi-controller/` | `10.0.1.25` | Unifi network controller |
 | (root compose) | `10.0.1.20` | Promtail (log shipper) |
 | `ghostfolio/` | `10.0.1.26` | Ghostfolio portfolio tracker (Postgres + Redis) |
-| (root compose) | `10.0.1.20` | Prometheus (scraping agent) + Promtail (log shipper) |
+| `cadvisor/` | `10.0.50.20` | cAdvisor per-container metrics on `:8081` (VLAN 50) |
 
 The `arr_stack` services run inside a WireGuard network namespace (all share the `wireguard` container's network via `network_mode: service:wireguard`).
 
@@ -203,24 +234,279 @@ Internet-accessible services, isolated in the DMZ. Has GPU passthrough (`/dev/dr
 | Jellyfin | Media server; `/media` from USB-HDD |
 | Immich | Photo management; `/immich` from USB-HDD |
 | Radicale | CalDAV/CardDAV server |
-| Prometheus + Promtail | Local metrics/log scraping agents |
+| ntfy | Push notification server (`10.1.0.24`); exposed at `ntfy.homelab.tarasa24.dev` |
+| Promtail | Log shipper to Loki |
+| cAdvisor | Per-container metrics on `10.0.50.120:8081` (VLAN 50) |
 
 ---
 
 ## Monitoring Stack (`10.0.1.4`)
 
-Long-term metrics and log storage on a dedicated container.
+Metrics and log storage on a dedicated container. All state in named Docker volumes, backed up via borgmatic.
 
 | Service | Notes |
 |---|---|
-| Prometheus | Short-retention TSDB; 30 min block duration (feeds Thanos) |
-| Thanos sidecar | Ships Prometheus blocks to MinIO (object store) |
-| Thanos store | Reads historical data from MinIO |
-| Thanos querier | Unified query layer across sidecar + store |
-| Thanos compactor | Compacts/downsamples blocks in object store |
-| Loki | Log aggregation; stores chunks in MinIO |
-| MinIO | Local S3-compatible object store on cold USB-SSD mount |
-| Grafana | Dashboards; provisions datasources from `grafana/provisioning/` |
+| Prometheus | Metrics TSDB; 14d retention, 5GB cap; scrapes node exporters on VLAN 50 |
+| Loki | Log aggregation; 7d retention; receives logs from all Promtail agents |
+| Alertmanager | Routes alerts from Prometheus and Loki ruler to ntfy |
+| Grafana | Dashboards; configured manually (no provisioning); datasources added via UI |
+| Gatus | Availability probing + public status page; fully config-as-code |
+
+Grafana datasources (add manually after first deploy):
+- **Prometheus** — `http://prometheus:9090` (set as default)
+- **Loki** — `http://loki:3100`
+
+### Availability Monitoring (Gatus + cAdvisor)
+
+Service availability is covered by two complementary signals. Neither alone is
+sufficient, and they are designed to be read together.
+
+**Gatus** (`configs/monitoring/gatus/config.yaml`) — HTTP probing and the public
+status page at `status.homelab.tarasa24.dev`. Replaces both the removed
+blackbox-exporter and Uptime Kuma, and unlike Uptime Kuma it is entirely
+config-as-code. Endpoints are split into three groups:
+
+| Group | Path probed | Purpose |
+|---|---|---|
+| `Public` | public DNS → Linode → WireGuard → nginx → service | True end-user experience. Includes the home WAN uplink, so a failure does not isolate the fault. |
+| `Internal` | direct to `10.0.1.x` over the LAN | Bypasses the WAN entirely. If Public fails but Internal passes, the fault is in the WAN/Linode/WireGuard/nginx path, not the service. |
+| `Infrastructure` | compose service names on the monitoring network | The monitoring stack checking itself. |
+
+Gatus does **not** alert directly. It sets `metrics: true`, Prometheus scrapes it
+as job `gatus`, and Alertmanager owns routing to ntfy — one alert pipeline with
+one set of grouping, inhibition and resolved-notification semantics.
+
+**cAdvisor** (`configs/{dmz_docker-host,private-docker-host}/cadvisor/`) —
+per-container metrics on both Docker hosts, published on the VLAN 50 IP
+(`10.0.50.20:8081`, `10.0.50.120:8081`) and scraped as job `cadvisor`. This is
+the only source of per-container up/down state: the Docker daemon metrics on
+`:9323` are engine-level aggregates and stay green when an individual container
+dies. cAdvisor is required because the monitoring LXC has no route into the DMZ
+(`10.1.0.0/24`), so DMZ services cannot be probed directly over the LAN.
+
+Runs `privileged: true` with read-only mounts inside an unprivileged LXC; some
+cgroup metrics may be unavailable in that environment. `CAdvisorDown` fires if it
+stops reporting, because container-level alerting is blind while it is down.
+
+**Metric names caveat**: the Gatus documentation describes `gatus_check_result_total`
+and `gatus_uptime`. Neither exists in the shipped binary. The real metrics are
+`gatus_results_endpoint_success` (1/0 gauge), `gatus_results_total`,
+`gatus_results_certificate_expiration_seconds` and `gatus_results_duration_seconds`.
+Verify against the live `/metrics` output after any Gatus upgrade — a renamed
+metric silently disables `ExternalServiceDown`.
+
+**Alert delivery path**: Alertmanager reaches ntfy over its *public* URL
+(`https://ntfy.homelab.tarasa24.dev/<topic>`), not the DMZ address
+`10.1.0.24:8080`. The monitoring LXC is on the LAN with its default gateway at
+the home router and has no route into `10.1.0.0/24`, so the internal address
+times out on every notification — and because a TCP connect timeout takes about
+two minutes, `alertmanager_notifications_failed_total` reads zero for a while
+before the failure lands. Do not trust that counter immediately after sending;
+confirm against the ntfy topic itself or the Alertmanager log. Delivery therefore
+depends on the home uplink, which is acceptable since push to a phone needs
+internet anyway; routing the LAN into the DMZ instead would weaken the isolation
+the DMZ exists to provide.
+
+**Nightly backup maintenance window**: borgmatic runs from cron at 02:00 UTC on
+every host and its `before_backup` hooks stop containers so their volumes can be
+copied cold. Those services genuinely go down, and the monitoring is correct to
+notice — on 2026-08-03 Docker restarted them at 02:02–02:03 UTC but probes did
+not recover until roughly 02:12, because this hardware is slow to bring apps back
+to a responsive state.
+
+Alertmanager therefore defines a `nightly-backup` time interval (01:55–03:00 UTC)
+and two routes ahead of the normal ones that mute exactly the expected noise:
+`ExternalServiceDown`, `ContainerDown`, `ContainerCrashLoop` and
+`ContainerErrors`. Everything else stays live during the window, so a real
+incident during a backup is still paged. Those two routes deliver to the same
+receivers the alerts would otherwise reach, so behaviour outside the window is
+unchanged — verified with `amtool config routes test`.
+
+Muting delays rather than discards: an alert still firing when the window closes
+notifies then, so a service that fails to come back is still reported. The window
+is defined in UTC on purpose — the containers and their crontabs run UTC, so a
+UTC window does not drift when local time changes for DST.
+
+The deeper fix is to stop taking services down at all: borgmatic supports
+database dump hooks (`postgresql_databases`, `mariadb_databases`) which snapshot
+data live and would let most `before_backup`/`after_backup` stop/start pairs be
+removed. Until then the mute window is the pragmatic mitigation.
+
+### Known monitoring gaps (accepted)
+
+These are deliberate trade-offs, not oversights. Recorded so a future change does
+not assume coverage that does not exist.
+
+**ntfy is a single point of failure in the alert path.** Two distinct failure
+modes follow from it:
+
+1. *ntfy itself is down.* Gatus detects it, but the alert saying so is delivered
+   through ntfy, so it never arrives.
+2. *Anything upstream is down* — Prometheus, Alertmanager, Loki, the monitoring
+   LXC, the WAN, or the Proxmox host — and **nothing fires at all**. Silence is
+   indistinguishable from everything being healthy. This is the more dangerous
+   mode, and this repo has been bitten by it: alerts were undeliverable for
+   months while every counter reported success.
+
+Accepted for a homelab. The conventional fixes, if this ever matters:
+
+- **Dead man's switch** for mode 2 — an always-firing `Watchdog` alert
+  (`expr: vector(1)`) routed to an external service (healthchecks.io, Better
+  Stack) that notifies when it *stops* hearing from you. It has to live outside
+  this infrastructure to be meaningful.
+- **Second receiver** for mode 1 — Alertmanager delivers to every receiver in a
+  matched route, so adding `email_configs` alongside the ntfy webhook gives
+  genuinely parallel delivery. A second ntfy instance in the DMZ would not help:
+  same host, same failure domain.
+
+**Not covered by any probe**: the Tailscale connectors (1100, 1000100), and the
+Linode bastion, which is only covered indirectly because the Gatus `Public` group
+traverses it.
+
+**Non-Docker hosts use the systemd collector.** cAdvisor only covers the two
+Docker hosts. The Bitcoin node runs `bitcoind` and `electrs` as plain systemd
+units on Debian, so service-level down-detection comes from
+`node_systemd_unit_state` via `--collector.systemd`, driven by the
+`node_exporter_systemd_units` allowlist in the role defaults. That allowlist is
+not optional: Debian's build enables the systemd collector by default and emits a
+series per unit per state, and a `SystemdUnitDown` rule without a `name` selector
+matches every oneshot unit that is legitimately inactive (`apt-daily.service`,
+`e2scrub_all.service`, …) — 134 pending alerts, in practice. Both the collector
+flag and the alert rule are scoped.
+
+The allowlist regex uses `[.]` rather than `\.` because systemd processes escape
+sequences in `ExecStart`. The role also notifies a restart handler when the
+override changes; `state: started` alone is a no-op on a running service, so a
+changed override would otherwise sit on disk unapplied until the next reboot.
+
+`electrs` binds its DMZ address only and is unreachable over the monitoring VLAN,
+so the systemd collector is the only way to see it at all. `bitcoind`'s P2P port
+does listen on all addresses and is additionally probed by Gatus over VLAN 50,
+and the public Electrum endpoint (`:50002`, TLS-terminated by the nginx stream)
+is probed as a `Public` endpoint.
+
+**Container-level coverage depends on explicit `container_name`.** The
+`ContainerDown` rules are generated per container name; a service defined without
+one gets a Docker-generated name like `root-promtail-1` and is deliberately
+skipped, so it has no down-detection.
+
+**The `host` label contract**: every node, docker and cadvisor scrape target
+carries a static `host` label, and every Gatus endpoint sets one via
+`extra-labels`. Alertmanager's inhibit rule matches on `host` to suppress service
+alerts when the machine hosting them is already down. Do not add a `host` label to
+the `gatus` scrape job — it would collide with the per-endpoint value and
+Prometheus would rename the latter to `exported_host`, breaking the inhibit rules.
+
+### Log Collection (Loki / Promtail)
+
+Logs are collected from all Docker hosts via a Promtail agent running as a container on each host. Each agent ships to Loki at `http://10.0.50.4:3100` (monitoring VLAN).
+
+**Hosts shipping logs:**
+
+| Host | LXC ID | Promtail config |
+|---|---|---|
+| `monitoring` | 1004 | `configs/monitoring/promtail/promtail-config.yaml` |
+| `private-docker-host` | 1020 | `configs/private-docker-host/root/promtail/config.yml` |
+| `dmz-docker-host` | 100020 | `configs/dmz_docker-host/root/promtail/config.yml` |
+| `dmz-router` | 1002 | `configs/promtail/dmz-router.yaml` |
+| `backup` | 1003 | `configs/promtail/backup.yaml` |
+| `dns` | 1001 | `configs/promtail/dns.yaml` |
+| `pve` (hypervisor) | — | `configs/promtail/pve.yaml` |
+| `dmz-bitcoin-node` | 10003 | `configs/promtail/dmz-bitcoin-node.yaml` |
+
+The three Docker hosts run Promtail as a container with Docker service
+discovery. `dmz-router`, `backup` and `dns` instead run it as a native Alpine
+package via the `promtail` role, tailing static file paths — there is no Docker
+daemon on those hosts.
+
+`pve` and `dmz-bitcoin-node` are Debian and run systemd, and Promtail is not
+packaged in bookworm, so the role installs the upstream release binary plus a
+systemd unit and scrapes **journald** rather than files. That is the only log
+source that matters on those two: kernel messages, LXC/VM start and stop and
+storage errors on the hypervisor, and `bitcoind`/`electrs` output on the Bitcoin
+node — which is where the "why" lives when `SystemdUnitDown` fires.
+
+Journal scraping has a cardinality trap. Every login creates a fresh
+`session-<N>.scope`, and a per-unit stream label therefore grows without bound;
+the relabel rules drop those and the `user@<N>.service` units explicitly. Entries
+with no unit at all (kernel, early boot) default to `service_name=kernel`,
+otherwise they produce a bare `<instance>/` job label.
+
+**Grafana datasources are provisioned as code** in
+`configs/monitoring/grafana/provisioning/`, so Prometheus and Loki exist on a
+fresh deploy instead of being added by hand. They are matched by **name** and
+carry no explicit `uid`: the datasources already existed with Grafana-assigned
+UIDs, and declaring a different one makes provisioning look them up by that uid,
+fail with "data source not found", and crash-loop Grafana at startup. Only pin a
+uid on a datasource provisioned from scratch.
+
+Two things about that role are load-bearing. It sets `use: openrc` explicitly,
+because these playbooks run with `gather_facts: false` and Ansible cannot then
+detect the init system, so the `rc-update` that registers Promtail in the default
+runlevel is skipped silently. That is precisely how `backup` and `dns` ended up
+shipping nothing: Promtail had been started by hand, ran until the 2026-05-31
+reboot, and never came back. It also resolves its config from `role_path` rather
+than a playbook-relative path, so the role works from any playbook.
+
+`ansible_hostname` must be set in the inventory for every host using the role
+(the config file is chosen by host name). Without it the role's `src` templates
+to an empty path and the task fails.
+
+**Label schema** — every log line gets the following Loki labels:
+
+| Label | Value | Example |
+|---|---|---|
+| `job` | `{instance}/{service_name}` | `dmz-docker-host/jellyfin` |
+| `instance` | hostname of the Docker host | `private-docker-host` |
+| `service_name` | Docker Compose service name | `authelia` |
+| `container_name` | Docker container name | `/authelia` |
+| `stream` | `stdout` or `stderr` | `stdout` |
+| `severity` | `critical` for key services, absent otherwise | `critical` |
+
+The `job` label combining `instance/service_name` gives a unique identifier per service per host, useful for filtering in Grafana. The `instance`, `service_name`, and `container_name` labels are required by the [Loki v3 logging dashboard](https://grafana.com/grafana/dashboards/24574).
+
+**Discovery** — Promtail uses Docker service discovery (`docker_sd_configs`) via the Docker socket (`/var/run/docker.sock`). Service name is extracted from the `com.docker.compose.service` container label set automatically by Docker Compose.
+
+**Retention** — Loki is configured for 7-day retention. Older logs are compacted and deleted by the Loki compactor.
+
+**Alerting from logs** — Loki ruler evaluates alert rules in
+`configs/monitoring/loki/rules/fake/loki-alerts.yml` and fires to Alertmanager on
+pattern matches (errors, OOM kills, auth failures, backup failures, TLS expiry).
+
+The `fake` subdirectory is required, not a placeholder: `auth_enabled: false`
+means Loki uses the single tenant `fake`, and the local ruler backend reads rules
+from `<storage.local.directory>/<tenant>/`. `rule_path` (scratch space the ruler
+writes during evaluation) and `storage.local.directory` (where rule files are
+read from) are deliberately different paths, so the read-only rules bind mount
+does not have to be nested inside the `loki-data` named volume.
+
+Two failure modes to avoid when editing these rules:
+
+- **Self-reference.** Loki's ruler logs the text of every query it evaluates, and
+  Promtail ships Loki's own logs back into Loki, so a rule searching for
+  `oom.?kill` matches the ruler log line containing that pattern and fires
+  forever. Broad rules must exclude `monitoring/loki` and `monitoring/promtail`.
+- **Substring matches.** A bare `error` pattern matches `errors=0`, which Gatus
+  prints on every *successful* probe. Use `\b` word boundaries.
+
+Most of these rules detect log *content* only. A down service emits no logs, so
+`count_over_time()` returns an empty vector and can never fire — down-detection
+for services belongs to Gatus and cAdvisor, not here.
+
+The exception is `LogShippingStopped`, which uses `absent_over_time()` on the
+per-host `instance` label to detect a host that has stopped shipping altogether.
+Promtail dying is otherwise completely silent — an absence of logs is
+indistinguishable from a quiet host — and that is how `backup` and `dns` shipped
+nothing between the 2026-05-31 reboot and 2026-08-04. It deliberately does not
+scrape Promtail's own `:9080`, which would need another firewall rule on the DMZ
+router; the 2h window is sized off the quietest host (`backup`, ~21 syslog lines
+per hour).
+
+`NginxErrorRateHigh` uses the `status` and `server_name` stream labels directly,
+so no parsing is needed. `TraefikErrorRateHigh` must parse JSON, and Traefik
+mixes plain-text startup lines into the same stream, so it needs `| __error__=""`
+to drop unparseable lines — without it the query errors on every evaluation. The
+field is `DownstreamStatus` (what the client received), not `OriginStatus`.
 
 ---
 
@@ -292,6 +578,7 @@ Some containers (`lxc_dns`, `lxc_nixos_template`, `lxc_tailscale_connector_templ
 - **Secrets are never in configs**: all sensitive values are read at Ansible runtime via `lookup('file', '...')` from the encrypted `secrets/` tree.
 - **SSL certificates are centralised**: Certbot runs only on the DMZ router. Certs are stored on the shared USB-SSD mount and bind-mounted read-only into containers that need them.
 - **Borgmatic restore-on-deploy**: the borgmatic role always attempts `borgmatic extract --archive latest` before starting services — this is how service state (Docker volumes, configs) is restored after reprovisioning.
+- **State lives on the container disk, never on USB mounts**: Docker service state (databases, app data, config) always uses named Docker volumes, which default to `/var/lib/docker/volumes/` on the container's own disk. Borgmatic then backs these up to the borg server over SSH. USB-mounted cold storage (`/mnt/USB-SSD`, `/mnt/USB-HDD`) is reserved exclusively for bulk data that cannot reasonably be backed up (media libraries, blockchain data, SSL certs). Never use bind mounts to cold storage paths for service state.
 - **Terraform `terraform.tfvars`**: sensitive Proxmox endpoint/credentials live in `secrets/terraform.tfvars` (git-crypt encrypted). The Proxmox provider SSH key is read from `~/.ssh/homelab_proxmox`.
 - **Domain naming**: `*.lan.tarasa24.dev` for internal LAN services (via Traefik), `*.homelab.tarasa24.dev` and `*.dormlab.tarasa24.dev` for DMZ/externally reachable services (via nginx on the DMZ router).
 

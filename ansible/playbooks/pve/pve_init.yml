@@ -32,7 +32,34 @@
       "/mnt/USB-SSD/monitoring-cold/loki"
     ]
 
+  roles:
+    - role: node_exporter
+    - role: promtail
+
   tasks:
+    # Guards the host's default route. Was an untracked script on the host that
+    # bounced vmbr0 with `ip link`, dropping the ifupdown-configured gateway
+    # permanently; see configs/pve/net-watchdog.sh.
+    - name: Deploy net-watchdog script
+      ansible.builtin.copy:
+        src: "../../../configs/pve/net-watchdog.sh"
+        dest: /usr/local/bin/net-watchdog.sh
+        owner: root
+        group: root
+        mode: '0755'
+
+    - name: Remove any unmanaged net-watchdog crontab entry
+      ansible.builtin.shell: |
+        crontab -l 2>/dev/null | grep -v 'net-watchdog' | crontab - || true
+      changed_when: false
+
+    - name: Schedule net-watchdog
+      ansible.builtin.cron:
+        name: net-watchdog
+        job: /usr/local/bin/net-watchdog.sh
+        minute: "*"
+        state: present
+
     - name: Create mount points
       ansible.builtin.file:
         name: "/mnt/{{ item.key }}"
@@ -78,9 +105,24 @@
           	bridge-stp off
           	bridge-fd 0
         dest: /etc/network/interfaces.d/vmbr1.cfg
+    
     - name: "Up the DMZ bridge"
       ansible.builtin.command:
         cmd: ifup vmbr1
+    
+    - name: "Ensure vmbr0 is VLAN-aware"
+      ansible.builtin.lineinfile:
+        path: /etc/network/interfaces
+        regexp: '^\\s*iface vmbr0 inet'
+        line: 'iface vmbr0 inet manual'
+        insertbefore: '^auto vmbr0'
+    
+    - name: "Add VLAN awareness to vmbr0"
+      ansible.builtin.lineinfile:
+        path: /etc/network/interfaces
+        line: '    bridge-vlan-aware yes'
+        insertafter: '^iface vmbr0 inet manual'
+  
 
   handlers:
     - name: reload systemd

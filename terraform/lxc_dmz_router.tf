@@ -16,14 +16,20 @@ resource "proxmox_virtual_environment_container" "lxc_dmz_router" {
 
     ip_config {
       ipv4 {
-        address = var.dmz_router_wan_ip.address
+        address = var.dmz_router_wan_ip.address # WAN IP (eth0)
         gateway = var.dmz_router_wan_ip.gateway
       }
     }
 
     ip_config {
       ipv4 {
-        address = var.dmz_router_lan_ip.address
+        address = var.dmz_router_lan_ip.address # LAN IP (dmz)
+      }
+    }
+
+    ip_config {
+      ipv4 {
+        address = "10.0.50.2/24" # Monitoring VLAN IP (mon)
       }
     }
 
@@ -35,11 +41,18 @@ resource "proxmox_virtual_environment_container" "lxc_dmz_router" {
 
   network_interface {
     name     = "eth0"
+    bridge   = "vmbr0"
     firewall = true
   }
   network_interface {
     name     = "dmz"
     bridge   = proxmox_virtual_environment_network_linux_bridge.dmz_bridge.name
+    firewall = true
+  }
+  network_interface {
+    name     = "mon"
+    bridge   = "vmbr0"
+    vlan_id  = var.vlan_ids["monitoring"]
     firewall = true
   }
 
@@ -192,5 +205,16 @@ resource "proxmox_virtual_environment_firewall_rules" "lxc_dmz_router" {
     comment = "Allow input traffic from local network"
     iface   = "net0"
     source  = "10.0.0.0/22"
+  }
+
+  # net2 is the mon NIC; without this, input_policy=DROP blocked all scrapes.
+  rule {
+    type    = "in"
+    action  = "ACCEPT"
+    comment = "Allow Prometheus to scrape node_exporter over the monitoring VLAN"
+    iface   = "net2"
+    source  = "10.0.50.0/24"
+    dport   = 9100
+    proto   = "tcp"
   }
 }

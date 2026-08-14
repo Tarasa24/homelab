@@ -1,0 +1,7 @@
+---
+# Which file under configs/promtail/ to deploy. `mandatory` so a missing
+# hostname fails loudly instead of templating to an empty path.
+promtail_config_name: "{{ ansible_hostname | mandatory }}"
+
+# Debian only; kept close to the Loki server version.
+promtail_version: "2.9.4"

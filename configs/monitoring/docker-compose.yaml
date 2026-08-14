@@ -1,136 +1,132 @@
+version: '3.8'
+
 services:
+  alertmanager:
+    image: prom/alertmanager:latest
+    container_name: alertmanager
+    restart: unless-stopped
+    command:
+      - '--config.file=/etc/alertmanager/config.yml'
+      - '--storage.path=/alertmanager'
+      - '--web.listen-address=0.0.0.0:9093'
+      - '--web.external-url=http://alertmanager:9093/'
+    volumes:
+      - ./alertmanager/config.yml:/etc/alertmanager/config.yml:ro
+      - alertmanager-data:/alertmanager
+    ports:
+      - "0.0.0.0:9093:9093"
+    networks:
+      - monitoring
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:9093/-/healthy"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
   prometheus:
     image: prom/prometheus:latest
     container_name: prometheus
+    restart: unless-stopped
     command:
-      - --config.file=/etc/config/prometheus.yml
-      - --storage.tsdb.path=/prometheus
-      - --storage.tsdb.max-block-duration=30m
-      - --storage.tsdb.min-block-duration=30m
-      - --web.enable-lifecycle
-      - --web.console.libraries=/usr/share/prometheus/console_libraries
-      - --web.console.templates=/usr/share/prometheus/consoles
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--storage.tsdb.retention.time=14d'
+      - '--storage.tsdb.retention.size=5GB'
+      - '--web.enable-lifecycle'
+      - '--storage.tsdb.max-block-duration=2h'
+      - '--storage.tsdb.min-block-duration=2h'
+      - '--web.listen-address=0.0.0.0:9090'
     volumes:
-      - ./prometheus/prometheus.yml:/etc/config/prometheus.yml
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./prometheus/alert.rules.yml:/etc/prometheus/alert.rules.yml:ro
       - prometheus-data:/prometheus
     ports:
-        - 9081:9090
-    restart: always
-
-  thanos-sidecar:
-    image: quay.io/thanos/thanos:v0.38.0
-    container_name: thanos-sidecar
+      - "0.0.0.0:9090:9090"
+    networks:
+      - monitoring
     depends_on:
-      - prometheus
-      - minio
-    command:
-      - sidecar
-      - --tsdb.path=/prometheus
-      - --prometheus.url=http://prometheus:9090
-      - --grpc-address=0.0.0.0:10091
-      - --http-address=0.0.0.0:10902
-      - --objstore.config-file=/etc/thanos/objstore.yml
-    volumes:
-      - prometheus-data:/prometheus
-      - ./thanos:/etc/thanos
-    restart: always
-
-  thanos-querier:
-    image: quay.io/thanos/thanos:v0.38.0
-    container_name: thanos-querier
-    depends_on:
-      - thanos-sidecar
-      - thanos-store
-    command:
-      - query
-      - --grpc-address=0.0.0.0:10091
-      - --http-address=0.0.0.0:10902
-      - --endpoint=thanos-sidecar:10091
-      - --endpoint=thanos-store:10091
-    ports:
-      - 10902:10902
-    restart: always
-
-  thanos-store:
-    image: quay.io/thanos/thanos:v0.38.0
-    container_name: thanos-store
-    depends_on:
-      - minio
-    command:
-      - store
-      - --grpc-address=0.0.0.0:10091
-      - --http-address=0.0.0.0:10902
-      - --data-dir=/tmp/thanos/store
-      - --objstore.config-file=/etc/thanos/objstore.yml
-    volumes:
-      - ./thanos:/etc/thanos
-    restart: always
-
-  thanos-compactor:
-    image: quay.io/thanos/thanos:v0.38.0
-    container_name: thanos-compactor
-    depends_on:
-      - minio
-    command:
-      - compact
-      - --objstore.config-file=/etc/thanos/objstore.yml
-      - --data-dir=/tmp/thanos/compact
-      - --wait
-    volumes:
-      - ./thanos:/etc/thanos
-    restart: always
+      - alertmanager
 
   loki:
     image: grafana/loki:2.9.2
-    depends_on:
-      - minio
     container_name: loki
-    user: 0:0
+    restart: unless-stopped
+    user: "0:0"  # Run as root to avoid permission issues
     command: -config.file=/etc/loki/loki-config.yaml
     volumes:
-      - ./loki/loki-config.yaml:/etc/loki/loki-config.yaml
-      - /var/lib/monitoring-fast/loki:/loki
+      - ./loki/loki-config.yaml:/etc/loki/loki-config.yaml:ro
+      - ./loki/rules:/etc/loki/rules:ro
+      - loki-data:/loki
     ports:
-      - 3100:3100
+      - "0.0.0.0:3100:3100"
+    networks:
+      - monitoring
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:3100/ready"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  promtail:
+    image: grafana/promtail:2.9.2
+    container_name: promtail
     restart: unless-stopped
-
-  minio:
-    image: minio/minio
-    container_name: minio
-    environment:
-      MINIO_ACCESS_KEY: minioadmin
-      MINIO_SECRET_KEY: minioadmin
+    command: -config.file=/etc/promtail/config.yaml
     volumes:
-      - /mnt/monitoring-cold/minio:/data
-    ports:
-      - "9000:9000"
-    command: server /data
-
-  createbuckets:
-    image: minio/mc
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - ./promtail/promtail-config.yaml:/etc/promtail/config.yaml:ro
+      - /var/lib/docker/containers:/var/lib/docker/containers:ro
+    environment:
+      - HOSTNAME=monitoring-host
+    networks:
+      - monitoring
     depends_on:
-      - minio
-    entrypoint: >
-      /bin/sh -c "
-        until /usr/bin/mc alias set myminio http://minio:9000 minioadmin minioadmin; do sleep 1; done;
-        /usr/bin/mc mb -p myminio/loki-index;
-        /usr/bin/mc mb -p myminio/loki-chunks;
-        /usr/bin/mc mb -p myminio/thanos;
-        exit 0;
-      "
+      - loki
+
+  gatus:
+    image: ghcr.io/twin/gatus:stable
+    container_name: gatus
+    restart: unless-stopped
+    volumes:
+      - ./gatus/config.yaml:/config/config.yaml:ro
+      - gatus-data:/data
+    ports:
+      - "0.0.0.0:8080:8080"
+    networks:
+      - monitoring
+    # No healthcheck: the image is distroless, so any CMD check fails
+    # permanently. Liveness is covered by the GatusDown Prometheus rule.
 
   grafana:
-    image: grafana/grafana-oss
+    image: grafana/grafana-oss:latest
     container_name: grafana
-    user: 0:0
-    ports:
-      - 3000:3000
+    restart: unless-stopped
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_ADMIN_PASSWORD:-changeme123}
+      - GF_INSTALL_PLUGINS=  # Remove deprecated angular plugin
+      - GF_USERS_ALLOW_SIGN_UP=false
+      - GF_AUTH_ANONYMOUS_ENABLED=false
+      - GF_PLUGINS_ALLOW_LOADING_UNSIGNED_PLUGINS=grafana-piechart-panel
     volumes:
       - grafana-data:/var/lib/grafana
-      - ./grafana/provisioning:/etc/grafana/provisioning
-      - ./grafana/config.ini:/etc/grafana/grafana.ini
-    restart: unless-stopped
+      - ./grafana/config.ini:/etc/grafana/grafana.ini:ro
+      - ./grafana/provisioning:/etc/grafana/provisioning:ro
+    ports:
+      - "0.0.0.0:3000:3000"
+    networks:
+      - monitoring
+    depends_on:
+      - prometheus
+      - loki
+
+
+networks:
+  monitoring:
+    driver: bridge
 
 volumes:
   prometheus-data:
+  loki-data:
+  gatus-data:
   grafana-data:
+  alertmanager-data:

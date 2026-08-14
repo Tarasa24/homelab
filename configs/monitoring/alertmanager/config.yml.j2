@@ -1,0 +1,114 @@
+global:
+  resolve_timeout: 5m
+
+time_intervals:
+  # borgmatic runs from cron at 02:00 UTC. UTC on purpose: the crontabs are UTC,
+  # so this does not drift with DST. Padded well past the observed ~12min run.
+  - name: nightly-backup
+    time_intervals:
+      - times:
+          - start_time: '01:55'
+            end_time: '03:00'
+        location: 'UTC'
+
+route:
+  receiver: 'critical-receiver'
+  group_by: ['alertname', 'alerttype', 'instance']
+  group_wait: 30s
+  group_interval: 5m
+  repeat_interval: 12h
+
+  routes:
+    # Backup window. borgmatic stops containers, so these alerts are expected
+    # noise; everything else stays live. Muting delays rather than loses - an
+    # alert still firing at 03:00 notifies then.
+    - matchers:
+        - alertname =~ "ExternalServiceDown|ContainerDown|ContainerCrashLoop"
+      receiver: 'critical-receiver'
+      mute_time_intervals:
+        - nightly-backup
+      continue: false
+
+    # Proxy 5xx is the same expected noise while a backend is stopped.
+    - matchers:
+        - alertname =~ "ContainerErrors|TraefikErrorRateHigh|NginxErrorRateHigh"
+      receiver: 'services-receiver'
+      mute_time_intervals:
+        - nightly-backup
+      continue: false
+    # ---------------------------------------------------------------------
+
+    # Storage alerts → storage topic
+    - matchers:
+        - alerttype = storage
+      receiver: 'storage-receiver'
+      continue: false
+
+    # Infrastructure warnings (non-critical) → services topic
+    - matchers:
+        - severity = warning
+        - alerttype = infrastructure
+      receiver: 'services-receiver'
+      continue: false
+
+    # Service warnings (non-critical) → services topic
+    - matchers:
+        - severity = warning
+        - alerttype = service
+      receiver: 'services-receiver'
+      continue: false
+
+    # Everything critical → critical topic
+    - matchers:
+        - severity = critical
+      receiver: 'critical-receiver'
+      continue: false
+
+receivers:
+  # Public URL, not the DMZ address 10.1.0.24:8080 - the monitoring LXC has no
+  # route into 10.1.0.0/24, so that silently timed out on every notification.
+  # ?template=homelab renders readable text instead of raw Alertmanager JSON.
+  - name: 'critical-receiver'
+    webhook_configs:
+      - url: 'https://ntfy.homelab.tarasa24.dev/homelab-critical?template=homelab'
+        send_resolved: true
+        http_config:
+          basic_auth:
+            username: alertmanager
+            password: '{{ ntfy_alertmanager_password }}'
+
+  - name: 'storage-receiver'
+    webhook_configs:
+      - url: 'https://ntfy.homelab.tarasa24.dev/homelab-storage?template=homelab'
+        send_resolved: true
+        http_config:
+          basic_auth:
+            username: alertmanager
+            password: '{{ ntfy_alertmanager_password }}'
+
+  - name: 'services-receiver'
+    webhook_configs:
+      - url: 'https://ntfy.homelab.tarasa24.dev/homelab-services?template=homelab'
+        send_resolved: true
+        http_config:
+          basic_auth:
+            username: alertmanager
+            password: '{{ ntfy_alertmanager_password }}'
+
+inhibit_rules:
+  # Suppress target missing warnings when node is already down
+  - source_matchers:
+      - alertname = NodeDown
+    target_matchers:
+      - alertname = PrometheusTargetMissing
+    equal: ['instance']
+
+  # Compare on `host`, not `instance`: instance differs between an infra alert
+  # (10.0.50.120:9100) and the service alert it should suppress, so it never
+  # matched. Every target and Gatus endpoint carries a `host` label.
+  - source_matchers:
+      - severity = critical
+      - alerttype = infrastructure
+    target_matchers:
+      - alerttype = service
+    equal: ['host']

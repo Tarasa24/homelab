@@ -3,10 +3,10 @@ resource "proxmox_virtual_environment_vm" "vm_homeassistant" {
 
   node_name = "pve"
   vm_id     = 1005
-  tags = ["homeassistant"]
-  name = "homeassistant"
-  bios = "ovmf"
-  machine = "q35"
+  tags      = ["homeassistant"]
+  name      = "homeassistant"
+  bios      = "ovmf"
+  machine   = "q35"
 
   memory {
     dedicated = 4096
@@ -36,6 +36,13 @@ resource "proxmox_virtual_environment_vm" "vm_homeassistant" {
       }
     }
   }
+
+  agent {
+    enabled = true
+    timeout = "15m"
+    trim    = false
+    type    = "virtio"
+  }
 }
 
 variable "homeassistant_ip" {
@@ -51,10 +58,10 @@ variable "homeassistant_ip" {
 }
 
 resource "proxmox_virtual_environment_download_file" "homeassistant_qcow2_template" {
-  content_type = "iso"
-  datastore_id = "local"
-  node_name    = "pve"
-  url = "https://github.com/home-assistant/operating-system/releases/download/16.3/haos_ova-16.3.qcow2.xz"
-  file_name = "haos_ova-16.3.qcow2.xz.img"
+  content_type            = "iso"
+  datastore_id            = "local"
+  node_name               = "pve"
+  url                     = "https://github.com/home-assistant/operating-system/releases/download/16.3/haos_ova-16.3.qcow2.xz"
+  file_name               = "haos_ova-16.3.qcow2.xz.img"
   decompression_algorithm = "zst"
 }

@@ -23,8 +23,14 @@ resource "proxmox_virtual_environment_container" "lxc_dns" {
 
     ip_config {
       ipv4 {
-        address = var.dns_ip.address
+        address = var.dns_ip.address # LAN IP (eth0)
         gateway = var.dns_ip.gateway
+      }
+    }
+
+    ip_config {
+      ipv4 {
+        address = "10.0.50.1/24" # Monitoring VLAN IP (mon)
       }
     }
 
@@ -44,7 +50,16 @@ resource "proxmox_virtual_environment_container" "lxc_dns" {
   }
 
   network_interface {
-    name = "eth0"
+    name     = "eth0"
+    bridge   = "vmbr0"
+    firewall = true
+  }
+
+  network_interface {
+    name     = "mon"
+    bridge   = "vmbr0"
+    vlan_id  = var.vlan_ids["monitoring"]
+    firewall = true
   }
 
   operating_system {

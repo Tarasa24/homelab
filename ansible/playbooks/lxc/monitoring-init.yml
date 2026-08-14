@@ -1,10 +1,14 @@
 ---
-- name: Configure private docker host
+- name: Configure monitoring container
   hosts: lxc_monitoring
   gather_facts: false
+  vars:
+    ntfy_alertmanager_password: "{{ lookup('file', '../../../secrets/monitoring/ntfy_alertmanager_password') }}"
   roles:
     - role: lxc_python3
     - role: docker
+    - role: node_exporter
+    - role: borgmatic
 
   tasks:
     - name: Try to down containers
@@ -13,12 +17,33 @@
         chdir: /root
       ignore_errors: true
 
-    - name: Remove old configs
-      shell: rm -rf /root/*
+    - name: Remove old configs (except persistent data)
+      shell: |
+        # Remove everything except docker-compose.yaml and data directories
+        find /root -maxdepth 1 -type f -name "docker-compose.yaml" -delete
+        find /root -maxdepth 1 -type d ! -name "." ! -name ".." -exec rm -rf {} +
+      args:
+        chdir: /root
+      ignore_errors: true
+    
     - name: Copy over configs
       copy:
         src: "../../../configs/monitoring/"
         dest: "/root/"
+        owner: root
+        group: root
+        mode: '0644'
+        directory_mode: '0755'
+
+    - name: Render alertmanager config with secrets
+      template:
+        src: "../../../configs/monitoring/alertmanager/config.yml.j2"
+        dest: "/root/alertmanager/config.yml"
+        owner: root
+        group: root
+        mode: '0644'
+
+    
 
     - name: Pull images
       shell: docker-compose pull -q
@@ -26,17 +51,32 @@
         chdir: /root
       timeout: 1200
       retries: 3
-
-    - name: Create directories for persistent storage
-      ansible.builtin.file:
-        name: "{{ item }}"
-        state: directory
-      with_items:
-        - /mnt/monitoring-cold/thanos
-        - /mnt/monitoring-cold/influxdb
-        - /mnt/monitoring-cold/minio
     
     - name: Start containers
       shell: docker-compose up -d
       args:
         chdir: /root
+    
+    - name: Wait for Prometheus to be healthy
+      shell: timeout 120 bash -c "until curl -s -f http://localhost:9090/-/healthy >/dev/null; do echo 'Waiting for Prometheus...'; sleep 5; done; echo 'Prometheus is healthy'"
+      args:
+        chdir: /root
+      ignore_errors: true
+    
+    - name: Wait for Loki to be ready
+      shell: timeout 180 bash -c "until curl -s -f http://localhost:3100/ready >/dev/null; do echo 'Waiting for Loki...'; sleep 5; done; echo 'Loki is ready'"
+      args:
+        chdir: /root
+      ignore_errors: true
+    
+    - name: Wait for Grafana to be healthy
+      shell: timeout 120 bash -c "until curl -s -f http://localhost:3000/api/health >/dev/null; do echo 'Waiting for Grafana...'; sleep 5; done; echo 'Grafana is healthy'"
+      args:
+        chdir: /root
+      ignore_errors: true
+    
+    - name: Wait for Gatus to respond
+      shell: timeout 120 bash -c "until curl -s -f http://localhost:8080/health >/dev/null 2>&1; do echo 'Waiting for Gatus...'; sleep 5; done; echo 'Gatus is responding'"
+      args:
+        chdir: /root
+      ignore_errors: true

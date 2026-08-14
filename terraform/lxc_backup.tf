@@ -16,8 +16,14 @@ resource "proxmox_virtual_environment_container" "lxc_backup" {
 
     ip_config {
       ipv4 {
-        address = var.lxc_backup_ip.address
+        address = var.lxc_backup_ip.address # LAN IP (veth0)
         gateway = var.lxc_backup_ip.gateway
+      }
+    }
+
+    ip_config {
+      ipv4 {
+        address = "10.0.50.3/24" # Monitoring VLAN IP (mon)
       }
     }
 
@@ -32,7 +38,16 @@ resource "proxmox_virtual_environment_container" "lxc_backup" {
   }
 
   network_interface {
-    name = "veth0"
+    name     = "veth0"
+    bridge   = "vmbr0"
+    firewall = true
+  }
+
+  network_interface {
+    name     = "mon"
+    bridge   = "vmbr0"
+    vlan_id  = var.vlan_ids["monitoring"]
+    firewall = true
   }
 
   operating_system {

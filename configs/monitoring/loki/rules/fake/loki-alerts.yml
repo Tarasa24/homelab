@@ -1,0 +1,200 @@
+# Loki ruler alert rules.
+#
+# Path matters: auth_enabled=false means tenant "fake", and the local ruler
+# backend reads from <directory>/<tenant>/, so this must live in fake/.
+# The `job` label is "<instance>/<service_name>"; selectors matching a bare
+# service name match nothing.
+#
+# Two traps guarded against below:
+#   - Self-reference: the ruler logs its own query text and promtail ships it
+#     back, so broad rules must exclude monitoring/loki and monitoring/promtail.
+#   - Substring matches: a bare `error` matches Gatus's "errors=0" success
+#     output, hence the \b word boundaries.
+#
+# These are log-CONTENT rules. A down service emits nothing, so they cannot
+# detect it - that is Gatus and cAdvisor's job. LogShippingStopped is the one
+# exception, using absent_over_time.
+
+groups:
+  - name: loki_alerts
+    rules:
+      # Threshold is deliberately high; several services log routine errors.
+      - alert: ContainerErrors
+        expr: |
+          sum by (job) (
+            count_over_time({job=~".+", job!~"monitoring/(loki|promtail)"} |~ `(?i)\b(error|fatal|panic|exception)\b` [5m])
+          ) > 25
+        for: 5m
+        labels:
+          severity: warning
+          alerttype: service
+        annotations:
+          summary: "{{ $labels.job }} is logging a lot of errors"
+          description: "{{ $labels.job }} logged more than 25 error/fatal/panic lines in 5 minutes"
+
+      - alert: ContainerCrashLoop
+        expr: |
+          sum by (job) (
+            count_over_time({job=~".+", job!~"monitoring/(loki|promtail)"} |~ `(?i)\b(fatal|panic)\b` [5m])
+          ) > 50
+        for: 2m
+        labels:
+          severity: critical
+          alerttype: service
+        annotations:
+          summary: "{{ $labels.job }} may be crash looping"
+          description: "{{ $labels.job }} logged more than 50 fatal/panic lines in 5 minutes"
+
+      - alert: AuthenticationFailureSpike
+        expr: |
+          sum by (job) (
+            count_over_time({job="private-docker-host/authelia"} |~ `(?i)(authentication failed|invalid credentials|user not found|brute.?force)` [5m])
+          ) > 10
+        for: 2m
+        labels:
+          severity: critical
+          alerttype: service
+        annotations:
+          summary: "Authelia authentication failure spike"
+          description: "More than 10 authentication failures in 5 minutes - possible brute force attempt"
+
+      - alert: BackupJobFailed
+        expr: |
+          sum by (job) (
+            count_over_time({job=~".+", job!~"monitoring/(loki|promtail)"} |~ `(?i)(borgmatic|borg|restic)` |~ `(?i)\b(error|failed|exception)\b` [1h])
+          ) > 0
+        for: 5m
+        labels:
+          severity: warning
+          alerttype: storage
+        annotations:
+          summary: "Backup error logged on {{ $labels.job }}"
+          description: "A borg/borgmatic/restic error appeared in the logs of {{ $labels.job }} within the last hour"
+
+      - alert: OOMKill
+        expr: |
+          sum by (job) (
+            count_over_time({job=~".+", job!~"monitoring/(loki|promtail)"} |~ `(?i)(out of memory|oom.?kill|killed process)` [5m])
+          ) > 0
+        for: 0m
+        labels:
+          severity: critical
+          alerttype: infrastructure
+        annotations:
+          summary: "OOM kill detected in {{ $labels.job }}"
+          description: "An out-of-memory kill appeared in the logs of {{ $labels.job }} - check container memory limits"
+
+      - alert: TLSCertExpiryWarningInLogs
+        expr: |
+          sum by (job) (
+            count_over_time({job=~".*/(nginx|traefik)"} |~ `(?i)(certificate.*expir|ssl.*expir|cert.*expir)` [1h])
+          ) > 0
+        for: 5m
+        labels:
+          severity: warning
+          alerttype: service
+        annotations:
+          summary: "TLS certificate expiry warning in {{ $labels.job }} logs"
+          description: "The proxy logged a certificate expiry warning - check certbot renewal on the DMZ router"
+
+      # nginx promotes `status` and `server_name` to stream labels, so no
+      # parsing is needed here.
+      - alert: NginxErrorRateHigh
+        expr: |
+          sum by (server_name) (
+            count_over_time({job="dmz-router/nginx", status=~"5.."}[5m])
+          ) > 10
+        for: 5m
+        labels:
+          severity: warning
+          alerttype: service
+          host: dmz-router
+        annotations:
+          summary: "{{ $labels.server_name }} is returning 5xx errors"
+          description: "More than 10 5xx responses in 5 minutes for {{ $labels.server_name }} - the backend behind the DMZ router is likely failing"
+
+      # Traefik mixes plain-text startup lines into the JSON stream, so
+      # | __error__="" is required or the query errors on every evaluation.
+      # The field is DownstreamStatus (what the client got), not OriginStatus.
+      - alert: TraefikErrorRateHigh
+        expr: |
+          sum(
+            count_over_time({job="private-docker-host/traefik"} | json | __error__="" | DownstreamStatus>=500 [5m])
+          ) > 5
+        for: 5m
+        labels:
+          severity: warning
+          alerttype: service
+          host: private-docker-host
+        annotations:
+          summary: "Traefik is returning 5xx errors on the LAN"
+          description: "More than 5 5xx responses in 5 minutes through Traefik - an internal service behind it is likely failing"
+
+      # Promtail dying is otherwise silent - an absence of logs looks identical
+      # to a quiet host. The 2h window is sized off the quietest host (backup,
+      # ~21 lines/hour). absent_over_time drops all labels, hence static hosts.
+      - alert: LogShippingStopped
+        expr: absent_over_time({instance="backup"}[2h])
+        for: 10m
+        labels:
+          severity: warning
+          alerttype: infrastructure
+          host: backup
+        annotations:
+          summary: "No logs received from backup for 2 hours"
+          description: "Promtail on backup has stopped shipping to Loki - log-based alerting is blind for this host"
+
+      - alert: LogShippingStopped
+        expr: absent_over_time({instance="dns"}[2h])
+        for: 10m
+        labels:
+          severity: warning
+          alerttype: infrastructure
+          host: dns
+        annotations:
+          summary: "No logs received from dns for 2 hours"
+          description: "Promtail on dns has stopped shipping to Loki - log-based alerting is blind for this host"
+
+      - alert: LogShippingStopped
+        expr: absent_over_time({instance="dmz-router"}[2h])
+        for: 10m
+        labels:
+          severity: warning
+          alerttype: infrastructure
+          host: dmz-router
+        annotations:
+          summary: "No logs received from dmz-router for 2 hours"
+          description: "Promtail on dmz-router has stopped shipping to Loki - log-based alerting is blind for this host"
+
+      - alert: LogShippingStopped
+        expr: absent_over_time({instance="private-docker-host"}[2h])
+        for: 10m
+        labels:
+          severity: warning
+          alerttype: infrastructure
+          host: private-docker-host
+        annotations:
+          summary: "No logs received from private-docker-host for 2 hours"
+          description: "Promtail on private-docker-host has stopped shipping to Loki - log-based alerting is blind for this host"
+
+      - alert: LogShippingStopped
+        expr: absent_over_time({instance="dmz-docker-host"}[2h])
+        for: 10m
+        labels:
+          severity: warning
+          alerttype: infrastructure
+          host: dmz-docker-host
+        annotations:
+          summary: "No logs received from dmz-docker-host for 2 hours"
+          description: "Promtail on dmz-docker-host has stopped shipping to Loki - log-based alerting is blind for this host"
+
+      - alert: LogShippingStopped
+        expr: absent_over_time({instance="monitoring"}[2h])
+        for: 10m
+        labels:
+          severity: warning
+          alerttype: infrastructure
+          host: monitoring
+        annotations:
+          summary: "No logs received from monitoring for 2 hours"
+          description: "Promtail on monitoring has stopped shipping to Loki - log-based alerting is blind for this host"

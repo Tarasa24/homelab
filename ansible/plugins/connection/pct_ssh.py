@@ -20,43 +20,31 @@
 # You should have received a copy of the GNU General Public License
 # along with Ansible.  If not, see <http://www.gnu.org/licenses/>.
 
-from __future__ import absolute_import, division, print_function
-
-__metaclass__ = type
-
 import errno
 import fcntl
 import hashlib
 import os
-import pipes
 import pty
+import selectors
 import shlex
 import subprocess
-import sys
 import time
-
-from ansible.release import __version__ as ansible_version
 from functools import wraps
+
 from ansible import constants as C
 from ansible.errors import (
-    AnsibleError,
     AnsibleConnectionFailure,
+    AnsibleError,
     AnsibleFileNotFound,
+    AnsibleOptionsError,
 )
-from ansible.errors import AnsibleOptionsError
-from ansible.compat import selectors
-from ansible.module_utils.six import PY3, text_type, binary_type
-from ansible.module_utils.six.moves import shlex_quote
 from ansible.module_utils._text import to_bytes, to_native, to_text
-from ansible.module_utils.parsing.convert_bool import BOOLEANS, boolean
-from ansible.plugins.connection import ConnectionBase, BUFSIZE
-from ansible.utils.path import unfrackpath, makedirs_safe
-
-from ansible.module_utils._text import (
-    to_bytes,
-    to_text as to_unicode,
-    to_native as to_str,
-)
+from ansible.module_utils._text import to_text as to_unicode
+from ansible.module_utils._text import to_native as to_str
+from ansible.module_utils.parsing.convert_bool import boolean
+from ansible.plugins.connection import BUFSIZE, ConnectionBase
+from ansible.release import __version__ as ansible_version
+from ansible.utils.path import makedirs_safe, unfrackpath
 
 DOCUMENTATION = """
     name: lxc_ssh
@@ -553,7 +541,6 @@ class Connection(ConnectionBase):
             display.vvv("LXC v2")
         else:
             raise AnsibleConnectionFailure("Cannot identify LXC version")
-            sys.exit(1)
 
     def set_options(self, *args, **kwargs):
         super(Connection, self).set_options(*args, **kwargs)
@@ -573,9 +560,7 @@ class Connection(ConnectionBase):
     def _sshpass_available():
         global SSHPASS_AVAILABLE
 
-        # We test once if sshpass is available, and remember the result. It
-        # would be nice to use distutils.spawn.find_executable for this, but
-        # distutils isn't always available; shutils.which() is Python3-only.
+        # We test once if sshpass is available, and remember the result.
 
         if SSHPASS_AVAILABLE is None:
             try:
@@ -631,18 +616,11 @@ class Connection(ConnectionBase):
         list ['-o', 'Foo=1', '-o', 'Bar=foo bar'] that can be added to
         the argument list. The list will not contain any empty elements.
         """
-        if sys.version_info[0] >= 3:
-            return [
-                to_unicode(x.strip())
-                for x in shlex.split(to_bytes(argstring).decode())
-                if x.strip()
-            ]
-        else:
-            return [
-                to_unicode(x.strip())
-                for x in shlex.split(to_bytes(argstring))
-                if x.strip()
-            ]
+        return [
+            to_unicode(x.strip())
+            for x in shlex.split(to_bytes(argstring).decode())
+            if x.strip()
+        ]
 
     def _add_args(self, b_command, b_args, explanation):
         """
@@ -977,7 +955,7 @@ class Connection(ConnectionBase):
         Starts the command and communicates with it until it ends.
         """
 
-        display_cmd = list(map(shlex_quote, map(to_text, cmd)))
+        display_cmd = list(map(shlex.quote, map(to_text, cmd)))
         display.vvv("SSH: EXEC {0}".format(" ".join(display_cmd)), host=self.host)
 
         # Start the given command. If we don't need to pipeline data, we can try
@@ -987,19 +965,16 @@ class Connection(ConnectionBase):
 
         p = None
 
-        if isinstance(cmd, (text_type, binary_type)):
+        if isinstance(cmd, (str, bytes)):
             cmd = to_bytes(cmd)
         else:
-            if sys.version_info[0] >= 3:
-                cmd = list(map(to_bytes, cmd))
-            else:
-                cmd = map(to_bytes, cmd)
+            cmd = list(map(to_bytes, cmd))
 
         if not in_data:
             try:
                 # Make sure stdin is a proper pty to avoid tcgetattr errors
                 master, slave = pty.openpty()
-                if PY3 and self._play_context.password:
+                if self._play_context.password:
                     p = subprocess.Popen(
                         cmd,
                         stdin=slave,
@@ -1020,7 +995,7 @@ class Connection(ConnectionBase):
                 p = None
 
         if not p:
-            if PY3 and self._play_context.password:
+            if self._play_context.password:
                 p = subprocess.Popen(
                     cmd,
                     stdin=subprocess.PIPE,
@@ -1385,18 +1360,18 @@ class Connection(ConnectionBase):
         ssh_executable = self.get_option("ssh_executable")
         h = self.container_name
         if self.lxc_version == "pct":
-            lxc_cmd = "pct exec %s -- %s" % (pipes.quote(h), cmd)
+            lxc_cmd = "pct exec %s -- %s" % (shlex.quote(h), cmd)
         elif self.lxc_version == "lxc-v2":
             lxc_cmd = "%slxc exec %s --mode=non-interactive -- /bin/sh -c %s" % (
                 self.systemd_run_prefix,
-                pipes.quote(h),
-                pipes.quote(cmd),
+                shlex.quote(h),
+                shlex.quote(cmd),
             )
         elif self.lxc_version == "lxc-v1":
             lxc_cmd = "%slxc-attach --name %s -- /bin/sh -c %s" % (
                 self.systemd_run_prefix,
-                pipes.quote(h),
-                pipes.quote(cmd),
+                shlex.quote(h),
+                shlex.quote(cmd),
             )
         if in_data:
             cmd = self._build_command(ssh_executable, "ssh", self.host, lxc_cmd)
@@ -1416,78 +1391,40 @@ class Connection(ConnectionBase):
                 "file or module does not exist: {0}".format(to_native(in_path))
             )
 
-        if sys.version_info[0] >= 3:
-            with open(in_path, "rb") as in_f:
-                in_data = in_f.read()
-                if len(in_data) == 0:
-                    # define a shortcut for empty files - nothing ro read so
-                    # the ssh pipe will hang
-                    cmd = "touch %s; echo -n done" % pipes.quote(out_path)
-                else:
-                    # regular command
-                    cmd = "cat > %s; echo -n done" % pipes.quote(out_path)
-                h = self.container_name
-                if self.lxc_version == "pct":
-                    lxc_cmd = "pct exec %s -- /bin/sh -c %s" % (
-                        pipes.quote(h),
-                        pipes.quote(cmd),
-                    )
-                elif self.lxc_version == "lxc-v2":
-                    lxc_cmd = "%slxc exec %s --mode=non-interactive -- /bin/sh -c %s" % (
-                        self.systemd_run_prefix,
-                        pipes.quote(h),
-                        pipes.quote(cmd),
-                    )
-                elif self.lxc_version == "lxc-v1":
-                    lxc_cmd = "%slxc-attach --name %s -- /bin/sh -c %s" % (
-                        self.systemd_run_prefix,
-                        pipes.quote(h),
-                        pipes.quote(cmd),
-                    )
-                if in_data:
-                    cmd = self._build_command(ssh_executable, "ssh", self.host, lxc_cmd)
-                else:
-                    cmd = self._build_command(
-                        ssh_executable, "ssh", "-tt", self.host, lxc_cmd
-                    )
-                (returncode, stdout, stderr) = self._run(cmd, in_data, sudoable=False)
-                return (returncode, stdout, stderr)
-        else:
-            with open(in_path, "r") as in_f:
-                in_data = in_f.read()
-                if len(in_data) == 0:
-                    # define a shortcut for empty files - nothing ro read so
-                    # the ssh pipe will hang
-                    cmd = "touch %s; echo -n done" % pipes.quote(out_path)
-                else:
-                    # regular command
-                    cmd = "cat > %s; echo -n done" % pipes.quote(out_path)
-                h = self.container_name
-                if self.lxc_version == "pct":
-                    lxc_cmd = "pct exec %s -- %s" % (
-                        pipes.quote(h),
-                        pipes.quote(cmd),
-                    )
-                elif self.lxc_version == "lxc-v2":
-                    lxc_cmd = "%slxc exec %s --mode=non-interactive -- /bin/sh -c %s" % (
-                        self.systemd_run_prefix,
-                        pipes.quote(h),
-                        pipes.quote(cmd),
-                    )
-                elif self.lxc_version == "lxc-v1":
-                    lxc_cmd = "%slxc-attach --name %s -- /bin/sh -c %s" % (
-                        self.systemd_run_prefix,
-                        pipes.quote(h),
-                        pipes.quote(cmd),
-                    )
-                if in_data:
-                    cmd = self._build_command(ssh_executable, "ssh", self.host, lxc_cmd)
-                else:
-                    cmd = self._build_command(
-                        ssh_executable, "ssh", "-tt", self.host, lxc_cmd
-                    )
-                (returncode, stdout, stderr) = self._run(cmd, in_data, sudoable=False)
-                return (returncode, stdout, stderr)
+        with open(in_path, "rb") as in_f:
+            in_data = in_f.read()
+            if len(in_data) == 0:
+                # define a shortcut for empty files - nothing to read so
+                # the ssh pipe will hang
+                cmd = "touch %s; echo -n done" % shlex.quote(out_path)
+            else:
+                cmd = "cat > %s; echo -n done" % shlex.quote(out_path)
+            h = self.container_name
+            if self.lxc_version == "pct":
+                lxc_cmd = "pct exec %s -- /bin/sh -c %s" % (
+                    shlex.quote(h),
+                    shlex.quote(cmd),
+                )
+            elif self.lxc_version == "lxc-v2":
+                lxc_cmd = "%slxc exec %s --mode=non-interactive -- /bin/sh -c %s" % (
+                    self.systemd_run_prefix,
+                    shlex.quote(h),
+                    shlex.quote(cmd),
+                )
+            elif self.lxc_version == "lxc-v1":
+                lxc_cmd = "%slxc-attach --name %s -- /bin/sh -c %s" % (
+                    self.systemd_run_prefix,
+                    shlex.quote(h),
+                    shlex.quote(cmd),
+                )
+            if in_data:
+                cmd = self._build_command(ssh_executable, "ssh", self.host, lxc_cmd)
+            else:
+                cmd = self._build_command(
+                    ssh_executable, "ssh", "-tt", self.host, lxc_cmd
+                )
+            (returncode, stdout, stderr) = self._run(cmd, in_data, sudoable=False)
+            return (returncode, stdout, stderr)
 
     def fetch_file(self, in_path, out_path):
         """fetch a file from lxc to local"""
@@ -1495,24 +1432,24 @@ class Connection(ConnectionBase):
         display.vvv("FETCH {0} TO {1}".format(in_path, out_path), host=self.host)
         ssh_executable = self.get_option("ssh_executable")
 
-        cmd = "cat < %s" % pipes.quote(in_path)
+        cmd = "cat < %s" % shlex.quote(in_path)
         h = self.container_name
         if self.lxc_version == "pct":
             lxc_cmd = "pct exec %s -- %s" % (
-                pipes.quote(h),
-                pipes.quote(cmd),
+                shlex.quote(h),
+                shlex.quote(cmd),
             )
         elif self.lxc_version == "lxc-v2":
             lxc_cmd = "%slxc exec %s --mode=non-interactive -- /bin/sh -c %s" % (
                 self.systemd_run_prefix,
-                pipes.quote(h),
-                pipes.quote(cmd),
+                shlex.quote(h),
+                shlex.quote(cmd),
             )
         elif self.lxc_version == "lxc-v1":
             lxc_cmd = "%slxc-attach --name %s -- /bin/sh -c %s" % (
                 self.systemd_run_prefix,
-                pipes.quote(h),
-                pipes.quote(cmd),
+                shlex.quote(h),
+                shlex.quote(cmd),
             )
 
         cmd = self._build_command(ssh_executable, "ssh", self.host, lxc_cmd)
@@ -1525,12 +1462,8 @@ class Connection(ConnectionBase):
                 )
             )
 
-        if sys.version_info[0] >= 3:
-            with open(out_path, "wb") as out_f:
-                out_f.write(stdout)
-        else:
-            with open(out_path, "w") as out_f:
-                out_f.write(stdout)
+        with open(out_path, "wb") as out_f:
+            out_f.write(stdout)
 
         return (returncode, stdout, stderr)
 

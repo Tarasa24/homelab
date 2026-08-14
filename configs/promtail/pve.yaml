@@ -1,0 +1,41 @@
+server:
+  http_listen_port: 9080
+  grpc_listen_port: 0
+
+positions:
+  filename: /var/lib/promtail/positions.yaml
+
+clients:
+  # LAN address: this host has no interface on VLAN 50.
+  - url: http://10.0.1.4:3100/loki/api/v1/push
+
+scrape_configs:
+  # journald is the only log source here; there are no files to tail.
+  - job_name: journal
+    journal:
+      max_age: 12h
+      path: /var/log/journal
+      labels:
+        instance: pve
+        stream: stdout
+    relabel_configs:
+      # Fresh per login, so keeping them grows Loki streams without bound.
+      - source_labels: ['__journal__systemd_unit']
+        regex: '(session-\d+\.scope|user@\d+\.service|user-runtime-dir@\d+\.service)'
+        action: drop
+      # Default first, then override: kernel/early-boot entries carry no unit.
+      - target_label: 'service_name'
+        replacement: 'kernel'
+      - target_label: 'container_name'
+        replacement: 'kernel'
+      - source_labels: ['__journal__systemd_unit']
+        regex: '(.+)'
+        target_label: 'service_name'
+        replacement: '$1'
+      - source_labels: ['__journal__systemd_unit']
+        regex: '(.+)'
+        target_label: 'container_name'
+        replacement: '$1'
+      - source_labels: ['instance', 'service_name']
+        separator: '/'
+        target_label: 'job'
