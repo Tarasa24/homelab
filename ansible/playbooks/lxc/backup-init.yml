@@ -11,6 +11,12 @@
     # port option -- hence the ssh config alias written below.
     hetzner_storagebox_host: "{{ lookup('file', '../../../secrets/hetzner/storagebox_host') | trim }}"
     hetzner_storagebox_port: 23
+    # Host key lines as published by Hetzner, in known_hosts format. Pinned
+    # rather than accepted on first use: this is the one backup hop that leaves
+    # the network, so the server gets authenticated. Restic encrypts the
+    # payload either way, but without this an active attacker can impersonate
+    # the Storage Box instead of merely observing ciphertext.
+    hetzner_storagebox_host_key: "{{ lookup('file', '../../../secrets/hetzner/storagebox_host_key') }}"
     resticprofile_configurations:
       - global
       - borg-to-hetzner-storagebox
@@ -101,11 +107,17 @@
         owner: backup
         group: backup
         mode: '0600'
+    - name: Pin the Storage Box host key
+      ansible.builtin.copy:
+        content: "{{ hetzner_storagebox_host_key }}"
+        dest: /home/backup/.ssh/known_hosts_hetzner
+        owner: backup
+        group: backup
+        mode: '0600'
     # restic addresses the repository as sftp:hetzner-storagebox:..., so this
-    # alias is what supplies the non-standard port and the key. Host key
-    # checking is off because the backup runs unattended from cron and a
-    # rebuilt container has no known_hosts -- the same trade already made for
-    # the borg clients.
+    # alias is what supplies the non-standard port, the key and the pinned host
+    # key. Unlike the borg clients on the LAN, this connection leaves the
+    # network, so it verifies the server rather than trusting on first use.
     - name: Configure ssh alias for the Storage Box
       ansible.builtin.copy:
         content: |
@@ -114,8 +126,9 @@
               Port {{ hetzner_storagebox_port }}
               User {{ hetzner_storagebox_host.split('.')[0] }}
               IdentityFile /home/backup/.ssh/hetzner_storagebox
-              StrictHostKeyChecking no
-              UserKnownHostsFile /dev/null
+              IdentitiesOnly yes
+              StrictHostKeyChecking yes
+              UserKnownHostsFile /home/backup/.ssh/known_hosts_hetzner
               BatchMode yes
         dest: /home/backup/.ssh/config
         owner: backup
