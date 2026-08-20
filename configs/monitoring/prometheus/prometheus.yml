@@ -31,7 +31,7 @@ scrape_configs:
           host: dns
       - targets: ['10.0.50.2:9100']  # DMZ Router
         labels:
-          host: dmz-router
+          host: dmz-proxy
       - targets: ['10.0.50.3:9100']  # Backup server
         labels:
           host: backup
@@ -49,7 +49,7 @@ scrape_configs:
           host: dmz-bitcoin-node
       # On the LAN, not VLAN 50: the host owns vmbr0 and has no address there.
       # Needs the cluster firewall rule in terraform/firewall_base.tf.
-      - targets: ['10.0.0.2:9100']   # Proxmox host
+      - targets: ['10.0.30.2:9100']   # Proxmox host
         labels:
           host: pve
 

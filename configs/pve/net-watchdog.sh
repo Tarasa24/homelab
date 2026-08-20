@@ -1,5 +1,6 @@
 #!/bin/bash
-# Keeps vmbr0's default route alive. Run from root's crontab every minute.
+# Keeps the management interface's default route alive. Run from root's crontab
+# every minute.
 #
 # The previous version bounced the bridge with `ip link set down/up` whenever the
 # gateway stopped answering. That does not go through ifupdown, so the static
@@ -15,16 +16,22 @@
 
 set -u
 
-IF="vmbr0"
+# The management address lives on the VLAN 30 subinterface, not on the bridge
+# itself: vmbr0 is VLAN-aware and carries VLANs 30/40/50, so it holds no
+# address and no route. Watching "vmbr0" here would find neither, and the
+# script would exit 1 every minute without ever restoring anything.
+IF="vmbr0.30"
 COOLDOWN=600
 STAMP="/run/net-watchdog.last-reload"
 
+# The gateway is declared in interfaces.d, not in the main interfaces file, so
+# both have to be searched.
 declared_gateway() {
     awk -v iface="$IF" '
         $1 == "iface" && $2 == iface { in_iface = 1; next }
         $1 == "iface" || $1 == "auto" { in_iface = 0 }
         in_iface && $1 == "gateway" { print $2; exit }
-    ' /etc/network/interfaces
+    ' /etc/network/interfaces /etc/network/interfaces.d/* 2>/dev/null
 }
 
 GW=$(ip route show default dev "$IF" | awk '{print $3}' | head -n1)
@@ -32,7 +39,7 @@ GW=$(ip route show default dev "$IF" | awk '{print $3}' | head -n1)
 if [ -z "$GW" ]; then
     DECLARED=$(declared_gateway)
     if [ -z "$DECLARED" ]; then
-        logger "net-watchdog: no default route on $IF and none declared in /etc/network/interfaces"
+        logger "net-watchdog: no default route on $IF and none declared in /etc/network/interfaces or interfaces.d"
         exit 1
     fi
     if ip route add default via "$DECLARED" dev "$IF" 2>/dev/null; then

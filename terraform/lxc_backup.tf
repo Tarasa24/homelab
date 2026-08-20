@@ -2,7 +2,7 @@ resource "proxmox_virtual_environment_container" "lxc_backup" {
   description = "Container running various backup services (borg, restic)"
 
   node_name = "pve"
-  vm_id     = 1003
+  vm_id     = 1013
 
   tags         = ["alpine"]
   unprivileged = true
@@ -16,7 +16,7 @@ resource "proxmox_virtual_environment_container" "lxc_backup" {
 
     ip_config {
       ipv4 {
-        address = var.lxc_backup_ip.address # LAN IP (veth0)
+        address = var.lxc_backup_ip.address # Lab VLAN IP (veth0)
         gateway = var.lxc_backup_ip.gateway
       }
     }
@@ -40,6 +40,7 @@ resource "proxmox_virtual_environment_container" "lxc_backup" {
   network_interface {
     name     = "veth0"
     bridge   = "vmbr0"
+    vlan_id  = var.vlan_ids["lab"]
     firewall = true
   }
 
@@ -79,8 +80,8 @@ variable "lxc_backup_ip" {
   })
 
   default = {
-    address = "10.0.1.3/22"
-    gateway = "10.0.0.1"
+    address = "10.0.30.13/24"
+    gateway = "10.0.30.1"
   }
 }
 

@@ -2,6 +2,11 @@
   hosts: proxmox
   gather_facts: false
   vars:
+    # Lab VLAN. The host has no address on the monitoring VLAN; Prometheus
+    # scrapes it here instead, which is why firewall_base.tf allows it.
+    pve_mgmt_vlan: 30
+    pve_mgmt_address: 10.0.30.2/24
+    pve_mgmt_gateway: 10.0.30.1
     disks: {
       "USB-HDD": "/dev/disk/by-uuid/d10e88e6-9a20-4d5f-972f-c432c26f9019",
       "USB-SSD": "/dev/disk/by-uuid/c06ebfa7-0bf3-4751-87c4-19c5f0c3515f",
@@ -96,33 +101,58 @@
         owner: 101000
         group: 101000
       with_items: "{{ required_directories }}"
-    - name: "Create DMZ bridge"
-      ansible.builtin.copy:
-        content: |
-          auto vmbr1
-          iface vmbr1 inet manual
-          	bridge-ports none
-          	bridge-stp off
-          	bridge-fd 0
-        dest: /etc/network/interfaces.d/vmbr1.cfg
-    
-    - name: "Up the DMZ bridge"
-      ansible.builtin.command:
-        cmd: ifup vmbr1
-    
+    # The DMZ used to be a separate, untagged bridge. It is now VLAN 40 on the
+    # VLAN-aware vmbr0, so vmbr1 has no purpose. Removing the file does not tear
+    # the bridge down on a running host -- that needs `ifdown vmbr1` by hand,
+    # which is deliberately not automated while containers may still be on it.
+    - name: "Remove the obsolete DMZ bridge definition"
+      ansible.builtin.file:
+        path: /etc/network/interfaces.d/vmbr1.cfg
+        state: absent
+
+    # The management address moves off vmbr0 itself and onto a VLAN 30
+    # subinterface. Leaving the old address in place would give the host two
+    # default routes, so refuse to run rather than half-apply it. This is the
+    # one change that can strand the host, and it is expected to be made from
+    # the console before this playbook is run.
+    - name: "Read /etc/network/interfaces"
+      ansible.builtin.slurp:
+        src: /etc/network/interfaces
+      register: pve_interfaces
+
+    - name: "Assert the legacy flat-LAN address has been removed from vmbr0"
+      ansible.builtin.assert:
+        that:
+          - "'10.0.0.2' not in (pve_interfaces.content | b64decode)"
+        fail_msg: >-
+          /etc/network/interfaces still assigns 10.0.0.2 to vmbr0. Remove that
+          address and its gateway from the vmbr0 stanza (from the console),
+          then re-run. Leaving it results in two default routes.
+
     - name: "Ensure vmbr0 is VLAN-aware"
       ansible.builtin.lineinfile:
         path: /etc/network/interfaces
-        regexp: '^\\s*iface vmbr0 inet'
-        line: 'iface vmbr0 inet manual'
-        insertbefore: '^auto vmbr0'
-    
-    - name: "Add VLAN awareness to vmbr0"
+        regexp: '^\s*bridge-vlan-aware\s'
+        line: "\tbridge-vlan-aware yes"
+        insertafter: '^iface vmbr0 inet'
+
+    - name: "Ensure vmbr0 trunks the VLANs in use"
       ansible.builtin.lineinfile:
         path: /etc/network/interfaces
-        line: '    bridge-vlan-aware yes'
-        insertafter: '^iface vmbr0 inet manual'
-  
+        regexp: '^\s*bridge-vids\s'
+        line: "\tbridge-vids 30 40 50"
+        insertafter: '^\s*bridge-vlan-aware yes'
+
+    - name: "Define the VLAN 30 management interface"
+      ansible.builtin.copy:
+        content: |
+          auto vmbr0.{{ pve_mgmt_vlan }}
+          iface vmbr0.{{ pve_mgmt_vlan }} inet static
+          	address {{ pve_mgmt_address }}
+          	gateway {{ pve_mgmt_gateway }}
+        dest: /etc/network/interfaces.d/vmbr0-mgmt.cfg
+        mode: "0644"
+
 
   handlers:
     - name: reload systemd

@@ -2,13 +2,13 @@ resource "proxmox_virtual_environment_container" "lxc_dmz_bitcoin_node" {
   description = "Debian container for Bitcoin node in DMZ"
 
   node_name = "pve"
-  vm_id     = 10003
+  vm_id     = 4013
 
   tags = ["debian", "dmz"]
 
   depends_on = [
     proxmox_virtual_environment_container.lxc_backup,
-    proxmox_virtual_environment_container.lxc_dmz_router
+    proxmox_virtual_environment_container.lxc_dmz_proxy
   ]
 
   memory {
@@ -29,7 +29,7 @@ resource "proxmox_virtual_environment_container" "lxc_dmz_bitcoin_node" {
     hostname = "bitcoin-node"
 
     dns {
-      servers = ["1.1.1.1", "8.8.8.8"] # split("/", var.dmz_router_lan_ip.address)[0]
+      servers = ["1.1.1.1", "8.8.8.8"]
     }
 
     ip_config {
@@ -53,7 +53,8 @@ resource "proxmox_virtual_environment_container" "lxc_dmz_bitcoin_node" {
 
   network_interface {
     name     = "dmz"
-    bridge   = proxmox_virtual_environment_network_linux_bridge.dmz_bridge.name
+    bridge   = "vmbr0"
+    vlan_id  = var.vlan_ids["dmz"]
     firewall = true
   }
 
@@ -100,7 +101,7 @@ variable "dmz_bitcoin_node_ip" {
   })
 
   default = {
-    address = "10.1.0.3/24"
-    gateway = "10.1.0.1"
+    address = "10.0.40.13/24"
+    gateway = "10.0.40.1"
   }
 }

@@ -1,0 +1,29 @@
+source_directories:
+  - /etc/letsencrypt
+
+repositories:
+  # At cutover the repo directory is renamed from dmz-router to dmz-proxy AND
+  # every archive inside it must be renamed too, with `borg rename` per archive
+  # -- moving the directory alone is not enough. archive_name_format below is
+  # keyed on {hostname}, so `borgmatic extract --archive latest` resolves
+  # "latest" only within match_archives (dmz-proxy-*) and cannot see archives
+  # still called dmz-router-*. The borgmatic role treats "No archives found" as
+  # success, so a missed rename does not fail the play: the container just comes
+  # up with nothing restored. See the runbook in the PR description.
+  - path: ssh://backup@10.0.30.13/backup/repos/dmz-proxy
+
+compression: zlib,6
+ssh_command: ssh -i /root/.ssh/id_ed25519 -o StrictHostKeyChecking=no
+unknown_unencrypted_repo_access_is_ok: true
+
+keep_daily: 7
+keep_weekly: 4
+keep_monthly: 6
+keep_yearly: 2
+archive_name_format: "{hostname}-{now}"
+match_archives: "{hostname}-*"
+
+checks:
+  - name: repository
+  - name: archives
+check_last: 3

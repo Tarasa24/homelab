@@ -3,7 +3,7 @@ services:
     image: 11notes/radicale:3.1.9
     container_name: radicale
     ports:
-      - "10.1.0.22:5232:5232"
+      - "10.0.40.22:5232:5232"
     volumes:
       - radicale_data:/radicale/var
       - ./radicale/config:/radicale/etc

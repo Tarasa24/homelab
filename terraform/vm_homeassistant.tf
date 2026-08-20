@@ -2,11 +2,17 @@ resource "proxmox_virtual_environment_vm" "vm_homeassistant" {
   description = "Virtual Machine for Home Assistant and related services"
 
   node_name = "pve"
-  vm_id     = 1005
-  tags      = ["homeassistant"]
-  name      = "homeassistant"
-  bios      = "ovmf"
-  machine   = "q35"
+
+  # Intentionally still 1005 while the rest of the Lab moves to the 1000+host
+  # scheme. This VM has no borg config and its disk is on local-lvm, so a
+  # ForceNew on vm_id would destroy all Home Assistant state. The move to 1015
+  # is done by hand on the PVE host (config rename + lvrename) and reconciled
+  # with `terraform state rm` + `import`; only then does this become 1015.
+  vm_id   = 1005
+  tags    = ["homeassistant"]
+  name    = "homeassistant"
+  bios    = "ovmf"
+  machine = "q35"
 
   memory {
     dedicated = 4096
@@ -25,7 +31,8 @@ resource "proxmox_virtual_environment_vm" "vm_homeassistant" {
   }
 
   network_device {
-    bridge = "vmbr0"
+    bridge  = "vmbr0"
+    vlan_id = var.vlan_ids["lab"]
   }
 
   initialization {
@@ -52,8 +59,8 @@ variable "homeassistant_ip" {
   })
 
   default = {
-    address = "10.0.1.5/22"
-    gateway = "10.0.0.1"
+    address = "10.0.30.15/24"
+    gateway = "10.0.30.1"
   }
 }
 

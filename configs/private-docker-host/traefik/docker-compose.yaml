@@ -16,9 +16,9 @@ services:
       - "--entrypoints.https.address=:443"
       - "--serverstransport.insecureSkipVerify=true"
     ports:
-      - "10.0.1.20:80:80"
-      - "10.0.1.20:443:443"
-      - "10.0.1.20:8080:8080"
+      - "10.0.30.20:80:80"
+      - "10.0.30.20:443:443"
+      - "10.0.30.20:8080:8080"
     volumes:
       - "/var/run/docker.sock:/var/run/docker.sock:ro"
       - "/etc/letsencrypt/live/*.lan.tarasa24.dev/fullchain.pem:/certs/fullchain.pem:ro"

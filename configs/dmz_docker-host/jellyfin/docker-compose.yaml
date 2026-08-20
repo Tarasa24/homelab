@@ -5,8 +5,8 @@ services:
     hostname: jellyfin
     user: 1000:1000
     ports:
-      - 10.1.0.21:8096:8096
-      - 10.1.0.21:8920:8920
+      - 10.0.40.21:8096:8096
+      - 10.0.40.21:8920:8920
     volumes:
       - jelllyfin_config:/config
       - /cache:/cache

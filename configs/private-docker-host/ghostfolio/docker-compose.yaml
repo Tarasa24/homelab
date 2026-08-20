@@ -13,7 +13,7 @@ services:
       - ghostfolio                            # Connects to the specified Docker network.
       - default
     ports:
-      - "10.0.1.26:3333:3333"                # Exposes Ghostfolio on port 3333.
+      - "10.0.30.26:3333:3333"                # Exposes Ghostfolio on port 3333.
     depends_on:
       ghostfolio_db:
         condition: service_healthy            # Waits for Postgres to be healthy before starting.

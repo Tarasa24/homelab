@@ -7,7 +7,7 @@ positions:
 
 clients:
   # LAN address: this host has no interface on VLAN 50.
-  - url: http://10.0.1.4:3100/loki/api/v1/push
+  - url: http://10.0.30.14:3100/loki/api/v1/push
 
 scrape_configs:
   # journald is the only log source here; there are no files to tail.

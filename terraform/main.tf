@@ -15,8 +15,9 @@ variable "proxmox_config" {
 variable "vlan_ids" {
   type = map(number)
   default = {
+    lab        = 30
+    dmz        = 40
     monitoring = 50
-    dmz        = 40 # Future VLAN for DMZ when migrated from bridge
   }
   description = "VLAN IDs for different network segments"
 }

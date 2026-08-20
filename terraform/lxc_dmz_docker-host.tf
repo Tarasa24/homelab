@@ -2,12 +2,12 @@ resource "proxmox_virtual_environment_container" "lxc_dmz-docker-host" {
   description = "Container for hosting containized external services"
 
   node_name = "pve"
-  vm_id     = 100020
+  vm_id     = 4020
 
   tags = ["alpine", "docker", "dmz"]
   depends_on = [
     proxmox_virtual_environment_container.lxc_backup,
-    proxmox_virtual_environment_container.lxc_dmz_router
+    proxmox_virtual_environment_container.lxc_dmz_proxy
   ]
 
   memory {
@@ -24,7 +24,7 @@ resource "proxmox_virtual_environment_container" "lxc_dmz-docker-host" {
 
     dns {
       domain  = " "
-      servers = ["1.1.1.1", "8.8.8.8"] # split("/", var.dmz_router_lan_ip.address)[0]
+      servers = ["1.1.1.1", "8.8.8.8"]
     }
 
     ip_config {
@@ -57,7 +57,8 @@ resource "proxmox_virtual_environment_container" "lxc_dmz-docker-host" {
 
   network_interface {
     name     = "dmz"
-    bridge   = proxmox_virtual_environment_network_linux_bridge.dmz_bridge.name
+    bridge   = "vmbr0"
+    vlan_id  = var.vlan_ids["dmz"]
     firewall = true
   }
 
@@ -111,8 +112,8 @@ variable "dmz-docker-host_ip" {
   })
 
   default = {
-    address = "10.1.0.20/24"
-    gateway = "10.1.0.1"
+    address = "10.0.40.20/24"
+    gateway = "10.0.40.1"
   }
 }
 

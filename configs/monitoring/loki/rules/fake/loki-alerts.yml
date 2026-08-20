@@ -102,13 +102,13 @@ groups:
       - alert: NginxErrorRateHigh
         expr: |
           sum by (server_name) (
-            count_over_time({job="dmz-router/nginx", status=~"5.."}[5m])
+            count_over_time({job="dmz-proxy/nginx", status=~"5.."}[5m])
           ) > 10
         for: 5m
         labels:
           severity: warning
           alerttype: service
-          host: dmz-router
+          host: dmz-proxy
         annotations:
           summary: "{{ $labels.server_name }} is returning 5xx errors"
           description: "More than 10 5xx responses in 5 minutes for {{ $labels.server_name }} - the backend behind the DMZ router is likely failing"
@@ -156,15 +156,15 @@ groups:
           description: "Promtail on dns has stopped shipping to Loki - log-based alerting is blind for this host"
 
       - alert: LogShippingStopped
-        expr: absent_over_time({instance="dmz-router"}[2h])
+        expr: absent_over_time({instance="dmz-proxy"}[2h])
         for: 10m
         labels:
           severity: warning
           alerttype: infrastructure
-          host: dmz-router
+          host: dmz-proxy
         annotations:
-          summary: "No logs received from dmz-router for 2 hours"
-          description: "Promtail on dmz-router has stopped shipping to Loki - log-based alerting is blind for this host"
+          summary: "No logs received from dmz-proxy for 2 hours"
+          description: "Promtail on dmz-proxy has stopped shipping to Loki - log-based alerting is blind for this host"
 
       - alert: LogShippingStopped
         expr: absent_over_time({instance="private-docker-host"}[2h])

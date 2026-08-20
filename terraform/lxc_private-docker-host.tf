@@ -52,6 +52,7 @@ resource "proxmox_virtual_environment_container" "lxc_private-docker-host" {
   network_interface {
     name     = "eth0"
     bridge   = "vmbr0"
+    vlan_id  = var.vlan_ids["lab"]
     firewall = true
   }
 
@@ -105,8 +106,8 @@ variable "private-docker-host_ip" {
   })
 
   default = {
-    address = "10.0.1.20/22"
-    gateway = "10.0.0.1"
+    address = "10.0.30.20/24"
+    gateway = "10.0.30.1"
   }
 }
 

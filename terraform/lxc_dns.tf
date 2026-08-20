@@ -2,7 +2,7 @@ resource "proxmox_virtual_environment_container" "lxc_dns" {
   description = "Container for T-DNS server"
 
   node_name = "pve"
-  vm_id     = 1001
+  vm_id     = 1011
 
   tags = ["alpine", "dns"]
   depends_on = [
@@ -52,6 +52,7 @@ resource "proxmox_virtual_environment_container" "lxc_dns" {
   network_interface {
     name     = "eth0"
     bridge   = "vmbr0"
+    vlan_id  = var.vlan_ids["lab"]
     firewall = true
   }
 
@@ -88,8 +89,8 @@ variable "dns_ip" {
   })
 
   default = {
-    address = "10.0.1.1/22"
-    gateway = "10.0.0.1"
+    address = "10.0.30.11/24"
+    gateway = "10.0.30.1"
   }
 }
 
