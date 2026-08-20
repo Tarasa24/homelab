@@ -7,12 +7,14 @@
     ansible_host: "{{ hostvars[inventory_hostname].ansible_host }}"
     lxc_host: "{{ hostvars[inventory_hostname].lxc_host }}"
     repositories_dir: /backup/repos
-    linode_access_key: "{{ lookup('file', '../../../secrets/backup/resticprofile/access_key') }}"
-    linode_secret_key: "{{ lookup('file', '../../../secrets/backup/resticprofile/secret_key') }}"
+    # Storage Box SSH listens on 23, not 22, and restic's sftp backend has no
+    # port option -- hence the ssh config alias written below.
+    hetzner_storagebox_host: "{{ lookup('file', '../../../secrets/hetzner/storagebox_host') | trim }}"
+    hetzner_storagebox_port: 23
     resticprofile_configurations:
       - global
-      - borg-to-linode-s3
-      - immich-media-to-linode-s3
+      - borg-to-hetzner-storagebox
+      - immich-media-to-hetzner-storagebox
   roles:
     - role: lxc_python3
     - role: node_exporter
@@ -85,6 +87,41 @@
         group: backup
         mode: '0600'
 
+    - name: Create backup .ssh directory
+      ansible.builtin.file:
+        path: /home/backup/.ssh
+        state: directory
+        owner: backup
+        group: backup
+        mode: '0700'
+    - name: Install Storage Box SSH key
+      ansible.builtin.copy:
+        src: ../../../secrets/hetzner/storage_box_ssh_key
+        dest: /home/backup/.ssh/hetzner_storagebox
+        owner: backup
+        group: backup
+        mode: '0600'
+    # restic addresses the repository as sftp:hetzner-storagebox:..., so this
+    # alias is what supplies the non-standard port and the key. Host key
+    # checking is off because the backup runs unattended from cron and a
+    # rebuilt container has no known_hosts -- the same trade already made for
+    # the borg clients.
+    - name: Configure ssh alias for the Storage Box
+      ansible.builtin.copy:
+        content: |
+          Host hetzner-storagebox
+              HostName {{ hetzner_storagebox_host }}
+              Port {{ hetzner_storagebox_port }}
+              User {{ hetzner_storagebox_host.split('.')[0] }}
+              IdentityFile /home/backup/.ssh/hetzner_storagebox
+              StrictHostKeyChecking no
+              UserKnownHostsFile /dev/null
+              BatchMode yes
+        dest: /home/backup/.ssh/config
+        owner: backup
+        group: backup
+        mode: '0600'
+
     - name: Install restic
       ansible.builtin.apk:
         name: restic
@@ -118,8 +155,13 @@
         owner: backup
         group: backup
         mode: '0700'
+    # profiles.yaml is rebuilt by concatenating the templates below, so it is
+    # removed first to keep the play idempotent rather than appending forever.
     - name: Clean up resticprofile configurations
-      ansible.builtin.command: rm -f /home/backup/.config/resticprofile/profiles.yaml
+      ansible.builtin.file:
+        path: /home/backup/.config/resticprofile/profiles.yaml
+        state: absent
+      changed_when: false
     - name: Copy resticprofile configurations
       ansible.builtin.template:
         src: ../../../configs/backup/resticprofile/{{ item }}.yaml.j2
@@ -141,6 +183,22 @@
         mode: '0400'
         owner: backup
         group: backup
+    # restic's sftp backend creates the repository directory but not its
+    # parents, so a fresh Storage Box needs the tree laid out first or every
+    # init fails with "mkdir: file does not exist". Done over SFTP rather than
+    # `ssh ... mkdir` because SFTP is the one interface a Storage Box is
+    # guaranteed to expose; the restricted SSH shell varies by plan. The
+    # leading `-` tells sftp to carry on when a directory already exists.
+    - name: Ensure the Storage Box parent directories exist
+      ansible.builtin.shell:
+        cmd: |
+          printf -- '-mkdir backups\n-mkdir backups/borg\n' | sftp -b - hetzner-storagebox
+      changed_when: false
+      become: true
+      become_user: backup
+      become_method: su
+      become_flags: '-s /bin/sh'
+
     - name: Init restic repositories if they don't already exist
       ansible.builtin.command: resticprofile {{ item }}.init
       with_items: "{{ repositories + ['immich-media'] }}"

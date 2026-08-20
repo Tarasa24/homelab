@@ -1,9 +1,9 @@
 immich-media:
-  repository: s3:eu-central-1.linodeobjects.com/homelab-immich-media-backups
+  # sftp:<ssh-host-alias>:<path>. The alias resolves via /home/backup/.ssh/config,
+  # which pins port 23 and the key -- restic's sftp backend gives no way to pass
+  # a port, so the alias is doing real work here, not just shortening the line.
+  repository: sftp:hetzner-storagebox:backups/immich-media
   password-file: /home/backup/.config/resticprofile/restic-password.txt
-  env:
-    AWS_ACCESS_KEY_ID: {{ linode_access_key }}
-    AWS_SECRET_ACCESS_KEY: {{ linode_secret_key }}
 
   retention:
     after-backup: true
