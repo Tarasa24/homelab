@@ -3,12 +3,11 @@ resource "proxmox_virtual_environment_vm" "vm_homeassistant" {
 
   node_name = "pve"
 
-  # Intentionally still 1005 while the rest of the Lab moves to the 1000+host
-  # scheme. This VM has no borg config and its disk is on local-lvm, so a
-  # ForceNew on vm_id would destroy all Home Assistant state. The move to 1015
-  # is done by hand on the PVE host (config rename + lvrename) and reconciled
-  # with `terraform state rm` + `import`; only then does this become 1015.
-  vm_id   = 1005
+  # Moved to 1015 by hand on the PVE host (config rename + lvrename) and
+  # reconciled into state with `terraform state rm` + `import`, ahead of this
+  # apply -- vm_id is ForceNew and this VM has no borg config, so letting
+  # Terraform do the move itself would have destroyed all Home Assistant state.
+  vm_id   = 1015
   tags    = ["homeassistant"]
   name    = "homeassistant"
   bios    = "ovmf"
@@ -28,6 +27,13 @@ resource "proxmox_virtual_environment_vm" "vm_homeassistant" {
     file_id      = proxmox_virtual_environment_download_file.homeassistant_qcow2_template.id
     interface    = "scsi0"
     size         = 32
+  }
+
+  # file_id only matters for the initial clone-from-image; the imported disk
+  # has no such attribute in its live state, so config wanting it set would
+  # otherwise force a replace (and destroy) on every plan from now on.
+  lifecycle {
+    ignore_changes = [disk[0].file_id]
   }
 
   network_device {
