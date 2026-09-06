@@ -253,6 +253,28 @@ endpoints:
       host: private-docker-host
       path: internal
 
+  - name: "Kimai"
+    group: "Internal"
+    url: "http://10.0.1.27:8001/"
+    interval: 60s
+    # Symfony's TRUSTED_HOSTS check 400s a raw-IP Host header, so the probe
+    # sends the real vhost to get a genuine response (redirect to login).
+    headers:
+      Host: "kimai.lan.tarasa24.dev"
+    client:
+      timeout: 10s
+    conditions:
+      - "[STATUS] == any(200, 301, 302, 401)"
+    ui:
+      hide-url: true
+      hide-hostname: true
+      hide-port: true
+      hide-conditions: true
+      hide-errors: true
+    extra-labels:
+      host: private-docker-host
+      path: internal
+
   - name: "Unifi Controller"
     group: "Internal"
     url: "https://10.0.1.25:8443/"

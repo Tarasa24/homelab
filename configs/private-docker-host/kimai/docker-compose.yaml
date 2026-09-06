@@ -1,0 +1,64 @@
+services:
+  kimai_app:
+    image: kimai/kimai2:apache               # Apache-bundled image; listens on :8001, no separate nginx sidecar needed since Traefik is our reverse proxy.
+    container_name: kimai_app                # Names the container for easier management.
+    restart: always                          # Restarts the container automatically on failure.
+    env_file:
+      - ./kimai/config/.env                                       # Loads environment variables from .env file.
+    networks:
+      - kimai                                # Connects to the specified Docker network.
+      - default
+    ports:
+      - "10.0.1.27:8001:8001"                # Exposes Kimai on port 8001.
+    depends_on:
+      - kimai_db                                         # Ensures the database service starts before the app.
+    volumes:
+      - kimai_data:/opt/kimai/var/data       # Stores application data persistently.
+      - kimai_plugins:/opt/kimai/var/plugins # Stores installed plugins persistently.
+    healthcheck:
+      # Symfony's TRUSTED_HOSTS check rejects the bare "localhost" Host header
+      # with a 400, so the probe must send the real vhost to get a genuine
+      # response (302 to the login page when unauthenticated).
+      test: ["CMD", "curl", "-f", "-H", "Host: kimai.lan.tarasa24.dev", "http://localhost:8001/"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      # First boot runs DB migrations + cache warmup (~60-90s observed), and
+      # Traefik's Docker provider gates router creation on container health -
+      # without this, cold starts produce a real 404 window in front of users.
+      start_period: 90s
+    labels:
+      - "traefik.enable=true"
+      - "traefik.docker.network=root_default"
+      - "traefik.http.routers.kimai.rule=Host(`kimai.lan.tarasa24.dev`)"
+      - "traefik.http.routers.kimai.entrypoints=https"
+      - "traefik.http.routers.kimai.tls=true"
+      - "traefik.http.routers.kimai.middlewares=hsts@file"
+      - "traefik.http.services.kimai.loadbalancer.server.port=8001"
+
+  kimai_db:
+    image: mariadb:lts                       # Uses the latest stable MariaDB image.
+    container_name: kimai_db                 # Names the container for easier management.
+    hostname: db                             # Sets the hostname inside the container (matches DATABASE_URL).
+    restart: always                          # Restarts the container automatically on failure.
+    env_file:
+      - ./kimai/config/.db.env                                    # Loads environment variables from .db.env file.
+    networks:
+      - kimai                                # Connects to the specified Docker network.
+    volumes:
+      - kimai_db:/var/lib/mysql              # Stores database data persistently.
+
+volumes:
+  kimai_data:
+    external: true
+    name: root_kimai_data
+  kimai_plugins:
+    external: true
+    name: root_kimai_plugins
+  kimai_db:
+    external: true
+    name: root_kimai_db
+
+networks:
+  kimai:
+    driver: bridge
