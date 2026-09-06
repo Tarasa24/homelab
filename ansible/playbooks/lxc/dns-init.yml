@@ -30,7 +30,7 @@
         cmd: rm -rf /opt/technitium-dns && rm -rf /tmp/DnsServerPortable.tar.gz
       when: technitium_exists.stat.exists
 
-    - name: Configure edge repositories for ASP.NET Core 9
+    - name: Configure edge repositories for ASP.NET Core runtime
       copy:
         dest: /etc/apk/repositories
         content: |
@@ -42,7 +42,7 @@
       ansible.builtin.command:
         cmd: apk update
 
-    - name: Install ASP.NET Core 9 runtime from Edge
+    - name: Install ASP.NET Core runtime from Edge
       ansible.builtin.apk:
         name: aspnetcore9-runtime
         state: present
@@ -58,9 +58,19 @@
       ansible.builtin.command:
         cmd: apk update
 
+    # Pinned, not "latest": a fresh provision on 2026-09-06 pulled v15.4.0,
+    # which targets net10.0, whose aspnetcore10-runtime Alpine package fails
+    # to start here (native crypto shim can't resolve EVP_PKEY_sign_message_init
+    # against this Alpine's openssl3 -- an Alpine packaging bug, not something
+    # to chase at deploy time). v15.2.0 was also checked and *also* targets
+    # net10.0 (runtimeOptions.tfm in DnsServerApp.runtimeconfig.json) -- the
+    # switch happened earlier than expected. v14.3.0 is the newest release
+    # confirmed to target net9.0 and run cleanly against aspnetcore9-runtime.
+    # Before trusting any newer pin, extract the tarball and check
+    # DnsServerApp.runtimeconfig.json's tfm before deploying it.
     - name: Download technitium dns
       ansible.builtin.command:
-        cmd: wget https://download.technitium.com/dns/DnsServerPortable.tar.gz
+        cmd: wget https://download.technitium.com/dns/archive/14.3.0/DnsServerPortable.tar.gz
         chdir: /tmp
 
     - name: Create technitium dns directory
@@ -88,8 +98,16 @@
           directory="/opt/technitium-dns"
           command="/opt/technitium-dns/start.sh"
           command_user="root"
+          command_background="yes"
           pidfile="/var/run/technitium-dns.pid"
-          
+
+          # command_background was missing: start.sh execs dotnet directly and
+          # never writes its own pidfile, so start-stop-daemon ran it attached
+          # to whatever session invoked `rc-service start` (hanging that
+          # session at "Press CTRL+C to stop") and OpenRC never had a real PID
+          # to track, so status/stop/start all disagreed with reality afterward.
+          # With command_background set, start-stop-daemon backgrounds it and
+          # manages pidfile itself.
           depend() {
               need net
           }
