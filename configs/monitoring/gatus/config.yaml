@@ -255,16 +255,22 @@ endpoints:
 
   - name: "Kimai"
     group: "Internal"
-    url: "http://10.0.30.27:8001/"
+    # /en/login directly, not "/": root 302s to /en/homepage, and Gatus's
+    # client either doesn't resend the overridden Host header across that
+    # redirect or doesn't follow it the way curl -L does -- observed as a
+    # hard 404 from Gatus every check while curl -L against the same URL
+    # cleanly reached /en/login with 200. Hitting the login route directly
+    # sidesteps the discrepancy instead of chasing it further.
+    url: "http://10.0.30.27:8001/en/login"
     interval: 60s
     # Symfony's TRUSTED_HOSTS check 400s a raw-IP Host header, so the probe
-    # sends the real vhost to get a genuine response (redirect to login).
+    # sends the real vhost to get a genuine response.
     headers:
       Host: "kimai.lan.tarasa24.dev"
     client:
       timeout: 10s
     conditions:
-      - "[STATUS] == any(200, 301, 302, 401)"
+      - "[STATUS] == 200"
     ui:
       hide-url: true
       hide-hostname: true
