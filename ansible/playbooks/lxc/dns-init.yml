@@ -58,16 +58,9 @@
       ansible.builtin.command:
         cmd: apk update
 
-    # Pinned, not "latest": a fresh provision on 2026-09-06 pulled v15.4.0,
-    # which targets net10.0, whose aspnetcore10-runtime Alpine package fails
-    # to start here (native crypto shim can't resolve EVP_PKEY_sign_message_init
-    # against this Alpine's openssl3 -- an Alpine packaging bug, not something
-    # to chase at deploy time). v15.2.0 was also checked and *also* targets
-    # net10.0 (runtimeOptions.tfm in DnsServerApp.runtimeconfig.json) -- the
-    # switch happened earlier than expected. v14.3.0 is the newest release
-    # confirmed to target net9.0 and run cleanly against aspnetcore9-runtime.
-    # Before trusting any newer pin, extract the tarball and check
-    # DnsServerApp.runtimeconfig.json's tfm before deploying it.
+    # Pinned: 15.x+ targets net10.0, whose aspnetcore10-runtime fails to start
+    # here (Alpine openssl3 packaging bug). Check DnsServerApp.runtimeconfig.json's
+    # tfm before bumping this.
     - name: Download technitium dns
       ansible.builtin.command:
         cmd: wget https://download.technitium.com/dns/archive/14.3.0/DnsServerPortable.tar.gz
@@ -101,13 +94,8 @@
           command_background="yes"
           pidfile="/var/run/technitium-dns.pid"
 
-          # command_background was missing: start.sh execs dotnet directly and
-          # never writes its own pidfile, so start-stop-daemon ran it attached
-          # to whatever session invoked `rc-service start` (hanging that
-          # session at "Press CTRL+C to stop") and OpenRC never had a real PID
-          # to track, so status/stop/start all disagreed with reality afterward.
-          # With command_background set, start-stop-daemon backgrounds it and
-          # manages pidfile itself.
+          # Required: start.sh execs dotnet directly with no pidfile of its own,
+          # so start-stop-daemon needs to background it and track the pid itself.
           depend() {
               need net
           }

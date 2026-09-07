@@ -3,10 +3,8 @@ resource "proxmox_virtual_environment_vm" "vm_homeassistant" {
 
   node_name = "pve"
 
-  # Moved to 1015 by hand on the PVE host (config rename + lvrename) and
-  # reconciled into state with `terraform state rm` + `import`, ahead of this
-  # apply -- vm_id is ForceNew and this VM has no borg config, so letting
-  # Terraform do the move itself would have destroyed all Home Assistant state.
+  # vm_id is ForceNew; moved to 1015 by hand (config rename + lvrename) and
+  # reconciled via state rm + import to avoid destroying this VM's state.
   vm_id   = 1015
   tags    = ["homeassistant"]
   name    = "homeassistant"
@@ -29,9 +27,8 @@ resource "proxmox_virtual_environment_vm" "vm_homeassistant" {
     size         = 32
   }
 
-  # file_id only matters for the initial clone-from-image; the imported disk
-  # has no such attribute in its live state, so config wanting it set would
-  # otherwise force a replace (and destroy) on every plan from now on.
+  # file_id is create-only and absent from imported state; without this it
+  # forces a replace on every plan.
   lifecycle {
     ignore_changes = [disk[0].file_id]
   }

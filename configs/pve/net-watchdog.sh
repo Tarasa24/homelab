@@ -26,22 +26,11 @@ STAMP="/run/net-watchdog.last-reload"
 METRICS_FILE="/var/lib/node_exporter/textfile_collector/net_watchdog.prom"
 METRICS_TMP="${METRICS_FILE}.$$"
 
-# 2026-09-07: an incident on 2026-09-05 ran ifreload -a 74 times over ~12h
-# (every ~10min, rate-limited) without the gateway ever becoming reachable
-# afterward -- ifreload plainly wasn't the fix for whatever was actually
-# wrong, and nothing else noticed or escalated, because this script only
-# wrote to syslog, which nobody was watching in real time. Two changes:
-#   - ping 3 times, not 1: a single dropped packet (this host generated a lot
-#     of network noise the same night) was enough to trigger the whole
-#     ifreload path; ping's own exit code already treats any reply out of
-#     the 3 as success, so this alone cuts down false positives.
-#   - write a Prometheus textfile metric on every run, so Alertmanager can
-#     actually page on "still unreachable N minutes after the last ifreload"
-#     instead of that only being discoverable by grepping syslog after the
-#     fact.
+# Pings 3x (not 1) to cut false positives, and exports a Prometheus textfile
+# metric so Alertmanager can page if ifreload -a isn't actually fixing it --
+# this used to only log to syslog, which nobody was watching in real time.
 write_metric() {
-    # in_progress writes truncate the read a scrape could be mid-way through;
-    # write elsewhere and rename, which is atomic on the same filesystem.
+    # Write elsewhere and rename: atomic, so a scrape never reads a partial file.
     cat > "$METRICS_TMP" <<-EOF
 	# HELP net_watchdog_gateway_reachable Whether the last watchdog ping of the declared gateway succeeded (1) or not (0).
 	# TYPE net_watchdog_gateway_reachable gauge

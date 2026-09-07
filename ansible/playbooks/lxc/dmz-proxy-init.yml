@@ -1,11 +1,8 @@
 ---
 - name: Configure the DMZ reverse proxy and TLS terminator
   hosts: lxc_dmz_proxy
-  # false, not true: on a genuinely fresh container (no Python yet) the
-  # implicit fact-gathering setup module runs before the lxc_python3 role
-  # gets a chance to bootstrap Python, and fails outright. Nothing later in
-  # this play actually consumes gathered facts. Matches the pattern already
-  # used by monitoring-init.yml and dmz-docker-host-init.yml.
+  # false: on a fresh container with no Python yet, fact-gathering runs before
+  # lxc_python3 can bootstrap it and fails outright.
   gather_facts: false
   vars:
     ansible_host: "{{ hostvars[inventory_hostname].ansible_host }}"
@@ -58,10 +55,8 @@
           args:
             creates: "/etc/letsencrypt/renewal/{{ item }}.conf"
           with_items: "{{ certificates }}"
-          # Matched by item value, not loop.index0 -- that variable doesn't
-          # exist for with_items on this ansible-core version ("'loop' is
-          # undefined"), and matching by value is robust regardless of loop
-          # ordering anyway.
+          # Matched by item value, not loop.index0: that variable doesn't
+          # exist for with_items on this ansible-core version.
           vars:
             cert_check: "{{ (certbot_certificates.results | selectattr('item', 'equalto', item) | first) }}"
           when: cert_check.rc != 0 or 'Certificate not yet due for renewal' in cert_check.stderr

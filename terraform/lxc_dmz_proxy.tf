@@ -211,17 +211,9 @@ resource "proxmox_virtual_environment_firewall_rules" "lxc_dmz_proxy" {
     dest    = "10.0.30.25/32"
   }
 
-  # 2026-09-07: nginx has always proxy_pass'd to these DMZ-internal backends
-  # (jellyfin, ntfy, status/Gatus, radicale, electrs, bitcoind P2P), but no
-  # outbound rule ever explicitly allowed reaching them -- output_policy=DROP
-  # silently ate every connection attempt. Same-VLAN destinations are not
-  # exempt from this container's own firewall; only WAN-bound dport 80/443/53
-  # above happened to be unscoped by dest. Caught via nginx's error log
-  # showing repeated "upstream timed out" for real requests (including real
-  # external peers failing to reach the public bitcoind P2P port), and
-  # confirmed the Gatus "Calendar & Contacts" check was a false-positive: it
-  # never actually reaches radicale, because Authelia's auth_request rejects
-  # unauthenticated requests with 401 before nginx attempts the proxy_pass.
+  # nginx proxy_passes to these DMZ-internal backends, but output_policy=DROP
+  # silently ate every connection attempt -- same-VLAN destinations are not
+  # exempt from this container's own firewall.
   rule {
     type    = "out"
     action  = "ACCEPT"
@@ -246,11 +238,7 @@ resource "proxmox_virtual_environment_firewall_rules" "lxc_dmz_proxy" {
     type    = "out"
     action  = "ACCEPT"
     comment = "Allow output traffic to Gatus (status page)"
-    # net1, not net0: 10.0.50.4 is on the monitoring VLAN, reachable via the
-    # mon NIC. Every other rule added alongside this one targets 10.0.40.x
-    # (same VLAN as net0), which is why this was the one actually missed
-    # initially -- nc -zv from dmz-proxy to 10.0.50.4:8080 still timed out
-    # with the net0-scoped version of this rule in place.
+    # net1, not net0: 10.0.50.4 is on the monitoring VLAN, reachable via the mon NIC.
     iface   = "net1"
     dport   = "8080"
     proto   = "tcp"
@@ -298,12 +286,9 @@ resource "proxmox_virtual_environment_firewall_rules" "lxc_dmz_proxy" {
     proto   = "tcp"
   }
 
-  # Found via the LogShippingStopped alert: promtail has presumably never
-  # been able to push to Loki since this container was created, for the
-  # exact same net0-vs-net1 reason as the Gatus rule above. Appended at the
-  # end, not inserted alongside the other net1 rule, because this provider
-  # diffs the rule list positionally -- inserting mid-list churns every rule
-  # after it as a spurious "modified" instead of one clean addition.
+  # Appended at the end, not alongside the other net1 rule above: this
+  # provider diffs the rule list positionally, and a mid-list insert churns
+  # every rule after it as a spurious "modified".
   rule {
     type    = "out"
     action  = "ACCEPT"
