@@ -28,5 +28,5 @@ scrape_configs:
         target_label: 'stream'
       - source_labels: ['__service__']
         target_label: 'severity'
-        regex: '(traefik|authelia|vaultwarden|firefly|unifi)'
+        regex: '(traefik|authelia|vaultwarden|firefly|unifi|kimai)'
         replacement: 'critical'

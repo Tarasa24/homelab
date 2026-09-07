@@ -217,6 +217,7 @@ Virtual NICs `eth0:0` through `eth0:9` (`10.0.1.21–30`) are assigned at boot v
 | `unifi-controller/` | `10.0.1.25` | Unifi network controller |
 | (root compose) | `10.0.1.20` | Promtail (log shipper) |
 | `ghostfolio/` | `10.0.1.26` | Ghostfolio portfolio tracker (Postgres + Redis) |
+| `kimai/` | `10.0.1.27` | Kimai time tracking (MariaDB) |
 | `cadvisor/` | `10.0.50.20` | cAdvisor per-container metrics on `:8081` (VLAN 50) |
 
 The `arr_stack` services run inside a WireGuard network namespace (all share the `wireguard` container's network via `network_mode: service:wireguard`).
