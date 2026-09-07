@@ -58,7 +58,13 @@
           args:
             creates: "/etc/letsencrypt/renewal/{{ item }}.conf"
           with_items: "{{ certificates }}"
-          when: certbot_certificates.results[loop.index0].rc != 0 or 'Certificate not yet due for renewal' in certbot_certificates.results[loop.index0].stderr
+          # Matched by item value, not loop.index0 -- that variable doesn't
+          # exist for with_items on this ansible-core version ("'loop' is
+          # undefined"), and matching by value is robust regardless of loop
+          # ordering anyway.
+          vars:
+            cert_check: "{{ (certbot_certificates.results | selectattr('item', 'equalto', item) | first) }}"
+          when: cert_check.rc != 0 or 'Certificate not yet due for renewal' in cert_check.stderr
 
     - name: Setup GeoIP2
       block:
