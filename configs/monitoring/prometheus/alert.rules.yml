@@ -64,6 +64,34 @@ groups:
           summary: "Disk read errors on {{ $labels.instance }}"
           description: "Device {{ $labels.device }} on {{ $labels.instance }} is reporting read errors"
 
+      # 2026-09-05: net-watchdog.sh ran ifreload -a 74 times over ~12h without
+      # the gateway ever coming back reachable, and nobody found out until
+      # someone happened to notice access was broken -- the script only wrote
+      # to syslog. 15m gives the script's own cooldown-gated ifreload retries
+      # a fair chance to self-heal before paging.
+      - alert: NetWatchdogGatewayUnreachable
+        expr: net_watchdog_gateway_reachable == 0
+        for: 15m
+        labels:
+          severity: critical
+          alerttype: infrastructure
+        annotations:
+          summary: "net-watchdog gateway unreachable on {{ $labels.instance }}"
+          description: "{{ $labels.instance }} has reported its default gateway ({{ $labels.interface }}) unreachable for over 15 minutes, and ifreload -a has not fixed it"
+
+      # Distinct from the above: this fires if the cron job/script has
+      # stopped running entirely (crashed, cron died, etc.), which the
+      # gateway-down alert can't detect since it depends on the metric being
+      # written in the first place.
+      - alert: NetWatchdogStale
+        expr: time() - net_watchdog_last_run_timestamp_seconds > 300
+        labels:
+          severity: warning
+          alerttype: infrastructure
+        annotations:
+          summary: "net-watchdog hasn't reported in on {{ $labels.instance }}"
+          description: "No net-watchdog metric update from {{ $labels.instance }} in over 5 minutes -- the cron job or script itself may have stopped"
+
   - name: service_alerts
     rules:
       - alert: DockerDaemonDown
