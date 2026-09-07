@@ -1,7 +1,12 @@
 ---
 - name: Configure the DMZ reverse proxy and TLS terminator
   hosts: lxc_dmz_proxy
-  gather_facts: true
+  # false, not true: on a genuinely fresh container (no Python yet) the
+  # implicit fact-gathering setup module runs before the lxc_python3 role
+  # gets a chance to bootstrap Python, and fails outright. Nothing later in
+  # this play actually consumes gathered facts. Matches the pattern already
+  # used by monitoring-init.yml and dmz-docker-host-init.yml.
+  gather_facts: false
   vars:
     ansible_host: "{{ hostvars[inventory_hostname].ansible_host }}"
     lxc_host: "{{ hostvars[inventory_hostname].lxc_host }}"
