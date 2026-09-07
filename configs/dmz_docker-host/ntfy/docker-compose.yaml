@@ -8,6 +8,8 @@ services:
       - NTFY_BASE_URL=https://ntfy.homelab.tarasa24.dev
       - NTFY_LISTEN_HTTP=0.0.0.0:8080
       - NTFY_AUTH_DEFAULT_ACCESS=deny-all
+      # user grants live in auth.db only; recreate via `ntfy user add` +
+      # `ntfy access <name> <topic> read-only` if a restore ever loses them
       - NTFY_BEHIND_PROXY=true
       - NTFY_CACHE_FILE=/var/lib/ntfy/cache.db
       - NTFY_AUTH_FILE=/var/lib/ntfy/auth.db
