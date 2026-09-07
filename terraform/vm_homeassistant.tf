@@ -3,9 +3,9 @@ resource "proxmox_virtual_environment_vm" "vm_homeassistant" {
 
   node_name = "pve"
 
-  # vm_id is ForceNew; moved to 1015 by hand (config rename + lvrename) and
+  # vm_id is ForceNew; moved by hand (config rename + lvrename) and
   # reconciled via state rm + import to avoid destroying this VM's state.
-  vm_id   = 1015
+  vm_id   = 3015
   tags    = ["homeassistant"]
   name    = "homeassistant"
   bios    = "ovmf"
