@@ -2,7 +2,7 @@ resource "proxmox_virtual_environment_container" "lxc_monitoring" {
   description = "Container for gathering and displaying monitoring data"
 
   node_name = "pve"
-  vm_id     = 1014
+  vm_id     = 3014
 
   tags = ["alpine", "docker", "monitoring"]
   depends_on = [
@@ -77,6 +77,17 @@ resource "proxmox_virtual_environment_container" "lxc_monitoring" {
   mount_point {
     volume = "/mnt/USB-SSD/monitoring-cold"
     path   = "/mnt/monitoring-cold"
+  }
+
+  # Both are create-time-only: an imported live container has neither in its
+  # actual state (password isn't readable back, template_file_id only matters
+  # for the initial clone), so config declaring them forces an unwanted
+  # replace on every plan after a VMID-preserving import.
+  lifecycle {
+    ignore_changes = [
+      initialization[0].user_account,
+      operating_system[0].template_file_id,
+    ]
   }
 }
 

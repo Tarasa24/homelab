@@ -2,7 +2,7 @@ resource "proxmox_virtual_environment_container" "lxc_backup" {
   description = "Container running various backup services (borg, restic)"
 
   node_name = "pve"
-  vm_id     = 1013
+  vm_id     = 3013
 
   tags         = ["alpine"]
   unprivileged = true
@@ -70,6 +70,17 @@ resource "proxmox_virtual_environment_container" "lxc_backup" {
     volume = "/mnt/USB-HDD/immich"
     path   = "/immich"
     shared = true
+  }
+
+  # Both are create-time-only: an imported live container has neither in its
+  # actual state (password isn't readable back, template_file_id only matters
+  # for the initial clone), so config declaring them forces an unwanted
+  # replace on every plan after a VMID-preserving import.
+  lifecycle {
+    ignore_changes = [
+      initialization[0].user_account,
+      operating_system[0].template_file_id,
+    ]
   }
 }
 

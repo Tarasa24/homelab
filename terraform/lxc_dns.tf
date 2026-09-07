@@ -2,7 +2,7 @@ resource "proxmox_virtual_environment_container" "lxc_dns" {
   description = "Container for T-DNS server"
 
   node_name = "pve"
-  vm_id     = 1011
+  vm_id     = 3011
 
   tags = ["alpine", "dns"]
   depends_on = [
@@ -79,6 +79,17 @@ resource "proxmox_virtual_environment_container" "lxc_dns" {
       ansible-playbook \
       ./playbooks/lxc/dns-init.yml
     EOT
+  }
+
+  # Both are create-time-only: the imported live container has neither in its
+  # actual state (the password isn't readable back, and template_file_id only
+  # matters for the initial clone), so config declaring them forces an
+  # unwanted replace on every plan after a VMID-preserving import.
+  lifecycle {
+    ignore_changes = [
+      initialization[0].user_account,
+      operating_system[0].template_file_id,
+    ]
   }
 }
 
