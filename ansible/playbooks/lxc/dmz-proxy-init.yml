@@ -1,7 +1,9 @@
 ---
 - name: Configure the DMZ reverse proxy and TLS terminator
   hosts: lxc_dmz_proxy
-  gather_facts: true
+  # false: on a fresh container with no Python yet, fact-gathering runs before
+  # lxc_python3 can bootstrap it and fails outright.
+  gather_facts: false
   vars:
     ansible_host: "{{ hostvars[inventory_hostname].ansible_host }}"
     lxc_host: "{{ hostvars[inventory_hostname].lxc_host }}"
@@ -88,7 +90,11 @@
           args:
             creates: "/etc/letsencrypt/renewal/{{ item }}.conf"
           with_items: "{{ certificates }}"
-          when: certbot_certificates.results[loop.index0].rc != 0 or 'Certificate not yet due for renewal' in certbot_certificates.results[loop.index0].stderr
+          # Matched by item value, not loop.index0: that variable doesn't
+          # exist for with_items on this ansible-core version.
+          vars:
+            cert_check: "{{ (certbot_certificates.results | selectattr('item', 'equalto', item) | first) }}"
+          when: cert_check.rc != 0 or 'Certificate not yet due for renewal' in cert_check.stderr
         # The Alpine certbot package used to bring its own periodic renewal job,
         # which called /usr/bin/certbot. That binary is gone now, so renewal has
         # to be scheduled explicitly or the certs simply expire in ~60 days with

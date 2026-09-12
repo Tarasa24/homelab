@@ -2,7 +2,7 @@ resource "proxmox_virtual_environment_container" "lxc_private-docker-host" {
   description = "Container for hosting containized internal services"
 
   node_name = "pve"
-  vm_id     = 1020
+  vm_id     = 3020
 
   tags = ["alpine", "docker"]
   depends_on = [
@@ -96,6 +96,15 @@ resource "proxmox_virtual_environment_container" "lxc_private-docker-host" {
     volume = "/mnt/USB-SSD/cache"
     path   = "/cache"
     shared = true
+  }
+
+  # Both create-time-only; absent from imported state, so they'd otherwise
+  # force a replace on every plan.
+  lifecycle {
+    ignore_changes = [
+      initialization[0].user_account,
+      operating_system[0].template_file_id,
+    ]
   }
 }
 

@@ -37,13 +37,13 @@ homelab/
 │   └── plugins/
 │       └── connection/pct_ssh.py  # Custom Ansible connection plugin: SSH → PVE host → pct exec into LXC
 ├── configs/             # Application/service configuration files deployed by Ansible
-│   ├── dmz_router/      # nginx, dnsmasq, WireGuard configs for the DMZ router LXC
+│   ├── dmz_proxy/       # nginx, Certbot configs for the DMZ reverse proxy LXC
 │   ├── dmz_docker-host/ # Docker Compose stacks for public-facing DMZ services
 │   ├── dmz_bitcoin-node/ # bitcoind + electrs service files and bitcoin.conf
 │   ├── private-docker-host/ # Docker Compose stacks for internal LAN services
 │   ├── monitoring/      # Prometheus/Loki/Grafana/Alertmanager/Gatus stack
 │   ├── backup/          # borgmatic and resticprofile backup job configs
-│   ├── promtail/        # Host-specific Promtail configs (backup, dns, dmz-router)
+│   ├── promtail/        # Host-specific Promtail configs (backup, dns, dmz-proxy)
 │   └── linode/          # WireGuard server config + nftables for the Linode bastion
 ├── secrets/             # git-crypt encrypted secrets (keys, credentials, API tokens)
 │   ├── wireguard/       # WireGuard private/public keys and preshared key
@@ -60,40 +60,41 @@ homelab/
 
 ## Network Architecture
 
-Three distinct IP networks are used:
+Four tagged VLANs on a single VLAN-aware `vmbr0` (no more separate `vmbr1`):
 
-| Network | CIDR | Purpose |
-|---|---|---|
-| **Homelab LAN** | `10.0.0.0/22` | Physical PVE host + internal LXC/VM services |
-| **DMZ** | `10.1.0.0/24` | Internet-facing services isolated behind the DMZ router |
-| **DMZ-Bastion tunnel** | `10.2.0.0/30` | WireGuard point-to-point between DMZ router and Linode VPS |
-| **Tailscale** | `100.64.0.0/10` | Remote access mesh overlay |
+| Network | CIDR | VLAN | Purpose |
+|---|---|---|---|
+| **Lab** | `10.0.30.0/24` | 30 | PVE host + internal LXC/VM services |
+| **DMZ** | `10.0.40.0/24` | 40 | Internet-facing services |
+| **Monitoring** | `10.0.50.0/24` | 50 | Out-of-band Prometheus scraping |
+| **DMZ-Bastion tunnel** | `10.2.0.0/30` | — | WireGuard, temporary/manual (see below) |
+
+Gateway and DHCP for Lab and DMZ are both the UXG (`10.0.30.1` / `10.0.40.1`). No DHCP on DMZ — all DMZ hosts are static.
 
 ### Physical host
-- PVE node at `10.0.0.2` on the LAN, gateway `10.0.0.1` (home router).
+- PVE node at `10.0.30.2` on Lab (`vmbr0.30`), gateway `10.0.30.1` (UXG).
+- Still dual-homed: the pre-migration flat-LAN address `10.0.0.2/22` (gateway `10.0.0.1`) is deliberately still present on `vmbr0` as a failsafe — full cutover (removing it, running `pve_init.yml`) hasn't happened yet.
 
-### LAN subnet (`10.0.1.x`)
-Static allocations:
-
-| IP | VM/LXC ID | Role |
+### Lab subnet (`10.0.30.x`)
+| IP | VMID | Role |
 |---|---|---|
-| `10.0.1.1` | 1001 | DNS (Technitium DNS) |
-| `10.0.1.2` | 1002 | DMZ Router |
-| `10.0.1.3` | 1003 | Backup server |
-| `10.0.1.4` | 1004 | Monitoring (Prometheus/Grafana/Loki) |
-| `10.0.1.5` | 1005 | Home Assistant VM |
-| `10.0.1.20` | 1020 | Private docker-host (internal services) |
-| `10.0.1.21–30` | — | Virtual NICs on the private docker-host (one per service) |
-| `10.0.1.100` | 1100 | Homelab Tailscale connector |
+| `10.0.30.2` | — | PVE host |
+| `10.0.30.11` | 3011 | DNS (Technitium DNS) |
+| `10.0.30.13` | 3013 | Backup server |
+| `10.0.30.14` | 3014 | Monitoring (Prometheus/Grafana/Loki) |
+| `10.0.30.15` | 3015 | Home Assistant VM |
+| `10.0.30.20` | 3020 | Private docker-host (internal services) |
+| `10.0.30.21–30` | — | Virtual NICs on the private docker-host, see table below |
 
-### DMZ subnet (`10.1.0.x`)
-| IP | VM/LXC ID | Role |
+### DMZ subnet (`10.0.40.x`)
+| IP | VMID | Role |
 |---|---|---|
-| `10.1.0.1` | — | DMZ Router (DMZ-side interface) |
-| `10.1.0.2` | 10002 | DMZ mail (reserved/unused) |
-| `10.1.0.3` | 10003 | Bitcoin node |
-| `10.1.0.20` | 100020 | DMZ docker-host (public-facing services) |
-| `10.1.0.100` | 1000100 | DMZ Tailscale connector |
+| `10.0.40.10` | 4010 | dmz-proxy (nginx + certbot; replaces the old dmz-router) |
+| `10.0.40.13` | 4013 | Bitcoin node |
+| `10.0.40.20` | 4020 | DMZ docker-host (public-facing services) |
+| `10.0.40.21–30` | — | Virtual NICs on the DMZ docker-host, see table below |
+
+Tailscale connectors and the DMZ-router's WireGuard/dnsmasq role are gone; the UXG now terminates ingress directly.
 
 ### Monitoring VLAN 50 (`10.0.50.x`)
 Out-of-band monitoring network — all nodes with the `mon` NIC get a VLAN 50 interface for Prometheus scraping. No DHCP; all static.
@@ -101,7 +102,7 @@ Out-of-band monitoring network — all nodes with the `mon` NIC get a VLAN 50 in
 | IP | Host |
 |---|---|
 | `10.0.50.1` | dns |
-| `10.0.50.2` | dmz-router |
+| `10.0.50.2` | dmz-proxy |
 | `10.0.50.3` | backup |
 | `10.0.50.4` | monitoring |
 | `10.0.50.20` | private-docker-host |
@@ -109,20 +110,14 @@ Out-of-band monitoring network — all nodes with the `mon` NIC get a VLAN 50 in
 | `10.0.50.120` | dmz-docker-host |
 
 The Proxmox host itself is the exception: it owns `vmbr0` and has no address on
-VLAN 50, so it is scraped on the LAN at `10.0.0.2:9100`. That needs an explicit
+VLAN 50, so it is scraped on the Lab VLAN at `10.0.30.2:9100`. That needs an explicit
 allow in `terraform/firewall_base.tf` because the datacenter input policy is
 DROP. It carries `host="pve"`, so every existing node rule (NodeDown, CPU,
-memory, disk) covers the hypervisor without further change.
-
-**Known drift:** `/etc/network/interfaces` on the PVE host declares
-`gateway 10.0.0.1`, but the running kernel had no default route, so the host
-could reach the LAN yet had no internet — `apt` could not fetch anything and
-`resolv.conf` pointed at an unreachable `1.1.1.1`. The route was restored at
-runtime; since the gateway is already declared, a reboot re-applies it. Worth
-checking after any network change on the host.
+memory, disk) covers the hypervisor without further change. Home Assistant has
+no `mon` NIC and isn't scraped over VLAN 50.
 
 ### Linode (cloud)
-- `45.79.249.185` — Debian VPS acting as WireGuard server / public-IP bastion for the DMZ.
+- `45.79.249.185` — Debian VPS, WireGuard server. No longer the production bastion (the UXG now terminates ingress directly and public DNS points at the home WAN IP), but its `wg0` server is still active and untouched, and can be reconnected to temporarily (e.g. from a laptop, not necessarily the UXG) by reusing the existing peer keys in `secrets/wireguard/` — Linode's `nftables` blanket-DNATs everything to whatever answers as `10.2.0.2`, so no Linode-side change is needed to do this.
 
 ---
 
@@ -130,19 +125,18 @@ checking after any network change on the host.
 
 All containers use Alpine Linux unless noted. Templates are downloaded by Terraform before use.
 
-| Resource | TF file | OS | Notes |
-|---|---|---|---|
-| `lxc_dns` | `lxc_dns.tf` | Alpine | DNS server; provisioned via `local-exec` in Terraform |
-| `lxc_dmz_router` | `lxc_dmz_router.tf` | Alpine | Two NICs (LAN + DMZ bridge `vmbr1`); WireGuard + nginx + dnsmasq + Certbot |
-| `lxc_backup` | `lxc_backup.tf` | Alpine | Borg server + resticprofile; USB-SSD backup mount |
-| `lxc_monitoring` | `lxc_monitoring.tf` | Alpine | Docker; Prometheus/Loki/Grafana/Alertmanager/Gatus; state in named Docker volumes |
-| `vm_homeassistant` | `vm_homeassistant.tf` | HAOS (qcow2) | Full VM; 4 GB RAM; OVMF/UEFI; q35 machine type |
-| `lxc_private-docker-host` | `lxc_private-docker-host.tf` | Alpine | Docker; internal services; SSL certs + media shares mounted |
-| `lxc_homelab_tailscale_connector` | `lxc_homelab_tailscale_connector.tf` | Alpine | Cloned from Tailscale connector template |
-| `lxc_dmz_bitcoin_node` | `lxc_dmz_bitcoin_node.tf` | Debian | Privileged; USB Bitcoin disk mounts; DMZ network only |
-| `lxc_dmz-docker-host` | `lxc_dmz_docker-host.tf` | Alpine | Docker; DMZ network; GPU passthrough (`/dev/dri/renderD128`) |
-| `lxc_nixos_template` | `lxc_nixos_template.tf` | NixOS | Template container; converted to template after init |
-| `lxc_tailscale_connector_template` | `lxc_tailscale_connector_template.tf` | Alpine | Template with `/dev/net/tun` passthrough; cloned for each connector |
+| Resource | VMID | TF file | OS | Notes |
+|---|---|---|---|---|
+| `lxc_dns` | 3011 | `lxc_dns.tf` | Alpine | DNS server; provisioned via `local-exec` in Terraform |
+| `lxc_backup` | 3013 | `lxc_backup.tf` | Alpine | Borg server + resticprofile; USB-SSD backup mount |
+| `lxc_monitoring` | 3014 | `lxc_monitoring.tf` | Alpine | Docker; Prometheus/Loki/Grafana/Alertmanager/Gatus; state in named Docker volumes |
+| `vm_homeassistant` | 3015 | `vm_homeassistant.tf` | HAOS (qcow2) | Full VM; 4 GB RAM; OVMF/UEFI; q35 machine type |
+| `lxc_private-docker-host` | 3020 | `lxc_private-docker-host.tf` | Alpine | Docker; internal services; SSL certs + media shares mounted |
+| `lxc_dmz_proxy` | 4010 | `lxc_dmz_proxy.tf` | Alpine | Single DMZ NIC + mon NIC; nginx + Certbot only (replaces `lxc_dmz_router`; no WireGuard/dnsmasq) |
+| `lxc_dmz_bitcoin_node` | 4013 | `lxc_dmz_bitcoin_node.tf` | Debian | Privileged; USB Bitcoin disk mounts; DMZ network only |
+| `lxc_dmz-docker-host` | 4020 | `lxc_dmz_docker-host.tf` | Alpine | Docker; DMZ network; GPU passthrough (`/dev/dri/renderD128`) |
+
+Removed as part of the network overhaul (VLAN restructure, dnsmasq no longer needed since the UXG is now DHCP/gateway for both VLANs): `lxc_dmz_router`, `lxc_homelab_tailscale_connector`, `lxc_dmz_tailscale_connector`, `lxc_tailscale_connector_template`, `lxc_nixos_template`.
 
 ---
 
@@ -175,16 +169,20 @@ Secrets are consumed by Ansible playbooks via `lookup('file', '../../../secrets/
 
 ---
 
-## DMZ Router (`10.0.1.2` / `10.1.0.1`)
+## DMZ Proxy (`10.0.40.10`, was DMZ Router)
 
-The DMZ router LXC is the most complex container — it acts as:
+Replaces the old `dmz-router`. The UXG now terminates ingress and is the DMZ's
+gateway/DHCP server directly, so this container no longer routes, NATs, or
+runs WireGuard/dnsmasq — it's just:
 
-1. **WireGuard client** — tunnels to Linode bastion (`10.2.0.1`) over UDP port 51820. All DMZ traffic is NATed through this tunnel (MASQUERADE on `wg0` and `eth0`). Config: `configs/dmz_router/wg0.conf.j2`.
-2. **DHCP + DNS server** for the DMZ — `dnsmasq` bound to the `dmz` interface, serving `10.1.0.100–254`. Config: `configs/dmz_router/dnsmasq.conf`.
-3. **Reverse proxy + TLS termination** — nginx with stream module; wildcard certs for `*.homelab.tarasa24.dev`, `*.dormlab.tarasa24.dev`, `*.lan.tarasa24.dev` obtained via Certbot DNS-01 against Linode API. SSL certs are stored on the shared `/mnt/USB-SSD/ssl` mount (accessible to `private-docker-host` and `dmz-docker-host` as read-only).
-4. **Static route** — routes Tailscale CGNAT range (`100.64.0.0/10`) via the DMZ Tailscale connector at `10.1.0.100`.
+1. **Reverse proxy + TLS termination** — nginx with stream module; wildcard certs for `*.homelab.tarasa24.dev`, `*.dormlab.tarasa24.dev`, `*.lan.tarasa24.dev` obtained via Certbot DNS-01 against Linode API. SSL certs are stored on the shared `/mnt/USB-SSD/ssl` mount (accessible to `private-docker-host` and `dmz-docker-host` as read-only).
 
-Firewall is managed by Proxmox (via Terraform): the DMZ router has a strict `DROP` in/out policy with explicit `ACCEPT` rules only for WireGuard outbound, backup SSH, Authelia, Unifi, and LAN traffic inbound.
+Firewall is managed by Proxmox (via Terraform): strict `DROP` in/out policy.
+Outbound needs an explicit `ACCEPT` rule per backend it proxies to — every
+nginx `proxy_pass`/stream target (jellyfin, ntfy, radicale, electrs, bitcoind,
+Gatus, Loki, Unifi, Authelia, backup) needs its own rule in
+`terraform/lxc_dmz_proxy.tf`; same-VLAN destinations are not exempt from this
+container's own firewall, only unscoped WAN rules (80/443/53, no `dest`) are.
 
 ---
 
@@ -199,24 +197,25 @@ Config templates: `configs/linode/wg0.conf.j2`, `configs/linode/nftables.conf.j2
 
 ---
 
-## Private Docker-Host (`10.0.1.20`)
+## Private Docker-Host (`10.0.30.20`)
 
 Internal (LAN-only) services deployed as Docker Compose stacks. Ansible copies all contents of `configs/private-docker-host/` to `/root/` on the container, discovers all `docker-compose.yaml` files recursively, builds a `COMPOSE_FILE=...` `.env`, then does `docker-compose pull` + `docker-compose up -d`.
 
-Virtual NICs `eth0:0` through `eth0:9` (`10.0.1.21–30`) are assigned at boot via `/etc/local.d/assign-ips.start` so each service can bind a dedicated IP.
+Virtual NICs `eth0:0` through `eth0:9` (`10.0.30.21–30`) are assigned at boot via `/etc/local.d/assign-ips.start` so each service can bind a dedicated IP.
 
 ### Services
 
 | Compose file | IP | Services |
 |---|---|---|
-| `traefik/` | `10.0.1.20` | Traefik v3 reverse proxy (HTTP/HTTPS :80/:443, dashboard :8080) |
-| `authelia/` | `10.0.1.21` | Authelia SSO/2FA |
-| `vaultwarden/` | `10.0.1.22` | Vaultwarden (Bitwarden-compatible password manager) |
-| `arr_stack/` | `10.0.1.23` | WireGuard + qBittorrent, Sonarr, Radarr, Prowlarr, Bazarr, FlareSolverr |
-| `firefly_iii/` | `10.0.1.24` | Firefly III personal finance |
-| `unifi-controller/` | `10.0.1.25` | Unifi network controller |
-| (root compose) | `10.0.1.20` | Promtail (log shipper) |
-| `ghostfolio/` | `10.0.1.26` | Ghostfolio portfolio tracker (Postgres + Redis) |
+| `traefik/` | `10.0.30.20` | Traefik v3 reverse proxy (HTTP/HTTPS :80/:443, dashboard :8080) |
+| `authelia/` | `10.0.30.21` | Authelia SSO/2FA |
+| `vaultwarden/` | `10.0.30.22` | Vaultwarden (Bitwarden-compatible password manager) |
+| `arr_stack/` | `10.0.30.23` | WireGuard + qBittorrent, Sonarr, Radarr, Prowlarr, Bazarr, FlareSolverr |
+| `firefly_iii/` | `10.0.30.24` | Firefly III personal finance |
+| `unifi-controller/` | `10.0.30.25` | Unifi network controller |
+| (root compose) | `10.0.30.20` | Promtail (log shipper) |
+| `ghostfolio/` | `10.0.30.26` | Ghostfolio portfolio tracker (Postgres + Redis) |
+| `kimai/` | `10.0.30.27` | Kimai time tracking (MariaDB) |
 | `cadvisor/` | `10.0.50.20` | cAdvisor per-container metrics on `:8081` (VLAN 50) |
 
 The `arr_stack` services run inside a WireGuard network namespace (all share the `wireguard` container's network via `network_mode: service:wireguard`).
@@ -225,7 +224,7 @@ Traefik reads TLS certificates from the shared Certbot mount (`/etc/letsencrypt/
 
 ---
 
-## DMZ Docker-Host (`10.1.0.20`)
+## DMZ Docker-Host (`10.0.40.20`)
 
 Internet-accessible services, isolated in the DMZ. Has GPU passthrough (`/dev/dri/renderD128`) for hardware transcoding.
 
@@ -234,13 +233,13 @@ Internet-accessible services, isolated in the DMZ. Has GPU passthrough (`/dev/dr
 | Jellyfin | Media server; `/media` from USB-HDD |
 | Immich | Photo management; `/immich` from USB-HDD |
 | Radicale | CalDAV/CardDAV server |
-| ntfy | Push notification server (`10.1.0.24`); exposed at `ntfy.homelab.tarasa24.dev` |
+| ntfy | Push notification server (`10.0.40.24`); exposed at `ntfy.homelab.tarasa24.dev` |
 | Promtail | Log shipper to Loki |
 | cAdvisor | Per-container metrics on `10.0.50.120:8081` (VLAN 50) |
 
 ---
 
-## Monitoring Stack (`10.0.1.4`)
+## Monitoring Stack (`10.0.30.14`)
 
 Metrics and log storage on a dedicated container. All state in named Docker volumes, backed up via borgmatic.
 
@@ -268,8 +267,8 @@ config-as-code. Endpoints are split into three groups:
 
 | Group | Path probed | Purpose |
 |---|---|---|
-| `Public` | public DNS → Linode → WireGuard → nginx → service | True end-user experience. Includes the home WAN uplink, so a failure does not isolate the fault. |
-| `Internal` | direct to `10.0.1.x` over the LAN | Bypasses the WAN entirely. If Public fails but Internal passes, the fault is in the WAN/Linode/WireGuard/nginx path, not the service. |
+| `Public` | public DNS → home WAN IP → UXG port forward → nginx → service | True end-user experience. Includes the home WAN uplink, so a failure does not isolate the fault. |
+| `Internal` | direct to `10.0.30.x` over the LAN | Bypasses the WAN entirely. If Public fails but Internal passes, the fault is in the WAN/UXG/nginx path, not the service. |
 | `Infrastructure` | compose service names on the monitoring network | The monitoring stack checking itself. |
 
 Gatus does **not** alert directly. It sets `metrics: true`, Prometheus scrapes it
@@ -281,8 +280,9 @@ per-container metrics on both Docker hosts, published on the VLAN 50 IP
 (`10.0.50.20:8081`, `10.0.50.120:8081`) and scraped as job `cadvisor`. This is
 the only source of per-container up/down state: the Docker daemon metrics on
 `:9323` are engine-level aggregates and stay green when an individual container
-dies. cAdvisor is required because the monitoring LXC has no route into the DMZ
-(`10.1.0.0/24`), so DMZ services cannot be probed directly over the LAN.
+dies. Lab→DMZ routing works now (unlike the old dmz-router setup), so the
+monitoring LXC could reach DMZ ports directly, but cAdvisor is still needed
+for per-container granularity that the daemon-level metrics don't have.
 
 Runs `privileged: true` with read-only mounts inside an unprivileged LXC; some
 cgroup metrics may be unavailable in that environment. `CAdvisorDown` fires if it
@@ -295,17 +295,14 @@ and `gatus_uptime`. Neither exists in the shipped binary. The real metrics are
 Verify against the live `/metrics` output after any Gatus upgrade — a renamed
 metric silently disables `ExternalServiceDown`.
 
-**Alert delivery path**: Alertmanager reaches ntfy over its *public* URL
-(`https://ntfy.homelab.tarasa24.dev/<topic>`), not the DMZ address
-`10.1.0.24:8080`. The monitoring LXC is on the LAN with its default gateway at
-the home router and has no route into `10.1.0.0/24`, so the internal address
-times out on every notification — and because a TCP connect timeout takes about
-two minutes, `alertmanager_notifications_failed_total` reads zero for a while
-before the failure lands. Do not trust that counter immediately after sending;
-confirm against the ntfy topic itself or the Alertmanager log. Delivery therefore
-depends on the home uplink, which is acceptable since push to a phone needs
-internet anyway; routing the LAN into the DMZ instead would weaken the isolation
-the DMZ exists to provide.
+**Alert delivery path**: Alertmanager reaches ntfy directly at its internal
+DMZ address (`10.0.40.24:8080`), not the public URL — Lab→DMZ routing works
+now, so this removes the WAN and hairpin NAT from the alert path entirely.
+Confirm this keeps working after any UXG firewall change; delivery would
+otherwise fail silently (a TCP connect timeout takes about two minutes, so
+`alertmanager_notifications_failed_total` reads zero for a while before a
+real failure shows up there — confirm against the ntfy topic itself or the
+Alertmanager log instead of trusting that counter immediately).
 
 **Nightly backup maintenance window**: borgmatic runs from cron at 02:00 UTC on
 every host and its `before_backup` hooks stop containers so their volumes can be
@@ -359,9 +356,9 @@ Accepted for a homelab. The conventional fixes, if this ever matters:
   genuinely parallel delivery. A second ntfy instance in the DMZ would not help:
   same host, same failure domain.
 
-**Not covered by any probe**: the Tailscale connectors (1100, 1000100), and the
-Linode bastion, which is only covered indirectly because the Gatus `Public` group
-traverses it.
+**Not covered by any probe**: the Linode bastion, since DNS cutover moved the
+Gatus `Public` group's path to the home WAN IP directly — Linode is no longer
+in that path at all, even indirectly.
 
 **Non-Docker hosts use the systemd collector.** cAdvisor only covers the two
 Docker hosts. The Bitcoin node runs `bitcoind` and `electrs` as plain systemd
@@ -405,17 +402,17 @@ Logs are collected from all Docker hosts via a Promtail agent running as a conta
 
 | Host | LXC ID | Promtail config |
 |---|---|---|
-| `monitoring` | 1004 | `configs/monitoring/promtail/promtail-config.yaml` |
-| `private-docker-host` | 1020 | `configs/private-docker-host/root/promtail/config.yml` |
-| `dmz-docker-host` | 100020 | `configs/dmz_docker-host/root/promtail/config.yml` |
-| `dmz-router` | 1002 | `configs/promtail/dmz-router.yaml` |
-| `backup` | 1003 | `configs/promtail/backup.yaml` |
-| `dns` | 1001 | `configs/promtail/dns.yaml` |
+| `monitoring` | 3014 | `configs/monitoring/promtail/promtail-config.yaml` |
+| `private-docker-host` | 3020 | `configs/private-docker-host/root/promtail/config.yml` |
+| `dmz-docker-host` | 4020 | `configs/dmz_docker-host/root/promtail/config.yml` |
+| `dmz-proxy` | 4010 | `configs/promtail/dmz-proxy.yaml` |
+| `backup` | 3013 | `configs/promtail/backup.yaml` |
+| `dns` | 3011 | `configs/promtail/dns.yaml` |
 | `pve` (hypervisor) | — | `configs/promtail/pve.yaml` |
-| `dmz-bitcoin-node` | 10003 | `configs/promtail/dmz-bitcoin-node.yaml` |
+| `dmz-bitcoin-node` | 4013 | `configs/promtail/dmz-bitcoin-node.yaml` |
 
 The three Docker hosts run Promtail as a container with Docker service
-discovery. `dmz-router`, `backup` and `dns` instead run it as a native Alpine
+discovery. `dmz-proxy`, `backup` and `dns` instead run it as a native Alpine
 package via the `promtail` role, tailing static file paths — there is no Docker
 daemon on those hosts.
 
@@ -515,7 +512,7 @@ field is `DownstreamStatus` (what the client received), not `OriginStatus`.
 Two complementary backup tools run on all relevant containers:
 
 ### Borg (local + SSH)
-- **Server**: `lxc_backup` at `10.0.1.3`. Repositories stored at `/backup/repos/` (USB-SSD). Access is key-restricted via `authorized_keys` with `borg serve --restrict-to-path`.
+- **Server**: `lxc_backup` at `10.0.30.13`. Repositories stored at `/backup/repos/` (USB-SSD). Access is key-restricted via `authorized_keys` with `borg serve --restrict-to-path`.
 - **Clients**: Each service container has the `borgmatic` Ansible role applied. The role installs borgmatic, copies the SSH private key from `secrets/backup/ssh/id_ed25519`, copies the host-specific borgmatic config from `configs/backup/borg/<hostname>.yaml`, runs `borgmatic extract` to restore on first deploy, then schedules nightly backups via cron at 02:00.
 - **Trigger all**: `ansible-playbook playbooks/all/borg-backup-all.yml`
 
@@ -528,12 +525,7 @@ Two complementary backup tools run on all relevant containers:
 
 ## Tailscale Connectivity
 
-Two Tailscale connectors provide remote-access mesh:
-
-- **Homelab connector** (`10.0.1.100`, LXC 1100) — advertises LAN subnet routes into Tailscale.
-- **DMZ connector** (`10.1.0.100`, LXC 1000100) — advertises DMZ subnet routes.
-
-Both are cloned from `lxc_tailscale_connector_template` (LXC 3003), which has `/dev/net/tun` passed through. The template is prepared by `ansible-playbook playbooks/lxc/tailscale-connector-template-init.yml`.
+Removed as part of the network overhaul — both connectors (`lxc_homelab_tailscale_connector`, `lxc_dmz_tailscale_connector`) and their template have been destroyed. The UXG terminates ingress directly now; nothing replaces this mesh path.
 
 ---
 
@@ -553,7 +545,7 @@ Inventory hosts use `ansible_connection=pct_ssh` and `lxc_host=<VMID>`. The plug
 
 ### Initial PVE setup (once)
 1. Add SSH public key to PVE host's `authorized_keys`.
-2. `cd ansible && ansible-playbook playbooks/pve/pve_init.yml` — mounts USB disks, registers PVE storage pools, creates the DMZ bridge `vmbr1`.
+2. `cd ansible && ansible-playbook playbooks/pve/pve_init.yml` — mounts USB disks, registers PVE storage pools, makes `vmbr0` VLAN-aware and removes the obsolete `vmbr1`.
 
 ### Full bring-up (`scripts/create.sh`)
 ```bash
@@ -561,12 +553,12 @@ cd terraform && terraform init
 terraform apply -auto-approve   # run twice — some resources depend on outputs of the first pass
 cd ../ansible
 ansible-playbook playbooks/lxc/backup-init.yml       # backup server must be up first
-ansible-playbook playbooks/lxc/dmz-router-init.yml   # DMZ router (WireGuard + nginx + certs)
+ansible-playbook playbooks/lxc/dmz-proxy-init.yml    # DMZ reverse proxy (nginx + certs)
 ansible-playbook playbooks/lxc/dmz-docker-host-init.yml
 ansible-playbook playbooks/lxc/private-docker-host-init.yml
 ```
 
-Some containers (`lxc_dns`, `lxc_nixos_template`, `lxc_tailscale_connector_template`, `lxc_dmz_bitcoin_node`) trigger their Ansible playbook automatically via Terraform `local-exec` provisioners.
+Some containers (`lxc_dns`, `lxc_dmz_bitcoin_node`) trigger their Ansible playbook automatically via Terraform `local-exec` provisioners.
 
 ---
 

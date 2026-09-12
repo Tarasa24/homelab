@@ -211,6 +211,70 @@ resource "proxmox_virtual_environment_firewall_rules" "lxc_dmz_proxy" {
     dest    = "10.0.30.25/32"
   }
 
+  # nginx proxy_passes to these DMZ-internal backends, but output_policy=DROP
+  # silently ate every connection attempt -- same-VLAN destinations are not
+  # exempt from this container's own firewall.
+  rule {
+    type    = "out"
+    action  = "ACCEPT"
+    comment = "Allow output traffic to jellyfin"
+    iface   = "net0"
+    dport   = "8096"
+    proto   = "tcp"
+    dest    = "10.0.40.21/32"
+  }
+
+  rule {
+    type    = "out"
+    action  = "ACCEPT"
+    comment = "Allow output traffic to ntfy"
+    iface   = "net0"
+    dport   = "8080"
+    proto   = "tcp"
+    dest    = "10.0.40.24/32"
+  }
+
+  rule {
+    type    = "out"
+    action  = "ACCEPT"
+    comment = "Allow output traffic to Gatus (status page)"
+    # net1, not net0: 10.0.50.4 is on the monitoring VLAN, reachable via the mon NIC.
+    iface   = "net1"
+    dport   = "8080"
+    proto   = "tcp"
+    dest    = "10.0.50.4/32"
+  }
+
+  rule {
+    type    = "out"
+    action  = "ACCEPT"
+    comment = "Allow output traffic to radicale"
+    iface   = "net0"
+    dport   = "5232"
+    proto   = "tcp"
+    dest    = "10.0.40.22/32"
+  }
+
+  rule {
+    type    = "out"
+    action  = "ACCEPT"
+    comment = "Allow output traffic to electrs"
+    iface   = "net0"
+    dport   = "50001"
+    proto   = "tcp"
+    dest    = "10.0.40.13/32"
+  }
+
+  rule {
+    type    = "out"
+    action  = "ACCEPT"
+    comment = "Allow output traffic to bitcoind P2P"
+    iface   = "net0"
+    dport   = "8333"
+    proto   = "tcp"
+    dest    = "10.0.40.13/32"
+  }
+
   # net1 is the mon NIC; without this, input_policy=DROP blocked all scrapes.
   rule {
     type    = "in"
@@ -220,5 +284,18 @@ resource "proxmox_virtual_environment_firewall_rules" "lxc_dmz_proxy" {
     source  = "10.0.50.0/24"
     dport   = "9100"
     proto   = "tcp"
+  }
+
+  # Appended at the end, not alongside the other net1 rule above: this
+  # provider diffs the rule list positionally, and a mid-list insert churns
+  # every rule after it as a spurious "modified".
+  rule {
+    type    = "out"
+    action  = "ACCEPT"
+    comment = "Allow output traffic to Loki"
+    iface   = "net1"
+    dport   = "3100"
+    proto   = "tcp"
+    dest    = "10.0.50.4/32"
   }
 }

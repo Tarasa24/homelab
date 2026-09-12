@@ -253,6 +253,30 @@ endpoints:
       host: private-docker-host
       path: internal
 
+  - name: "Kimai"
+    group: "Internal"
+    # /en/login directly, not "/": root 302s to /en/homepage, which 404s for
+    # Gatus's client for reasons that don't reproduce with curl -L.
+    url: "http://10.0.30.27:8001/en/login"
+    interval: 60s
+    # Symfony's TRUSTED_HOSTS check 400s a raw-IP Host header, so the probe
+    # sends the real vhost to get a genuine response.
+    headers:
+      Host: "kimai.lan.tarasa24.dev"
+    client:
+      timeout: 10s
+    conditions:
+      - "[STATUS] == 200"
+    ui:
+      hide-url: true
+      hide-hostname: true
+      hide-port: true
+      hide-conditions: true
+      hide-errors: true
+    extra-labels:
+      host: private-docker-host
+      path: internal
+
   - name: "Unifi Controller"
     group: "Internal"
     url: "https://10.0.30.25:8443/"

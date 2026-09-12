@@ -2,7 +2,7 @@ resource "proxmox_virtual_environment_container" "lxc_monitoring" {
   description = "Container for gathering and displaying monitoring data"
 
   node_name = "pve"
-  vm_id     = 1014
+  vm_id     = 3014
 
   tags = ["alpine", "docker", "monitoring"]
   depends_on = [
@@ -77,6 +77,15 @@ resource "proxmox_virtual_environment_container" "lxc_monitoring" {
   mount_point {
     volume = "/mnt/USB-SSD/monitoring-cold"
     path   = "/mnt/monitoring-cold"
+  }
+
+  # Both create-time-only; absent from imported state, so they'd otherwise
+  # force a replace on every plan.
+  lifecycle {
+    ignore_changes = [
+      initialization[0].user_account,
+      operating_system[0].template_file_id,
+    ]
   }
 }
 

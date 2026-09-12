@@ -2,7 +2,7 @@ resource "proxmox_virtual_environment_container" "lxc_dns" {
   description = "Container for T-DNS server"
 
   node_name = "pve"
-  vm_id     = 1011
+  vm_id     = 3011
 
   tags = ["alpine", "dns"]
   depends_on = [
@@ -79,6 +79,15 @@ resource "proxmox_virtual_environment_container" "lxc_dns" {
       ansible-playbook \
       ./playbooks/lxc/dns-init.yml
     EOT
+  }
+
+  # Both create-time-only; absent from imported state, so they'd otherwise
+  # force a replace on every plan.
+  lifecycle {
+    ignore_changes = [
+      initialization[0].user_account,
+      operating_system[0].template_file_id,
+    ]
   }
 }
 

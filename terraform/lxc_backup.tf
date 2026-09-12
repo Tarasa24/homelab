@@ -2,7 +2,7 @@ resource "proxmox_virtual_environment_container" "lxc_backup" {
   description = "Container running various backup services (borg, restic)"
 
   node_name = "pve"
-  vm_id     = 1013
+  vm_id     = 3013
 
   tags         = ["alpine"]
   unprivileged = true
@@ -70,6 +70,15 @@ resource "proxmox_virtual_environment_container" "lxc_backup" {
     volume = "/mnt/USB-HDD/immich"
     path   = "/immich"
     shared = true
+  }
+
+  # Both create-time-only; absent from imported state, so they'd otherwise
+  # force a replace on every plan.
+  lifecycle {
+    ignore_changes = [
+      initialization[0].user_account,
+      operating_system[0].template_file_id,
+    ]
   }
 }
 

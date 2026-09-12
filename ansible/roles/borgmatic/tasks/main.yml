@@ -53,6 +53,30 @@
   ansible.builtin.shell: "yq '.source_directories[]' /etc/borgmatic/config.yaml"
   register: source_directories
 
+# extract can report rc=0 while restoring nothing; catch that before
+# docker-compose boots services against silently-empty volumes
+- name: Check restored docker volumes actually contain data
+  ansible.builtin.find:
+    paths: "{{ item }}"
+    recurse: true
+    file_type: file
+  register: restored_volume_check
+  loop: "{{ source_directories.stdout_lines }}"
+  when: >
+    not existing_borgmatic_config.stat.exists and
+    borgmatic_extract is defined and
+    borgmatic_extract.rc is defined and
+    borgmatic_extract.rc == 0 and
+    item is search('/var/lib/docker/volumes')
+
+- name: Fail loudly if a restored docker volume is empty
+  ansible.builtin.fail:
+    msg: "extract reported success but {{ item.item }} is empty after restore"
+  loop: "{{ restored_volume_check.results | default([]) }}"
+  loop_control:
+    label: "{{ item.item | default('n/a') }}"
+  when: item.matched is defined and item.matched == 0
+
 - name: Make sure docker volumes get created (if path contains /var/lib/docker/volumes)
   ansible.builtin.command:
     cmd: "docker volume create {{ item | regex_replace('/var/lib/docker/volumes/', '') | regex_replace('/_data', '') }}"
