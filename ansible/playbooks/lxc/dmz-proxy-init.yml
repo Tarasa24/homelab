@@ -13,7 +13,16 @@
       - "*.dormlab.tarasa24.dev"
       - "*.lan.tarasa24.dev"
     certbot_email: "admin@tarasa24.dev"
-    certbot_linode_credentials: "{{ lookup('file', '../../../secrets/linode/certbot_acme_api_creds.ini') }}"
+    # certbot-dns-hetzner is not in any stable Alpine release -- only in
+    # edge/testing -- and putting the sole ingress host on a rolling base is a
+    # worse trade than a venv. Wildcards make DNS-01 mandatory, so the plugin
+    # itself is not optional. 4.x talks to the Hetzner *Cloud* DNS API and needs
+    # a Cloud API token; if the zone is ever moved to the classic DNS console
+    # (dns.hetzner.com) this must go back to 3.x, which supports both.
+    certbot_venv: /opt/certbot
+    certbot_version: "5.7.0"
+    certbot_dns_hetzner_version: "4.0.0"
+    hetzner_dns_api_token: "{{ lookup('file', '../../../secrets/hetzner/certbot_dns_api_token') | trim }}"
   roles:
     - role: lxc_python3
     - role: borgmatic
@@ -29,9 +38,26 @@
     # allow 443/80/53 outbound explicitly -- see terraform/lxc_dmz_proxy.tf.
     - name: Generate SSL certificates
       block:
-        - name: Install Certbot
+        # cryptography and cffi publish musllinux wheels, so nothing should
+        # actually compile here; the toolchain is present so that a version
+        # bump landing without a wheel degrades to a slow install rather than a
+        # hard failure. If a future pin needs to build cryptography from source
+        # it will also want rust and cargo, which are deliberately not
+        # installed -- this container has a 5G disk.
+        - name: Install build prerequisites for the Certbot venv
           ansible.builtin.package:
-            name: [certbot, certbot-dns-linode]
+            name: [python3, py3-pip, gcc, musl-dev, python3-dev, libffi-dev, openssl-dev]
+            state: present
+        - name: Create the Certbot venv
+          ansible.builtin.command: python3 -m venv {{ certbot_venv }}
+          args:
+            creates: "{{ certbot_venv }}/bin/python"
+        - name: Install pinned Certbot and the Hetzner DNS plugin
+          ansible.builtin.pip:
+            name:
+              - "certbot=={{ certbot_version }}"
+              - "certbot-dns-hetzner=={{ certbot_dns_hetzner_version }}"
+            virtualenv: "{{ certbot_venv }}"
             state: present
         - name: Create Certbot folder - /etc/letsencrypt
           file:
@@ -40,18 +66,43 @@
             owner: root
             group: root
             mode: 0700
-        - name: Create Linode API key file
+        - name: Create Hetzner DNS API credentials file
           ansible.builtin.copy:
-            content: "{{ certbot_linode_credentials }}"
-            dest: /etc/letsencrypt/linode.ini
+            content: "dns_hetzner_api_token = {{ hetzner_dns_api_token }}\n"
+            dest: /etc/letsencrypt/hetzner.ini
             mode: "0600"
         - name: Check if certificates should be generated (they dont exist or are expired)
-          ansible.builtin.command: certbot certificates --cert-name {{ item }}
+          ansible.builtin.command: "{{ certbot_venv }}/bin/certbot certificates --cert-name {{ item }}"
           register: certbot_certificates
           ignore_errors: true
           with_items: "{{ certificates }}"
+        # Third-party plugins do not get a --dns-<name> shorthand; that is only
+        # generated for the plugins certbot bundles itself. The credentials path
+        # must be absolute, per the plugin's own documentation.
+        #
+        # --preferred-profile requests the ~160h "shortlived" ACME profile,
+        # falling back to classic if Let's Encrypt ever deprecates it. certbot
+        # persists the choice into renewal/<name>.conf, so the cron below
+        # doesn't need the flag too.
+        #
+        # The `creates:` guard means this never retroactively moves an
+        # existing classic cert onto shortlived. Run once by hand per domain
+        # to migrate (not idempotent -- --force-renewal would burn rate-limit
+        # budget on every play run):
+        #
+        #   /opt/certbot/bin/certbot certonly --force-renewal --preferred-profile shortlived \
+        #     --authenticator dns-hetzner --dns-hetzner-credentials /etc/letsencrypt/hetzner.ini \
+        #     --dns-hetzner-propagation-seconds 60 --cert-name '<name>' -d '<name>' \
+        #     --email admin@tarasa24.dev --agree-tos --no-eff-email --non-interactive
         - name: Certbot - Generate SSL certificates
-          ansible.builtin.command: certbot certonly --dns-linode --dns-linode-credentials /etc/letsencrypt/linode.ini --dns-linode-propagation-seconds 60 --email {{ certbot_email }} --agree-tos --no-eff-email --cert-name {{ item }} -d {{ item }} # --test-cert
+          ansible.builtin.command: >-
+            {{ certbot_venv }}/bin/certbot certonly
+            --authenticator dns-hetzner
+            --dns-hetzner-credentials /etc/letsencrypt/hetzner.ini
+            --dns-hetzner-propagation-seconds 60
+            --preferred-profile shortlived
+            --email {{ certbot_email }} --agree-tos --no-eff-email
+            --cert-name {{ item }} -d {{ item }}
           args:
             creates: "/etc/letsencrypt/renewal/{{ item }}.conf"
           with_items: "{{ certificates }}"
@@ -60,6 +111,35 @@
           vars:
             cert_check: "{{ (certbot_certificates.results | selectattr('item', 'equalto', item) | first) }}"
           when: cert_check.rc != 0 or 'Certificate not yet due for renewal' in cert_check.stderr
+        # The Alpine certbot package used to bring its own periodic renewal job,
+        # which called /usr/bin/certbot. That binary is gone now, so renewal has
+        # to be scheduled explicitly or the certs simply expire in ~60 days with
+        # nothing failing loudly until TLSCertExpiringSoon fires.
+        - name: Schedule Certbot renewal
+          ansible.builtin.cron:
+            name: "Renew TLS certificates"
+            job: "{{ certbot_venv }}/bin/certbot renew --quiet --deploy-hook 'nginx -s reload' >> /var/log/certbot-renew.log 2>&1"
+            minute: "17"
+            hour: "3,15"
+            state: present
+        # --quiet keeps a healthy log empty; this just bounds it in case of
+        # repeated failures.
+        - name: Install logrotate
+          ansible.builtin.package:
+            name: logrotate
+            state: present
+        - name: Configure logrotate for the certbot renewal log
+          ansible.builtin.copy:
+            content: |
+              /var/log/certbot-renew.log {
+                weekly
+                rotate 4
+                compress
+                missingok
+                notifempty
+              }
+            dest: /etc/logrotate.d/certbot-renew
+            mode: "0644"
 
     - name: Setup GeoIP2
       block:

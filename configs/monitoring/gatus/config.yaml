@@ -315,6 +315,34 @@ endpoints:
       host: private-docker-host
       path: internal
 
+  # Only Internal endpoint that goes through Traefik's TLS listener instead
+  # of bare HTTP -- this is what populates gatus_results_certificate_expiration_seconds
+  # for the lan wildcard cert, which TLSCertificateExpiringSoon alerts on.
+  - name: "Sonarr (via Traefik TLS)"
+    group: "Internal"
+    url: "https://10.0.30.20:443/ping"
+    interval: 60s
+    # Host-header trick, same as Kimai below: Traefik routes on Host().
+    headers:
+      Host: "sonarr.lan.tarasa24.dev"
+    client:
+      # URL host is an IP, so Go verifies the cert against 10.0.30.20, not the
+      # Host header -- would hostname-mismatch and stay permanently down
+      # without this. The peer cert is still captured either way.
+      insecure: true
+      timeout: 10s
+    conditions:
+      - "[STATUS] == 200"
+    ui:
+      hide-url: true
+      hide-hostname: true
+      hide-port: true
+      hide-conditions: true
+      hide-errors: true
+    extra-labels:
+      host: private-docker-host
+      path: internal
+
   - name: "Radarr"
     group: "Internal"
     url: "http://10.0.30.23:7878/ping"

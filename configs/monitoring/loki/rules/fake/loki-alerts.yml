@@ -97,6 +97,27 @@ groups:
           summary: "TLS certificate expiry warning in {{ $labels.job }} logs"
           description: "The proxy logged a certificate expiry warning - check certbot renewal on the DMZ router"
 
+      # Fast-path detector for certbot renewal failures (dmz-proxy/certbot,
+      # /var/log/certbot-renew.log). --quiet keeps healthy no-op runs silent,
+      # so any match here means certbot actually logged a problem. No
+      # separate renewal-freshness check needed on top of this: a fully
+      # silent failure (cron gone, log unread) is still caught by
+      # TLSCertificateExpiringSoon (alert.rules.yml), which watches the
+      # served cert directly rather than any log or file.
+      - alert: CertbotRenewalFailed
+        expr: |
+          sum by (job) (
+            count_over_time({job="dmz-proxy/certbot", job!~"monitoring/(loki|promtail)"} |~ `(?i)\b(error|failed|timeout|auth\w*|dns.?01|hetzner)\b` [1h])
+          ) > 0
+        for: 5m
+        labels:
+          severity: warning
+          alerttype: service
+          host: dmz-proxy
+        annotations:
+          summary: "Certbot renewal logged a failure on dmz-proxy"
+          description: "The certbot renewal log on dmz-proxy matched an error/failed/timeout/auth/dns-01/hetzner pattern in the last hour - check /var/log/certbot-renew.log"
+
       # nginx promotes `status` and `server_name` to stream labels, so no
       # parsing is needed here.
       - alert: NginxErrorRateHigh

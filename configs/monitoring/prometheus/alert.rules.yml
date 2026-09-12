@@ -133,14 +133,22 @@ groups:
 
       # All public vhosts share one wildcard cert, so this fires once per
       # endpoint; alertmanager groups them into a single notification.
+      #
+      # 216000s (60h), recalibrated for the ~160h "shortlived" ACME profile
+      # (dmz-proxy-init.yml) -- the old 604800s (7d) exceeded the cert's whole
+      # lifetime and would've read true from issuance. certbot renews at 1/2
+      # lifetime remaining (~80h), checked by a 12h cron, so a healthy cert
+      # never drops below ~68h -- 216000s only trips after a renewal has
+      # actually failed. `for: 1h` stays as-is; CertbotRenewalFailed
+      # (loki-alerts.yml) is the fast path, this is the backstop.
       - alert: TLSCertificateExpiringSoon
-        expr: gatus_results_certificate_expiration_seconds > 0 and gatus_results_certificate_expiration_seconds < 604800
+        expr: gatus_results_certificate_expiration_seconds > 0 and gatus_results_certificate_expiration_seconds < 216000
         for: 1h
         labels:
           severity: warning
           alerttype: service
         annotations:
-          summary: "TLS certificate for {{ $labels.name }} expires in under 7 days"
+          summary: "TLS certificate for {{ $labels.name }} expires in under 60 hours"
           description: "The certificate served for {{ $labels.name }} ({{ $labels.group }}) expires in {{ $value | humanizeDuration }}; check that certbot renewal on the DMZ router is working"
 
       - alert: GatusDown
