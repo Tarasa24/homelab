@@ -84,3 +84,14 @@
       args:
         chdir: /root
 
+    # Traefik only reloads a TLS cert when dynamic.yml's own mtime changes,
+    # not when the cert file itself changes -- this is what tells it to look.
+    - name: Schedule dynamic.yml touch on lan wildcard cert renewal
+      ansible.builtin.cron:
+        name: "Reload Traefik TLS cert on lan wildcard renewal"
+        job: >-
+          find /root/traefik/config/dynamic.yml -not -newer
+          /etc/letsencrypt/live/*.lan.tarasa24.dev/fullchain.pem
+          -exec touch /root/traefik/config/dynamic.yml \;
+        minute: "0"
+        state: present

@@ -12,6 +12,7 @@ services:
       - "--providers.docker=true"
       - "--providers.docker.exposedbydefault=false"
       - "--providers.file.filename=/etc/traefik/dynamic.yml"
+      - "--providers.file.watch=true"
       - "--entrypoints.http.address=:80"
       - "--entrypoints.https.address=:443"
       - "--serverstransport.insecureSkipVerify=true"
@@ -21,7 +22,12 @@ services:
       - "10.0.30.20:8080:8080"
     volumes:
       - "/var/run/docker.sock:/var/run/docker.sock:ro"
-      - "/etc/letsencrypt/live/*.lan.tarasa24.dev/fullchain.pem:/certs/fullchain.pem:ro"
-      - "/etc/letsencrypt/live/*.lan.tarasa24.dev/privkey.pem:/certs/privkey.pem:ro"
+      # Whole dirs, not individual files: certbot repoints the live/ symlink
+      # on renewal instead of editing in place, so a single-file mount stays
+      # pinned to the old cert forever. archive/ is needed too since live/
+      # symlinks resolve into it. Scoped to lan only, not all of
+      # /etc/letsencrypt -- Traefik has no use for the homelab/dormlab keys.
+      - "/etc/letsencrypt/live/*.lan.tarasa24.dev:/etc/letsencrypt/live/*.lan.tarasa24.dev:ro"
+      - "/etc/letsencrypt/archive/*.lan.tarasa24.dev:/etc/letsencrypt/archive/*.lan.tarasa24.dev:ro"
       - "./traefik/config/dynamic.yml:/etc/traefik/dynamic.yml:ro"
     restart: unless-stopped

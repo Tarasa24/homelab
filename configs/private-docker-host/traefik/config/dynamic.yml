@@ -2,8 +2,8 @@ tls:
   stores:
     default:
       defaultCertificate:
-        certFile: /certs/fullchain.pem
-        keyFile: /certs/privkey.pem
+        certFile: /etc/letsencrypt/live/*.lan.tarasa24.dev/fullchain.pem
+        keyFile: /etc/letsencrypt/live/*.lan.tarasa24.dev/privkey.pem
 
 http:
   middlewares:
