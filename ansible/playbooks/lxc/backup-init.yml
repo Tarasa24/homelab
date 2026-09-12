@@ -221,10 +221,16 @@
       become_user: backup
       become_method: su
       become_flags: '-s /bin/sh'
+    # restic phrases "already initialized" two different ways depending on
+    # which check fails first -- both mean the repo already exists, neither
+    # is a real error.
     - name: Check for errors in restic init
       ansible.builtin.fail:
         msg: "Error initializing restic repository"
-      when: item.rc != 0 and not ("repository master key and config already initialized" in item.stderr)
+      when: >-
+        item.rc != 0 and
+        "repository master key and config already initialized" not in item.stderr and
+        "config file already exists" not in item.stderr
       with_items: "{{ restic_init.results }}"
       become: true
       become_user: backup
