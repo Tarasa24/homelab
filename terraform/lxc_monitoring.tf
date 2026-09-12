@@ -2,7 +2,7 @@ resource "proxmox_virtual_environment_container" "lxc_monitoring" {
   description = "Container for gathering and displaying monitoring data"
 
   node_name = "pve"
-  vm_id     = 1004
+  vm_id     = 3014
 
   tags = ["alpine", "docker", "monitoring"]
   depends_on = [
@@ -23,8 +23,8 @@ resource "proxmox_virtual_environment_container" "lxc_monitoring" {
 
     ip_config {
       ipv4 {
-        address = "10.0.1.4/22" # LAN IP (eth0)
-        gateway = "10.0.0.1"
+        address = var.monitoring_ip.address # LAN IP (eth0)
+        gateway = var.monitoring_ip.gateway
       }
     }
 
@@ -52,6 +52,7 @@ resource "proxmox_virtual_environment_container" "lxc_monitoring" {
   network_interface {
     name     = "eth0"
     bridge   = "vmbr0"
+    vlan_id  = var.vlan_ids["lab"]
     firewall = true
   }
 
@@ -77,6 +78,15 @@ resource "proxmox_virtual_environment_container" "lxc_monitoring" {
     volume = "/mnt/USB-SSD/monitoring-cold"
     path   = "/mnt/monitoring-cold"
   }
+
+  # Both create-time-only; absent from imported state, so they'd otherwise
+  # force a replace on every plan.
+  lifecycle {
+    ignore_changes = [
+      initialization[0].user_account,
+      operating_system[0].template_file_id,
+    ]
+  }
 }
 
 variable "monitoring_ip" {
@@ -86,8 +96,8 @@ variable "monitoring_ip" {
   })
 
   default = {
-    address = "10.0.1.4/22"
-    gateway = "10.0.0.1"
+    address = "10.0.30.14/24"
+    gateway = "10.0.30.1"
   }
 }
 

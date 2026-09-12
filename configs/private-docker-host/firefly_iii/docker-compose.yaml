@@ -12,7 +12,7 @@ services:
       - firefly_iii                          # Connects to the specified Docker network.
       - default
     ports:
-      - "10.0.1.24:8051:8080"                # Exposes Firefly III on port 8051.
+      - "10.0.30.24:8051:8080"                # Exposes Firefly III on port 8051.
     depends_on:
       - firefly_iii_db                                   # Ensures the database service starts before the app.
     labels:
@@ -44,7 +44,7 @@ services:
       - firefly_iii
       - default
     ports:
-      - '10.0.1.24:81:8080'
+      - '10.0.30.24:81:8080'
     depends_on:
       - firefly_iii_app
     env_file: ./firefly_iii/config/.importer.env

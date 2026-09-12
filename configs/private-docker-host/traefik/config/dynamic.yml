@@ -69,24 +69,24 @@ http:
     prowlarr:
       loadBalancer:
         servers:
-          - url: http://10.0.1.23:9696
+          - url: http://10.0.30.23:9696
     sonarr:
       loadBalancer:
         servers:
-          - url: http://10.0.1.23:8989
+          - url: http://10.0.30.23:8989
     radarr:
       loadBalancer:
         servers:
-          - url: http://10.0.1.23:7878
+          - url: http://10.0.30.23:7878
     bazarr:
       loadBalancer:
         servers:
-          - url: http://10.0.1.23:6767
+          - url: http://10.0.30.23:6767
     qbittorrent:
       loadBalancer:
         servers:
-          - url: http://10.0.1.23:8080
+          - url: http://10.0.30.23:8080
     homeassistant:
       loadBalancer:
         servers:
-          - url: http://10.0.1.5:8123
+          - url: http://10.0.30.15:8123

@@ -1,6 +1,6 @@
 resource "proxmox_virtual_environment_firewall_alias" "dmz_network" {
   name = "dmz_network"
-  cidr = "10.1.0.0/24"
+  cidr = "10.0.40.0/24"
 }
 
 resource "proxmox_virtual_environment_firewall_rules" "cluster_level_firewall_rules" {
@@ -40,7 +40,7 @@ resource "proxmox_virtual_environment_firewall_rules" "cluster_level_firewall_ru
     type    = "in"
     action  = "ACCEPT"
     comment = "Allow Prometheus to scrape node_exporter on the PVE host"
-    source  = "10.0.1.4"
+    source  = "10.0.30.14"
     dport   = 9100
     proto   = "tcp"
   }

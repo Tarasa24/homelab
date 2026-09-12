@@ -124,7 +124,7 @@ endpoints:
   - name: "Traefik"
     group: "Internal"
     # /ping is not enabled here; the insecure API on :8080 is.
-    url: "http://10.0.1.20:8080/api/overview"
+    url: "http://10.0.30.20:8080/api/overview"
     interval: 60s
     client:
       timeout: 10s
@@ -142,7 +142,7 @@ endpoints:
 
   - name: "Authelia (LAN)"
     group: "Internal"
-    url: "http://10.0.1.21:9091/api/health"
+    url: "http://10.0.30.21:9091/api/health"
     interval: 60s
     client:
       timeout: 10s
@@ -160,7 +160,7 @@ endpoints:
 
   - name: "Vaultwarden"
     group: "Internal"
-    url: "http://10.0.1.22:80/alive"
+    url: "http://10.0.30.22:80/alive"
     interval: 60s
     client:
       timeout: 10s
@@ -178,7 +178,7 @@ endpoints:
 
   - name: "Firefly III"
     group: "Internal"
-    url: "http://10.0.1.24:8051/"
+    url: "http://10.0.30.24:8051/"
     interval: 60s
     client:
       timeout: 10s
@@ -197,7 +197,7 @@ endpoints:
   # Queries a public name so the check covers recursion, not just liveness.
   - name: "DNS"
     group: "Internal"
-    url: "10.0.1.1"
+    url: "10.0.30.11"
     interval: 60s
     dns:
       query-name: "google.com"
@@ -237,7 +237,7 @@ endpoints:
 
   - name: "Ghostfolio"
     group: "Internal"
-    url: "http://10.0.1.26:3333/api/v1/health"
+    url: "http://10.0.30.26:3333/api/v1/health"
     interval: 60s
     client:
       timeout: 10s
@@ -255,16 +255,18 @@ endpoints:
 
   - name: "Kimai"
     group: "Internal"
-    url: "http://10.0.1.27:8001/"
+    # /en/login directly, not "/": root 302s to /en/homepage, which 404s for
+    # Gatus's client for reasons that don't reproduce with curl -L.
+    url: "http://10.0.30.27:8001/en/login"
     interval: 60s
     # Symfony's TRUSTED_HOSTS check 400s a raw-IP Host header, so the probe
-    # sends the real vhost to get a genuine response (redirect to login).
+    # sends the real vhost to get a genuine response.
     headers:
       Host: "kimai.lan.tarasa24.dev"
     client:
       timeout: 10s
     conditions:
-      - "[STATUS] == any(200, 301, 302, 401)"
+      - "[STATUS] == 200"
     ui:
       hide-url: true
       hide-hostname: true
@@ -277,7 +279,7 @@ endpoints:
 
   - name: "Unifi Controller"
     group: "Internal"
-    url: "https://10.0.1.25:8443/"
+    url: "https://10.0.30.25:8443/"
     interval: 60s
     client:
       # Unifi serves its own self-signed cert on :8443.
@@ -297,7 +299,7 @@ endpoints:
 
   - name: "Sonarr"
     group: "Internal"
-    url: "http://10.0.1.23:8989/ping"
+    url: "http://10.0.30.23:8989/ping"
     interval: 60s
     client:
       timeout: 10s
@@ -315,7 +317,7 @@ endpoints:
 
   - name: "Radarr"
     group: "Internal"
-    url: "http://10.0.1.23:7878/ping"
+    url: "http://10.0.30.23:7878/ping"
     interval: 60s
     client:
       timeout: 10s
@@ -333,7 +335,7 @@ endpoints:
 
   - name: "Prowlarr"
     group: "Internal"
-    url: "http://10.0.1.23:9696/ping"
+    url: "http://10.0.30.23:9696/ping"
     interval: 60s
     client:
       timeout: 10s
@@ -351,7 +353,7 @@ endpoints:
 
   - name: "Bazarr"
     group: "Internal"
-    url: "http://10.0.1.23:6767/ping"
+    url: "http://10.0.30.23:6767/ping"
     interval: 60s
     client:
       timeout: 10s
@@ -369,7 +371,7 @@ endpoints:
 
   - name: "qBittorrent"
     group: "Internal"
-    url: "http://10.0.1.23:8080/"
+    url: "http://10.0.30.23:8080/"
     interval: 60s
     client:
       timeout: 10s
@@ -387,7 +389,7 @@ endpoints:
 
   - name: "Home Assistant"
     group: "Internal"
-    url: "http://10.0.1.5:8123/"
+    url: "http://10.0.30.15:8123/"
     interval: 60s
     client:
       timeout: 10s

@@ -10,6 +10,11 @@
   vars:
     ansible_host: "{{ hostvars[inventory_hostname].ansible_host }}"
     lxc_host: "{{ hostvars[inventory_hostname].lxc_host }}"
+    # bitcoind can only advertise a literal address, so the home WAN IP is
+    # kept in git-crypt rather than in the config in plaintext. If the WAN
+    # address ever changes this must be updated and the playbook re-run;
+    # nothing detects it going stale.
+    wan_public_ip: "{{ lookup('file', '../../../secrets/wan_public_ip') | trim }}"
   roles:
     - role: lxc_python3
     - role: node_exporter
@@ -153,8 +158,8 @@
             state: directory
             mode: "0710"
         - name: Copy over bitcoin config
-          ansible.builtin.copy:
-            src: ../../../configs/dmz_bitcoin-node/bitcoin.conf
+          ansible.builtin.template:
+            src: ../../../configs/dmz_bitcoin-node/bitcoin.conf.j2
             dest: /etc/bitcoin/bitcoin.conf
         # Started inside the block, not at the end of the play: if a later
         # task fails (e.g. the electrs build), bitcoind must not be left down.

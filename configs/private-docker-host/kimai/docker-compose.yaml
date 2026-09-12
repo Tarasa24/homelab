@@ -9,7 +9,7 @@ services:
       - kimai                                # Connects to the specified Docker network.
       - default
     ports:
-      - "10.0.1.27:8001:8001"                # Exposes Kimai on port 8001.
+      - "10.0.30.27:8001:8001"                # Exposes Kimai on port 8001.
     depends_on:
       - kimai_db                                         # Ensures the database service starts before the app.
     volumes:

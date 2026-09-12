@@ -5,8 +5,8 @@ services:
     hostname: jellyfin
     user: 1000:1000
     ports:
-      - 10.1.0.21:8096:8096
-      - 10.1.0.21:8920:8920
+      - 10.0.40.21:8096:8096
+      - 10.0.40.21:8920:8920
     volumes:
       - jelllyfin_config:/config
       - /cache:/cache
@@ -18,6 +18,10 @@ services:
       - /dev/dri/renderD128:/dev/dri/renderD128
     environment:
       - JELLYFIN_PublishedServerUrl=https://jellyfin.homelab.tarasa24.dev
+    extra_hosts:
+      # avoids hairpin NAT: DMZ can't loop back through the UXG to its own
+      # public IP, which broke SSO-Auth's server-side calls to Authelia
+      - "auth.homelab.tarasa24.dev:10.0.40.10"
 
 volumes:
   jelllyfin_config:

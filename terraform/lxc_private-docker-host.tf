@@ -2,7 +2,7 @@ resource "proxmox_virtual_environment_container" "lxc_private-docker-host" {
   description = "Container for hosting containized internal services"
 
   node_name = "pve"
-  vm_id     = 1020
+  vm_id     = 3020
 
   tags = ["alpine", "docker"]
   depends_on = [
@@ -52,6 +52,7 @@ resource "proxmox_virtual_environment_container" "lxc_private-docker-host" {
   network_interface {
     name     = "eth0"
     bridge   = "vmbr0"
+    vlan_id  = var.vlan_ids["lab"]
     firewall = true
   }
 
@@ -96,6 +97,15 @@ resource "proxmox_virtual_environment_container" "lxc_private-docker-host" {
     path   = "/cache"
     shared = true
   }
+
+  # Both create-time-only; absent from imported state, so they'd otherwise
+  # force a replace on every plan.
+  lifecycle {
+    ignore_changes = [
+      initialization[0].user_account,
+      operating_system[0].template_file_id,
+    ]
+  }
 }
 
 variable "private-docker-host_ip" {
@@ -105,8 +115,8 @@ variable "private-docker-host_ip" {
   })
 
   default = {
-    address = "10.0.1.20/22"
-    gateway = "10.0.0.1"
+    address = "10.0.30.20/24"
+    gateway = "10.0.30.1"
   }
 }
 

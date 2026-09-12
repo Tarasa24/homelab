@@ -2,11 +2,14 @@ resource "proxmox_virtual_environment_vm" "vm_homeassistant" {
   description = "Virtual Machine for Home Assistant and related services"
 
   node_name = "pve"
-  vm_id     = 1005
-  tags      = ["homeassistant"]
-  name      = "homeassistant"
-  bios      = "ovmf"
-  machine   = "q35"
+
+  # vm_id is ForceNew; moved by hand (config rename + lvrename) and
+  # reconciled via state rm + import to avoid destroying this VM's state.
+  vm_id   = 3015
+  tags    = ["homeassistant"]
+  name    = "homeassistant"
+  bios    = "ovmf"
+  machine = "q35"
 
   memory {
     dedicated = 4096
@@ -24,8 +27,15 @@ resource "proxmox_virtual_environment_vm" "vm_homeassistant" {
     size         = 32
   }
 
+  # file_id is create-only and absent from imported state; without this it
+  # forces a replace on every plan.
+  lifecycle {
+    ignore_changes = [disk[0].file_id]
+  }
+
   network_device {
-    bridge = "vmbr0"
+    bridge  = "vmbr0"
+    vlan_id = var.vlan_ids["lab"]
   }
 
   initialization {
@@ -52,8 +62,8 @@ variable "homeassistant_ip" {
   })
 
   default = {
-    address = "10.0.1.5/22"
-    gateway = "10.0.0.1"
+    address = "10.0.30.15/24"
+    gateway = "10.0.30.1"
   }
 }
 

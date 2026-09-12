@@ -14,11 +14,11 @@ scrape_configs:
       - targets:
           - localhost
         labels:
-          job: dmz-router/nginx
+          job: dmz-proxy/nginx
           service_name: nginx
           container_name: nginx
-          instance: dmz-router
-          host: dmz-router
+          instance: dmz-proxy
+          host: dmz-proxy
           stream: stdout
           __path__: /var/log/nginx/access.log
     pipeline_stages:
@@ -41,11 +41,11 @@ scrape_configs:
       - targets:
           - localhost
         labels:
-          job: dmz-router/nginx
+          job: dmz-proxy/nginx
           service_name: nginx
           container_name: nginx
-          instance: dmz-router
-          host: dmz-router
+          instance: dmz-proxy
+          host: dmz-proxy
           stream: stderr
           __path__: /var/log/nginx/error.log
 
@@ -54,11 +54,11 @@ scrape_configs:
       - targets:
           - localhost
         labels:
-          job: dmz-router/nginx
+          job: dmz-proxy/nginx
           service_name: nginx
           container_name: nginx
-          instance: dmz-router
-          host: dmz-router
+          instance: dmz-proxy
+          host: dmz-proxy
           stream: stdout
           __path__: /var/log/nginx/stream.log
 
@@ -67,9 +67,9 @@ scrape_configs:
       - targets:
           - localhost
         labels:
-          job: dmz-router/syslog
+          job: dmz-proxy/syslog
           service_name: syslog
           container_name: syslog
-          instance: dmz-router
+          instance: dmz-proxy
           stream: stdout
           __path__: /var/log/messages

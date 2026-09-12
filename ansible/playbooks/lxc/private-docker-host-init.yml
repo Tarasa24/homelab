@@ -6,16 +6,16 @@
     ansible_host: "{{ hostvars[inventory_hostname].ansible_host }}"
     lxc_host: "{{ hostvars[inventory_hostname].lxc_host }}"
     ip_range: [
-      "10.0.1.21",
-      "10.0.1.22",
-      "10.0.1.23",
-      "10.0.1.24",
-      "10.0.1.25",
-      "10.0.1.26",
-      "10.0.1.27",
-      "10.0.1.28",
-      "10.0.1.29",
-      "10.0.1.30"
+      "10.0.30.21",
+      "10.0.30.22",
+      "10.0.30.23",
+      "10.0.30.24",
+      "10.0.30.25",
+      "10.0.30.26",
+      "10.0.30.27",
+      "10.0.30.28",
+      "10.0.30.29",
+      "10.0.30.30"
     ]
   pre_tasks:
     - name: Safely stop and remove existing containers

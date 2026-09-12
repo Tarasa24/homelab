@@ -1,18 +1,12 @@
 ---
-- name: Configure Alpine Docker template in LXC container
-  hosts: lxc_dmz_router
-  gather_facts: true
+- name: Configure the DMZ reverse proxy and TLS terminator
+  hosts: lxc_dmz_proxy
+  # false: on a fresh container with no Python yet, fact-gathering runs before
+  # lxc_python3 can bootstrap it and fails outright.
+  gather_facts: false
   vars:
     ansible_host: "{{ hostvars[inventory_hostname].ansible_host }}"
     lxc_host: "{{ hostvars[inventory_hostname].lxc_host }}"
-
-    wireguard_client_ip: "10.2.0.2"
-    wireguard_server_endpoint_ip: "{{  hostvars[groups['linode_dmz_bastion'][0]].inventory_hostname }}"
-    wireguard_server_ip: "10.2.0.1"
-    wireguard_server_port: "51820"
-    wireguard_client_privatekey: "{{ lookup('file', '../../../secrets/wireguard/client/privatekey') }}"
-    wireguard_server_publickey: "{{ lookup('file', '../../../secrets/wireguard/server/publickey') }}"
-    wireguard_psk: "{{ lookup('file', '../../../secrets/wireguard/presharedkey') }}"
 
     certificates:
       - "*.homelab.tarasa24.dev"
@@ -25,85 +19,14 @@
     - role: borgmatic
     - role: node_exporter
     - role: promtail
-  pre_tasks:
-    - name: Check if wireguard is installed
-      ansible.builtin.command: lxc-attach {{ lxc_host }} -- which wg
-      delegate_to: "{{ ansible_host }}"
-      ignore_errors: true
-      register: wireguard_installed
-
-    - name: If wireguard is not installed, disable firewall
-      ansible.builtin.command: pvesh set /nodes/pve/lxc/{{ lxc_host }}/firewall/options -enable 0
-      delegate_to: "{{ ansible_host }}"
-      when: wireguard_installed.rc != 0
-  post_tasks:
-    - name: Enable firewall
-      ansible.builtin.command: pvesh set /nodes/pve/lxc/{{ lxc_host }}/firewall/options -enable 1
-      delegate_to: "{{ ansible_host }}"
-
   tasks:
-    - name: Setup wireguard tunnel
-      block:
-        - name: Install wireguard
-          ansible.builtin.apk:
-            name:
-              - wireguard-tools-wg-quick
-              - iptables
-            state: present
-            no_cache: true
-
-        - name: Enable ipv4 forwarding
-          ansible.posix.sysctl:
-            name: net.ipv4.ip_forward
-            value: 1
-            state: present
-            reload: true
-        - name: Down the current wg0 interface if it exists
-          ansible.builtin.command: wg-quick down wg0
-          changed_when: false
-          failed_when: false
-        - name: Create /etc/wireguard directory
-          ansible.builtin.file:
-            path: /etc/wireguard
-            state: directory
-        - name: Copy wireguard client config
-          ansible.builtin.template:
-            src: ../../../configs/dmz_router/wg0.conf.j2
-            dest: /etc/wireguard/wg0.conf
-            mode: "0600"
-
-        - name: Add wg0 as network interface
-          ansible.builtin.lineinfile:
-            path: /etc/network/interfaces
-            line: "{{ item }}"
-          with_items:
-            - "auto wg0"
-            - "iface wg0 inet static"
-            - "pre-up wg-quick up /etc/wireguard/wg0.conf"
-        - name: Up the wg0 interface
-          ansible.builtin.command: wg-quick up wg0
-
-    - name: Setup DNS and DHCP server
-      block:
-        - name: Install dnsmasq
-          ansible.builtin.package:
-            name: dnsmasq
-            state: present
-        - name: Create /etc/dnsmasq.d directory
-          ansible.builtin.file:
-            path: /etc/dnsmasq.d
-            state: directory
-        - name: Copy dnsmasq config file
-          ansible.builtin.copy:
-            src: ../../../configs/dmz_router/dnsmasq.conf
-            dest: /etc/dnsmasq.d/dmz.conf
-            mode: "0644"
-        - name: Start dnsmasq
-          ansible.builtin.service:
-            name: dnsmasq
-            state: started
-            enabled: true
-
+    # This host used to route and NAT the whole DMZ through a WireGuard tunnel
+    # to a Linode bastion, and to serve DHCP/DNS for the DMZ via dnsmasq. The
+    # UXG now terminates ingress and is the VLAN 40 gateway and DHCP server, so
+    # all of that is gone; what remains is nginx doing reverse proxying and TLS.
+    #
+    # Note that egress is no longer tunnelled, so the container firewall must
+    # allow 443/80/53 outbound explicitly -- see terraform/lxc_dmz_proxy.tf.
     - name: Generate SSL certificates
       block:
         - name: Install Certbot
@@ -132,7 +55,11 @@
           args:
             creates: "/etc/letsencrypt/renewal/{{ item }}.conf"
           with_items: "{{ certificates }}"
-          when: certbot_certificates.results[loop.index0].rc != 0 or 'Certificate not yet due for renewal' in certbot_certificates.results[loop.index0].stderr
+          # Matched by item value, not loop.index0: that variable doesn't
+          # exist for with_items on this ansible-core version.
+          vars:
+            cert_check: "{{ (certbot_certificates.results | selectattr('item', 'equalto', item) | first) }}"
+          when: cert_check.rc != 0 or 'Certificate not yet due for renewal' in cert_check.stderr
 
     - name: Setup GeoIP2
       block:
@@ -193,7 +120,7 @@
             state: present
         - name: Copy nginx config files
           ansible.builtin.copy:
-            src: ../../../configs/dmz_router/nginx/
+            src: ../../../configs/dmz_proxy/nginx/
             dest: /etc/nginx/
             mode: "0644"
         - name: Ensure correct permission for /var/lib/nginx (recursive)
@@ -215,13 +142,3 @@
             name: nginx
             state: started
             enabled: true
-
-    - name: Make sure staticroute is enabled
-      ansible.builtin.command: rc-update add staticroute
-    - name: Create /etc/conf.d/staticroute
-      ansible.builtin.copy:
-        dest: /etc/conf.d/staticroute
-        content: staticroute="net 100.64.0.0 netmask 255.192.0.0 gw 10.1.0.100"
-        mode: "0644"
-    - name: Start staticroute
-      ansible.builtin.command: rc-service staticroute start

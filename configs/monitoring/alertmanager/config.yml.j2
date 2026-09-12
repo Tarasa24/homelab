@@ -65,12 +65,15 @@ route:
       continue: false
 
 receivers:
-  # Public URL, not the DMZ address 10.1.0.24:8080 - the monitoring LXC has no
-  # route into 10.1.0.0/24, so that silently timed out on every notification.
+  # ntfy is addressed internally at 10.0.40.24:8080. This used to have to go via
+  # the public URL because the monitoring LXC had no route into the DMZ; Lab
+  # (VLAN 30) and DMZ (VLAN 40) are now both routed by the UXG, so the alert
+  # path no longer depends on the WAN uplink or on NAT hairpinning. Push to a
+  # phone still needs internet, but delivery to ntfy itself does not.
   # ?template=homelab renders readable text instead of raw Alertmanager JSON.
   - name: 'critical-receiver'
     webhook_configs:
-      - url: 'https://ntfy.homelab.tarasa24.dev/homelab-critical?template=homelab'
+      - url: 'http://10.0.40.24:8080/homelab-critical?template=homelab'
         send_resolved: true
         http_config:
           basic_auth:
@@ -79,7 +82,7 @@ receivers:
 
   - name: 'storage-receiver'
     webhook_configs:
-      - url: 'https://ntfy.homelab.tarasa24.dev/homelab-storage?template=homelab'
+      - url: 'http://10.0.40.24:8080/homelab-storage?template=homelab'
         send_resolved: true
         http_config:
           basic_auth:
@@ -88,7 +91,7 @@ receivers:
 
   - name: 'services-receiver'
     webhook_configs:
-      - url: 'https://ntfy.homelab.tarasa24.dev/homelab-services?template=homelab'
+      - url: 'http://10.0.40.24:8080/homelab-services?template=homelab'
         send_resolved: true
         http_config:
           basic_auth:

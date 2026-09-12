@@ -30,7 +30,7 @@
         cmd: rm -rf /opt/technitium-dns && rm -rf /tmp/DnsServerPortable.tar.gz
       when: technitium_exists.stat.exists
 
-    - name: Configure edge repositories for ASP.NET Core 9
+    - name: Configure edge repositories for ASP.NET Core runtime
       copy:
         dest: /etc/apk/repositories
         content: |
@@ -42,7 +42,7 @@
       ansible.builtin.command:
         cmd: apk update
 
-    - name: Install ASP.NET Core 9 runtime from Edge
+    - name: Install ASP.NET Core runtime from Edge
       ansible.builtin.apk:
         name: aspnetcore9-runtime
         state: present
@@ -58,9 +58,12 @@
       ansible.builtin.command:
         cmd: apk update
 
+    # Pinned: 15.x+ targets net10.0, whose aspnetcore10-runtime fails to start
+    # here (Alpine openssl3 packaging bug). Check DnsServerApp.runtimeconfig.json's
+    # tfm before bumping this.
     - name: Download technitium dns
       ansible.builtin.command:
-        cmd: wget https://download.technitium.com/dns/DnsServerPortable.tar.gz
+        cmd: wget https://download.technitium.com/dns/archive/14.3.0/DnsServerPortable.tar.gz
         chdir: /tmp
 
     - name: Create technitium dns directory
@@ -88,8 +91,11 @@
           directory="/opt/technitium-dns"
           command="/opt/technitium-dns/start.sh"
           command_user="root"
+          command_background="yes"
           pidfile="/var/run/technitium-dns.pid"
-          
+
+          # Required: start.sh execs dotnet directly with no pidfile of its own,
+          # so start-stop-daemon needs to background it and track the pid itself.
           depend() {
               need net
           }
