@@ -129,11 +129,9 @@ resource "proxmox_virtual_environment_firewall_rules" "lxc_dmz_proxy" {
     proto   = "udp"
   }
 
-  # Egress used to be tunnelled through WireGuard, so a single udp/51820 allow
-  # covered everything. With the tunnel gone, traffic leaves via the UXG and
-  # each protocol needs its own rule -- certbot in particular breaks silently
-  # without 443 and 53. No NTP rule: this is an unprivileged container, so it
-  # has no CAP_SYS_TIME and takes its clock from the PVE host regardless.
+  # Each outbound protocol needs its own rule; certbot in particular breaks
+  # silently without 443 and 53. No NTP rule: unprivileged container has no
+  # CAP_SYS_TIME and takes its clock from the PVE host.
   rule {
     type    = "out"
     action  = "ACCEPT"

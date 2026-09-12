@@ -87,9 +87,8 @@
     - name: Install bitcoin core
       when: bitcoind_installed.rc != 0 or ('v' + bitcoin_version + '.') not in bitcoind_installed.stdout
       block:
-        # Egress from the DMZ goes over the WireGuard tunnel to the Linode
-        # bastion, which intermittently times out the TLS handshake. Retry
-        # rather than fail the whole play on a transient network blip.
+        # DMZ egress intermittently times out on TLS handshake; retry
+        # rather than fail the whole play on a transient blip.
         - name: Download bitcoin core
           ansible.builtin.get_url:
             url: "https://bitcoincore.org/bin/bitcoin-core-{{ bitcoin_version }}/bitcoin-{{ bitcoin_version }}-{{ arch }}.tar.gz"

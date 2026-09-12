@@ -29,13 +29,7 @@
     - role: node_exporter
     - role: promtail
   tasks:
-    # This host used to route and NAT the whole DMZ through a WireGuard tunnel
-    # to a Linode bastion, and to serve DHCP/DNS for the DMZ via dnsmasq. The
-    # UXG now terminates ingress and is the VLAN 40 gateway and DHCP server, so
-    # all of that is gone; what remains is nginx doing reverse proxying and TLS.
-    #
-    # Note that egress is no longer tunnelled, so the container firewall must
-    # allow 443/80/53 outbound explicitly -- see terraform/lxc_dmz_proxy.tf.
+    # Outbound 443/80/53 must be allowed explicitly -- see terraform/lxc_dmz_proxy.tf.
     - name: Generate SSL certificates
       block:
         # cryptography and cffi publish musllinux wheels, so nothing should

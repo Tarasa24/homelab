@@ -20,8 +20,8 @@ ui:
   description: "Live availability of homelab services."
 
 endpoints:
-  # Public - the real end-user path via Linode/WireGuard/nginx. Includes the WAN
-  # uplink, so a failure here does not isolate the fault; compare with Internal.
+  # Public - the real end-user path via the home WAN IP/UXG/nginx. Includes the
+  # WAN uplink, so a failure here does not isolate the fault; compare with Internal.
   - name: "Jellyfin"
     group: "Public"
     url: "https://jellyfin.homelab.tarasa24.dev/health"

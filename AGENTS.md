@@ -26,7 +26,6 @@ homelab/
 │   ├── playbooks/       # Per-host init playbooks (organised by target type)
 │   │   ├── pve/         # Proxmox host bootstrap
 │   │   ├── lxc/         # LXC container init playbooks
-│   │   ├── linode/      # Linode bastion host playbook
 │   │   └── all/         # Cross-host playbooks (e.g. trigger borg backup on all hosts)
 │   ├── roles/
 │   │   ├── docker/        # Install Docker + docker-compose on Alpine; enables metrics on :9323
@@ -43,14 +42,11 @@ homelab/
 │   ├── private-docker-host/ # Docker Compose stacks for internal LAN services
 │   ├── monitoring/      # Prometheus/Loki/Grafana/Alertmanager/Gatus stack
 │   ├── backup/          # borgmatic and resticprofile backup job configs
-│   ├── promtail/        # Host-specific Promtail configs (backup, dns, dmz-proxy)
-│   └── linode/          # WireGuard server config + nftables for the Linode bastion
+│   └── promtail/        # Host-specific Promtail configs (backup, dns, dmz-proxy)
 ├── secrets/             # git-crypt encrypted secrets (keys, credentials, API tokens)
-│   ├── wireguard/       # WireGuard private/public keys and preshared key
-│   ├── backup/          # Restic password, SSH keypair for borg, S3 credentials
-│   ├── linode/          # Linode API key (used by Certbot DNS-01 challenge)
+│   ├── backup/          # Restic password, SSH keypair for borg
+│   ├── hetzner/         # Hetzner Storage Box SSH key + Certbot DNS-01 API token
 │   └── private-docker-host/ # App-level secrets for internal services
-├── docs/                # draw.io network diagrams (LAN and DMZ router views)
 ├── scripts/create.sh    # Full bring-up script: terraform apply then ansible init playbooks
 ├── devenv.nix           # Reproducible dev shell definition
 └── .gitattributes       # git-crypt filter applied to secrets/**
@@ -67,7 +63,6 @@ Four tagged VLANs on a single VLAN-aware `vmbr0` (no more separate `vmbr1`):
 | **Lab** | `10.0.30.0/24` | 30 | PVE host + internal LXC/VM services |
 | **DMZ** | `10.0.40.0/24` | 40 | Internet-facing services |
 | **Monitoring** | `10.0.50.0/24` | 50 | Out-of-band Prometheus scraping |
-| **DMZ-Bastion tunnel** | `10.2.0.0/30` | — | WireGuard, temporary/manual (see below) |
 
 Gateway and DHCP for Lab and DMZ are both the UXG (`10.0.30.1` / `10.0.40.1`). No DHCP on DMZ — all DMZ hosts are static.
 
@@ -116,9 +111,6 @@ DROP. It carries `host="pve"`, so every existing node rule (NodeDown, CPU,
 memory, disk) covers the hypervisor without further change. Home Assistant has
 no `mon` NIC and isn't scraped over VLAN 50.
 
-### Linode (cloud)
-- `45.79.249.185` — Debian VPS, WireGuard server. No longer the production bastion (the UXG now terminates ingress directly and public DNS points at the home WAN IP), but its `wg0` server is still active and untouched, and can be reconnected to temporarily (e.g. from a laptop, not necessarily the UXG) by reusing the existing peer keys in `secrets/wireguard/` — Linode's `nftables` blanket-DNATs everything to whatever answers as `10.2.0.2`, so no Linode-side change is needed to do this.
-
 ---
 
 ## Proxmox LXC/VM Inventory
@@ -159,10 +151,9 @@ Secrets live under `secrets/` and are encrypted with **git-crypt** (key file `cr
 
 Secrets are consumed by Ansible playbooks via `lookup('file', '../../../secrets/...')` — they are never inlined into config files in plain text. Categories:
 
-- `secrets/wireguard/` — WireGuard server/client private keys, public keys, preshared key
 - `secrets/backup/ssh/` — SSH keypair used by borgmatic clients to authenticate to the borg server
-- `secrets/backup/resticprofile/` — Restic repository password, S3 access/secret keys for Linode Object Storage
-- `secrets/linode/` — Linode API credentials for Certbot DNS-01 ACME challenge
+- `secrets/backup/resticprofile/` — Restic repository password (repository is a Hetzner Storage Box over SFTP, authenticated via `secrets/hetzner/`)
+- `secrets/hetzner/` — Hetzner Storage Box SSH key + host key, and the Certbot DNS-01 API token
 - `secrets/private-docker-host/` — Application-level secrets for internal services
 - `secrets/terraform.tfvars` — Proxmox API credentials (`proxmox_config` map)
 - `secrets/dmz_router/` — DMZ router specific secrets
@@ -175,7 +166,7 @@ Replaces the old `dmz-router`. The UXG now terminates ingress and is the DMZ's
 gateway/DHCP server directly, so this container no longer routes, NATs, or
 runs WireGuard/dnsmasq — it's just:
 
-1. **Reverse proxy + TLS termination** — nginx with stream module; wildcard certs for `*.homelab.tarasa24.dev`, `*.dormlab.tarasa24.dev`, `*.lan.tarasa24.dev` obtained via Certbot DNS-01 against Linode API. SSL certs are stored on the shared `/mnt/USB-SSD/ssl` mount (accessible to `private-docker-host` and `dmz-docker-host` as read-only).
+1. **Reverse proxy + TLS termination** — nginx with stream module; wildcard certs for `*.homelab.tarasa24.dev`, `*.dormlab.tarasa24.dev`, `*.lan.tarasa24.dev` obtained via Certbot DNS-01 against the Hetzner DNS API. SSL certs are stored on the shared `/mnt/USB-SSD/ssl` mount (accessible to `private-docker-host` and `dmz-docker-host` as read-only).
 
 Firewall is managed by Proxmox (via Terraform): strict `DROP` in/out policy.
 Outbound needs an explicit `ACCEPT` rule per backend it proxies to — every
@@ -183,17 +174,6 @@ nginx `proxy_pass`/stream target (jellyfin, ntfy, radicale, electrs, bitcoind,
 Gatus, Loki, Unifi, Authelia, backup) needs its own rule in
 `terraform/lxc_dmz_proxy.tf`; same-VLAN destinations are not exempt from this
 container's own firewall, only unscoped WAN rules (80/443/53, no `dest`) are.
-
----
-
-## Linode Bastion (`45.79.249.185`)
-
-A Debian VPS that acts as the public endpoint for the WireGuard server. It:
-- Runs `wg-quick@wg0` (systemd) as the WireGuard server on `10.2.0.1`.
-- Uses `nftables` for packet forwarding/masquerading from the DMZ WireGuard client.
-- Root login is `prohibit-password` (key-only SSH).
-
-Config templates: `configs/linode/wg0.conf.j2`, `configs/linode/nftables.conf.j2`.
 
 ---
 
@@ -356,10 +336,6 @@ Accepted for a homelab. The conventional fixes, if this ever matters:
   genuinely parallel delivery. A second ntfy instance in the DMZ would not help:
   same host, same failure domain.
 
-**Not covered by any probe**: the Linode bastion, since DNS cutover moved the
-Gatus `Public` group's path to the home WAN IP directly — Linode is no longer
-in that path at all, even indirectly.
-
 **Non-Docker hosts use the systemd collector.** cAdvisor only covers the two
 Docker hosts. The Bitcoin node runs `bitcoind` and `electrs` as plain systemd
 units on Debian, so service-level down-detection comes from
@@ -516,10 +492,10 @@ Two complementary backup tools run on all relevant containers:
 - **Clients**: Each service container has the `borgmatic` Ansible role applied. The role installs borgmatic, copies the SSH private key from `secrets/backup/ssh/id_ed25519`, copies the host-specific borgmatic config from `configs/backup/borg/<hostname>.yaml`, runs `borgmatic extract` to restore on first deploy, then schedules nightly backups via cron at 02:00.
 - **Trigger all**: `ansible-playbook playbooks/all/borg-backup-all.yml`
 
-### Restic (remote S3)
-- **Client**: `lxc_backup` also runs resticprofile to back up to Linode Object Storage (S3-compatible).
-- Profiles: `global`, `borg-to-linode-s3`, `immich-media-to-linode-s3`.
-- S3 credentials (`access_key`, `secret_key`) and the restic password come from `secrets/backup/resticprofile/`.
+### Restic (remote Hetzner Storage Box)
+- **Client**: `lxc_backup` also runs resticprofile to back up to a Hetzner Storage Box over SFTP.
+- Profiles: `global`, `borg-to-hetzner-storagebox`, `immich-media-to-hetzner-storagebox`.
+- SSH key + host key come from `secrets/hetzner/`; the restic password comes from `secrets/backup/resticprofile/`.
 
 ---
 
