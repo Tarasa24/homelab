@@ -79,12 +79,28 @@
         # Third-party plugins do not get a --dns-<name> shorthand; that is only
         # generated for the plugins certbot bundles itself. The credentials path
         # must be absolute, per the plugin's own documentation.
+        #
+        # --preferred-profile requests the ~160h "shortlived" ACME profile,
+        # falling back to classic if Let's Encrypt ever deprecates it. certbot
+        # persists the choice into renewal/<name>.conf, so the cron below
+        # doesn't need the flag too.
+        #
+        # The `creates:` guard means this never retroactively moves an
+        # existing classic cert onto shortlived. Run once by hand per domain
+        # to migrate (not idempotent -- --force-renewal would burn rate-limit
+        # budget on every play run):
+        #
+        #   /opt/certbot/bin/certbot certonly --force-renewal --preferred-profile shortlived \
+        #     --authenticator dns-hetzner --dns-hetzner-credentials /etc/letsencrypt/hetzner.ini \
+        #     --dns-hetzner-propagation-seconds 60 --cert-name '<name>' -d '<name>' \
+        #     --email admin@tarasa24.dev --agree-tos --no-eff-email --non-interactive
         - name: Certbot - Generate SSL certificates
           ansible.builtin.command: >-
             {{ certbot_venv }}/bin/certbot certonly
             --authenticator dns-hetzner
             --dns-hetzner-credentials /etc/letsencrypt/hetzner.ini
             --dns-hetzner-propagation-seconds 60
+            --preferred-profile shortlived
             --email {{ certbot_email }} --agree-tos --no-eff-email
             --cert-name {{ item }} -d {{ item }}
           args:
@@ -102,10 +118,28 @@
         - name: Schedule Certbot renewal
           ansible.builtin.cron:
             name: "Renew TLS certificates"
-            job: "{{ certbot_venv }}/bin/certbot renew --quiet --deploy-hook 'nginx -s reload'"
+            job: "{{ certbot_venv }}/bin/certbot renew --quiet --deploy-hook 'nginx -s reload' >> /var/log/certbot-renew.log 2>&1"
             minute: "17"
             hour: "3,15"
             state: present
+        # --quiet keeps a healthy log empty; this just bounds it in case of
+        # repeated failures.
+        - name: Install logrotate
+          ansible.builtin.package:
+            name: logrotate
+            state: present
+        - name: Configure logrotate for the certbot renewal log
+          ansible.builtin.copy:
+            content: |
+              /var/log/certbot-renew.log {
+                weekly
+                rotate 4
+                compress
+                missingok
+                notifempty
+              }
+            dest: /etc/logrotate.d/certbot-renew
+            mode: "0644"
 
     - name: Setup GeoIP2
       block:
