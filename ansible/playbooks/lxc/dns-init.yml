@@ -5,6 +5,7 @@
   vars:
     ansible_host: "{{ hostvars[inventory_hostname].ansible_host }}"
     lxc_host: "{{ hostvars[inventory_hostname].lxc_host }}"
+    ntfy_alertmanager_password: "{{ lookup('file', '../../../secrets/monitoring/ntfy_alertmanager_password') }}"
   roles:
     - role: lxc_python3
     - role: borgmatic

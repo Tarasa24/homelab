@@ -1,2 +1,5 @@
 global:
   scheduler: crond
+  # crond swallows scheduled-job output otherwise.
+  schedule-defaults:
+    log: /var/log/resticprofile-scheduled.log

@@ -17,6 +17,7 @@
       "10.0.30.29",
       "10.0.30.30"
     ]
+    ntfy_alertmanager_password: "{{ lookup('file', '../../../secrets/monitoring/ntfy_alertmanager_password') }}"
   pre_tasks:
     - name: Safely stop and remove existing containers
       shell: docker compose down || true

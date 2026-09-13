@@ -17,6 +17,7 @@
     # payload either way, but without this an active attacker can impersonate
     # the Storage Box instead of merely observing ciphertext.
     hetzner_storagebox_host_key: "{{ lookup('file', '../../../secrets/hetzner/storagebox_host_key') }}"
+    ntfy_alertmanager_password: "{{ lookup('file', '../../../secrets/monitoring/ntfy_alertmanager_password') }}"
     resticprofile_configurations:
       - global
       - borg-to-hetzner-storagebox
@@ -27,16 +28,17 @@
     - role: promtail
 
   pre_tasks:
-    - name: Find all ".yaml" and ".yml" borgmatic configuration files
+    # borg configs are now .j2 templates -- match plain and .j2 extensions.
+    - name: Find all borgmatic configuration files (.yaml/.yml, plain or .j2)
       local_action:
         module: find
         paths: "../../../configs/backup/borg"
-        patterns: "*.yml,*.yaml"
+        patterns: "*.yml,*.yaml,*.yml.j2,*.yaml.j2"
         file_type: file
       register: borgmatic_configs
     - name: Set the config names as a variable
       ansible.builtin.set_fact:
-        repositories: "{{ borgmatic_configs.files | map(attribute='path') | map('basename') | map('regex_replace', '\\.(yml|yaml)$', '') | list }}"
+        repositories: "{{ borgmatic_configs.files | map(attribute='path') | map('basename') | map('regex_replace', '\\.(yml|yaml)(\\.j2)?$', '') | list }}"
   tasks:
     - name: Install ssh
       ansible.builtin.apk:

@@ -27,8 +27,8 @@
   changed_when: false
 
 - name: Copy over borgmatic configuration
-  ansible.builtin.copy:
-    src: ../../../configs/backup/borg/{{ ansible_hostname }}.yaml
+  ansible.builtin.template:
+    src: ../../../configs/backup/borg/{{ ansible_hostname }}.yaml.j2
     dest: /etc/borgmatic/config.yaml
     mode: 0644
 
