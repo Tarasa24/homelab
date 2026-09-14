@@ -1,0 +1,4 @@
+title: Homelab
+instanceName: public
+disableUpdateCheck: true
+hideVersion: true

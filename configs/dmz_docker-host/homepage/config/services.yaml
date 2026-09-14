@@ -1,0 +1,28 @@
+# Static list, not Docker label auto-discovery - see docker-compose.yaml for
+# why (no docker.sock mount on a public-facing container).
+#
+# "SSO" here means: click through and, if you already have an Authelia
+# session from logging into this dashboard, you land in the app without a
+# second login prompt. Jellyfin/Immich do this via Authelia OIDC; Radicale
+# does it because the whole app sits behind an Authelia auth_request at
+# nginx. ntfy has no Authelia integration - it's public by design.
+
+- Media:
+    - Jellyfin:
+        icon: jellyfin.png
+        href: https://jellyfin.homelab.tarasa24.dev/
+        description: Movies & TV - SSO via Authelia
+    - Immich:
+        icon: immich.png
+        href: https://immich.homelab.tarasa24.dev/
+        description: Photos & videos - SSO via Authelia
+
+- Personal:
+    - Calendar & Contacts:
+        icon: radicale.png
+        href: https://cal.homelab.tarasa24.dev/
+        description: CalDAV/CardDAV - Authelia-protected
+    - ntfy:
+        icon: ntfy.png
+        href: https://ntfy.homelab.tarasa24.dev/
+        description: Push notifications (public)
