@@ -1,0 +1,5 @@
+# Explicit empty override. Homepage ships a demo widgets.yaml (CPU/memory/
+# disk resource bar + search box) baked into the image and falls back to it
+# when this file is absent - exactly the kind of info a public, internet-
+# facing dashboard shouldn't be handing out. No info widgets here on purpose.
+[]
