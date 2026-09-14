@@ -36,11 +36,6 @@
         href: https://vaultwarden.lan.tarasa24.dev/
         siteMonitor: https://vaultwarden.lan.tarasa24.dev/
         description: Password manager
-    - Firefly III:
-        icon: firefly.png
-        href: https://firefly.lan.tarasa24.dev/
-        siteMonitor: https://firefly.lan.tarasa24.dev/
-        description: Personal finance
     - Ghostfolio:
         icon: ghostfolio.png
         href: https://ghostfolio.lan.tarasa24.dev/

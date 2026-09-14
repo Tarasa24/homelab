@@ -191,7 +191,6 @@ Virtual NICs `eth0:0` through `eth0:9` (`10.0.30.21–30`) are assigned at boot 
 | `authelia/` | `10.0.30.21` | Authelia SSO/2FA |
 | `vaultwarden/` | `10.0.30.22` | Vaultwarden (Bitwarden-compatible password manager) |
 | `arr_stack/` | `10.0.30.23` | WireGuard + qBittorrent, Sonarr, Radarr, Prowlarr, Bazarr, FlareSolverr |
-| `firefly_iii/` | `10.0.30.24` | Firefly III personal finance |
 | `unifi-controller/` | `10.0.30.25` | Unifi network controller |
 | (root compose) | `10.0.30.20` | Promtail (log shipper) |
 | `ghostfolio/` | `10.0.30.26` | Ghostfolio portfolio tracker (Postgres + Redis) |

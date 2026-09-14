@@ -386,54 +386,6 @@ groups:
           description: "cAdvisor has not seen container qbittorrent on private-docker-host for 10 minutes"
 
       - alert: ContainerDown
-        expr: absent_over_time(container_last_seen{name="firefly_iii_app"}[10m])
-        for: 5m
-        labels:
-          severity: critical
-          alerttype: service
-          host: private-docker-host
-          container: firefly_iii_app
-        annotations:
-          summary: "Container firefly_iii_app has disappeared"
-          description: "cAdvisor has not seen container firefly_iii_app on private-docker-host for 10 minutes"
-
-      - alert: ContainerDown
-        expr: absent_over_time(container_last_seen{name="firefly_iii_db"}[10m])
-        for: 5m
-        labels:
-          severity: critical
-          alerttype: service
-          host: private-docker-host
-          container: firefly_iii_db
-        annotations:
-          summary: "Container firefly_iii_db has disappeared"
-          description: "cAdvisor has not seen container firefly_iii_db on private-docker-host for 10 minutes"
-
-      - alert: ContainerDown
-        expr: absent_over_time(container_last_seen{name="firefly_iii_importer"}[10m])
-        for: 5m
-        labels:
-          severity: critical
-          alerttype: service
-          host: private-docker-host
-          container: firefly_iii_importer
-        annotations:
-          summary: "Container firefly_iii_importer has disappeared"
-          description: "cAdvisor has not seen container firefly_iii_importer on private-docker-host for 10 minutes"
-
-      - alert: ContainerDown
-        expr: absent_over_time(container_last_seen{name="firefly_iii_cron"}[10m])
-        for: 5m
-        labels:
-          severity: critical
-          alerttype: service
-          host: private-docker-host
-          container: firefly_iii_cron
-        annotations:
-          summary: "Container firefly_iii_cron has disappeared"
-          description: "cAdvisor has not seen container firefly_iii_cron on private-docker-host for 10 minutes"
-
-      - alert: ContainerDown
         expr: absent_over_time(container_last_seen{name="vaultwarden"}[10m])
         for: 5m
         labels:

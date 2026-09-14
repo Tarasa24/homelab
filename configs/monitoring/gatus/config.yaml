@@ -212,24 +212,6 @@ endpoints:
       host: private-docker-host
       path: internal
 
-  - name: "Firefly III"
-    group: "Internal"
-    url: "http://10.0.30.24:8051/"
-    interval: 60s
-    client:
-      timeout: 10s
-    conditions:
-      - "[STATUS] == any(200, 301, 302, 401)"
-    ui:
-      hide-url: true
-      hide-hostname: true
-      hide-port: true
-      hide-conditions: true
-      hide-errors: true
-    extra-labels:
-      host: private-docker-host
-      path: internal
-
   # Queries a public name so the check covers recursion, not just liveness.
   - name: "DNS"
     group: "Internal"
