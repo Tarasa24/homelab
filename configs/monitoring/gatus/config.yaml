@@ -88,6 +88,24 @@ endpoints:
       host: dmz-docker-host
       path: external
 
+  - name: "Homepage (Public)"
+    group: "Public"
+    url: "https://dash.homelab.tarasa24.dev/"
+    interval: 60s
+    client:
+      ignore-redirect: true
+      timeout: 10s
+    conditions:
+      # Auth-gated behind Authelia; a redirect or 401 still proves nginx, TLS
+      # and Authelia are all alive - same reasoning as the Calendar check.
+      - "[STATUS] == any(200, 301, 302, 401)"
+    ui:
+      hide-conditions: true
+      hide-errors: true
+    extra-labels:
+      host: dmz-docker-host
+      path: external
+
   - name: "Authelia"
     group: "Public"
     url: "https://auth.homelab.tarasa24.dev/api/health"
@@ -121,6 +139,24 @@ endpoints:
 
   # Internal - probed directly over the LAN, bypassing the WAN. If Public fails
   # but Internal passes, the fault is in the WAN/nginx path, not the service.
+  - name: "Homepage (Admin)"
+    group: "Internal"
+    url: "http://10.0.30.28:3000/api/healthcheck"
+    interval: 60s
+    client:
+      timeout: 10s
+    conditions:
+      - "[STATUS] == 200"
+    ui:
+      hide-url: true
+      hide-hostname: true
+      hide-port: true
+      hide-conditions: true
+      hide-errors: true
+    extra-labels:
+      host: private-docker-host
+      path: internal
+
   - name: "Traefik"
     group: "Internal"
     # /ping is not enabled here; the insecure API on :8080 is.
