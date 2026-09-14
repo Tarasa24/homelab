@@ -1,0 +1,26 @@
+services:
+  homepage:
+    image: ghcr.io/gethomepage/homepage:latest
+    container_name: homepage_admin
+    restart: unless-stopped
+    ports:
+      - "10.0.30.28:3000:3000"
+    volumes:
+      - ./homepage/config:/app/config
+      # No docker.sock: static services.yaml is enough, keeps this in line
+      # with the public instance instead of a one-off exception.
+    environment:
+      HOMEPAGE_ALLOWED_HOSTS: "dash.lan.tarasa24.dev,10.0.30.28:3000"
+    labels:
+      - "traefik.enable=true"
+      - "traefik.docker.network=root_default"
+      - "traefik.http.routers.homepage.rule=Host(`dash.lan.tarasa24.dev`)"
+      - "traefik.http.routers.homepage.entrypoints=https"
+      - "traefik.http.routers.homepage.tls=true"
+      - "traefik.http.routers.homepage.middlewares=hsts@file"
+      - "traefik.http.services.homepage.loadbalancer.server.port=3000"
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:3000/api/healthcheck"]
+      interval: 30s
+      timeout: 10s
+      retries: 3

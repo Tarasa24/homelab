@@ -7,11 +7,20 @@ server:
   address: "tcp://:9091"
   endpoints:
     authz:
+      # HTTP Basic clients (CalDAV/cal.homelab) - always 401+WWW-Authenticate.
       auth-request:
         implementation: "AuthRequest"
         authn_strategies:
           - name: "CookieSession"
           - name: "HeaderAuthorization"
+      # Browser vhosts (dash.homelab). nginx's auth_request only accepts
+      # 200/401/403, so ForwardAuth's real 302 gets rejected - must stay
+      # AuthRequest. Dropping HeaderAuthorization is what makes the 401 carry
+      # a Location header instead of WWW-Authenticate, which nginx redirects on.
+      auth-request-browser:
+        implementation: "AuthRequest"
+        authn_strategies:
+          - name: "CookieSession"
 log:
   level: "debug"
 
@@ -33,15 +42,15 @@ access_control:
       policy: "one_factor"
       subject:
         - ["group:radicale-users"]
+    - domain: "dash.homelab.tarasa24.dev"
+      policy: "one_factor"
 
 session:
   cookies:
     - domain: "homelab.tarasa24.dev"
       authelia_url: "https://auth.homelab.tarasa24.dev"
       # Landing page when logging in at the portal with no rd= parameter.
-      # Previously www.homelab.tarasa24.dev, which has no vhost. Revisit when a
-      # real dashboard exists.
-      default_redirection_url: "https://status.homelab.tarasa24.dev"
+      default_redirection_url: "https://dash.homelab.tarasa24.dev"
 
 regulation:
   max_retries: 3

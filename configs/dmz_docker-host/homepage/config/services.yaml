@@ -1,0 +1,18 @@
+# Minimal on purpose: only the two apps with real Authelia SSO. ntfy/Radicale
+# omitted - infra/transport, not launcher-worthy.
+#
+# siteMonitor targets the internal DMZ IP, not the public hostname: from
+# inside the DMZ, the public hostname hairpins through the UXG back to its
+# own WAN IP and fails (same gotcha as Jellyfin's OIDC redirect_uri).
+
+- Media:
+    - Jellyfin:
+        icon: jellyfin.png
+        href: https://jellyfin.homelab.tarasa24.dev/
+        siteMonitor: http://10.0.40.21:8096/health
+        description: Movies & TV - SSO via Authelia
+    - Immich:
+        icon: immich.png
+        href: https://immich.homelab.tarasa24.dev/
+        siteMonitor: http://10.0.40.23/api/server/ping
+        description: Photos & videos - SSO via Authelia

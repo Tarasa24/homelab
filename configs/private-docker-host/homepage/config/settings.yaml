@@ -1,0 +1,23 @@
+title: Homelab
+instanceName: admin
+theme: dark
+color: slate
+headerStyle: boxed
+iconStyle: gradient
+useEqualHeights: true
+cardBlur: xs
+statusStyle: dot
+disableUpdateCheck: true
+layout:
+  Media & Downloads:
+    style: row
+    columns: 5
+  Apps:
+    style: row
+    columns: 5
+  Infrastructure:
+    style: row
+    columns: 4
+  Monitoring:
+    style: row
+    columns: 2

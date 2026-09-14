@@ -1,0 +1,92 @@
+# LAN-only, no auth gate - same trust model as every other *.lan app.
+#
+# siteMonitor dots are cosmetic only (not wired into alerting). Proxmox and
+# Unifi skip it - self-signed certs would paint them permanently "down".
+
+- Media & Downloads:
+    - Sonarr:
+        icon: sonarr.png
+        href: https://sonarr.lan.tarasa24.dev/
+        siteMonitor: https://sonarr.lan.tarasa24.dev/
+        description: TV series management
+    - Radarr:
+        icon: radarr.png
+        href: https://radarr.lan.tarasa24.dev/
+        siteMonitor: https://radarr.lan.tarasa24.dev/
+        description: Movie management
+    - Prowlarr:
+        icon: prowlarr.png
+        href: https://prowlarr.lan.tarasa24.dev/
+        siteMonitor: https://prowlarr.lan.tarasa24.dev/
+        description: Indexer management
+    - Bazarr:
+        icon: bazarr.png
+        href: https://bazarr.lan.tarasa24.dev/
+        siteMonitor: https://bazarr.lan.tarasa24.dev/
+        description: Subtitle management
+    - qBittorrent:
+        icon: qbittorrent.png
+        href: https://qbittorrent.lan.tarasa24.dev/
+        siteMonitor: https://qbittorrent.lan.tarasa24.dev/
+        description: Torrent client (behind WireGuard netns)
+
+- Apps:
+    - Vaultwarden:
+        icon: vaultwarden.png
+        href: https://vaultwarden.lan.tarasa24.dev/
+        siteMonitor: https://vaultwarden.lan.tarasa24.dev/
+        description: Password manager
+    - Firefly III:
+        icon: firefly.png
+        href: https://firefly.lan.tarasa24.dev/
+        siteMonitor: https://firefly.lan.tarasa24.dev/
+        description: Personal finance
+    - Ghostfolio:
+        icon: ghostfolio.png
+        href: https://ghostfolio.lan.tarasa24.dev/
+        siteMonitor: https://ghostfolio.lan.tarasa24.dev/
+        description: Portfolio tracker
+    - Kimai:
+        icon: kimai.png
+        href: https://kimai.lan.tarasa24.dev/
+        siteMonitor: https://kimai.lan.tarasa24.dev/
+        description: Time tracking
+    - Home Assistant:
+        icon: home-assistant.png
+        href: https://homeassistant.lan.tarasa24.dev/
+        siteMonitor: https://homeassistant.lan.tarasa24.dev/
+        description: Home automation - SSO via Authelia
+
+- Infrastructure:
+    - Traefik:
+        icon: traefik.png
+        href: http://10.0.30.20:8080/dashboard/
+        siteMonitor: http://10.0.30.20:8080/
+        description: Reverse proxy dashboard
+    - Unifi Controller:
+        icon: unifi.png
+        href: https://unifi.lan.tarasa24.dev/
+        description: Network controller
+    - Authelia:
+        icon: authelia.png
+        href: https://auth.homelab.tarasa24.dev/
+        siteMonitor: https://auth.homelab.tarasa24.dev/
+        description: SSO / 2FA portal
+    - Proxmox:
+        icon: proxmox.png
+        href: https://10.0.30.2:8006/
+        description: Hypervisor management
+
+- Monitoring:
+    - Grafana:
+        icon: grafana.png
+        href: http://10.0.30.14:3000/
+        siteMonitor: http://10.0.30.14:3000/
+        description: Dashboards
+    - Gatus:
+        icon: gatus.png
+        href: https://status.homelab.tarasa24.dev/
+        description: Public status page
+        widget:
+          type: gatus
+          url: http://10.0.50.4:8080

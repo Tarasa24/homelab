@@ -1,0 +1,4 @@
+# Overrides Homepage's bundled demo widgets.yaml (CPU/mem/disk bar + search).
+- greeting:
+    text_size: 3xl
+    text: Homelab

@@ -296,4 +296,14 @@ resource "proxmox_virtual_environment_firewall_rules" "lxc_dmz_proxy" {
     proto   = "tcp"
     dest    = "10.0.50.4/32"
   }
+
+  rule {
+    type    = "out"
+    action  = "ACCEPT"
+    comment = "Allow output traffic to homepage (public dashboard)"
+    iface   = "net0"
+    dport   = "3000"
+    proto   = "tcp"
+    dest    = "10.0.40.25/32"
+  }
 }

@@ -1,0 +1,54 @@
+/* Cyan accent, distinct from admin's indigo. See admin custom.css for the
+ * note on why these selectors (not hashed Tailwind utilities). */
+
+body {
+  background:
+    radial-gradient(1100px circle at 10% -10%, rgba(56, 189, 248, 0.16), transparent 42%),
+    radial-gradient(900px circle at 90% 5%, rgba(59, 130, 246, 0.12), transparent 45%),
+    radial-gradient(1200px circle at 50% 115%, rgba(45, 212, 191, 0.08), transparent 50%),
+    #0b1120;
+  background-attachment: fixed;
+}
+
+.service-group-name {
+  position: relative;
+  padding-left: 0.9rem;
+  letter-spacing: 0.02em;
+  margin-bottom: 0.5rem !important;
+}
+
+.service-group-name::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0.2em;
+  bottom: 0.2em;
+  width: 4px;
+  border-radius: 4px;
+  background: linear-gradient(180deg, #38bdf8, transparent);
+}
+
+.service-card {
+  border-radius: 1.1rem !important;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  padding: 0.5rem;
+  transition: transform 180ms ease, box-shadow 180ms ease, border-color 180ms ease;
+}
+
+.service-card:hover {
+  transform: translateY(-4px);
+  border-color: rgba(56, 189, 248, 0.5);
+  box-shadow: 0 14px 32px -12px rgba(0, 0, 0, 0.55), 0 0 0 1px rgba(56, 189, 248, 0.15);
+}
+
+.service-icon img {
+  filter: drop-shadow(0 2px 8px rgba(0, 0, 0, 0.45));
+}
+
+.service-icon {
+  width: 3.5rem !important;
+}
+
+#information-widgets {
+  border-bottom-color: rgba(56, 189, 248, 0.25) !important;
+}

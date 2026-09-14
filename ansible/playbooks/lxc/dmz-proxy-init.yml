@@ -12,6 +12,9 @@
       - "*.homelab.tarasa24.dev"
       - "*.dormlab.tarasa24.dev"
       - "*.lan.tarasa24.dev"
+      # Bare apex, for the homelab.tarasa24.dev -> dash.homelab.tarasa24.dev
+      # redirect. The wildcard above does not cover the naked apex.
+      - "homelab.tarasa24.dev"
     certbot_email: "admin@tarasa24.dev"
     # certbot-dns-hetzner is not in any stable Alpine release -- only in
     # edge/testing -- and putting the sole ingress host on a rolling base is a

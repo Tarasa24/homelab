@@ -1,0 +1,15 @@
+title: Homelab
+instanceName: public
+theme: dark
+color: slate
+headerStyle: clean
+iconStyle: gradient
+useEqualHeights: true
+cardBlur: xs
+statusStyle: dot
+disableUpdateCheck: true
+hideVersion: true
+layout:
+  Media:
+    style: row
+    columns: 2

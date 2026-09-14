@@ -196,6 +196,7 @@ Virtual NICs `eth0:0` through `eth0:9` (`10.0.30.21–30`) are assigned at boot 
 | (root compose) | `10.0.30.20` | Promtail (log shipper) |
 | `ghostfolio/` | `10.0.30.26` | Ghostfolio portfolio tracker (Postgres + Redis) |
 | `kimai/` | `10.0.30.27` | Kimai time tracking (MariaDB) |
+| `homepage/` | `10.0.30.28` | Homepage admin dashboard (`dash.lan.tarasa24.dev`); full service inventory, no auth gate (LAN-trusted) |
 | `cadvisor/` | `10.0.50.20` | cAdvisor per-container metrics on `:8081` (VLAN 50) |
 
 The `arr_stack` services run inside a WireGuard network namespace (all share the `wireguard` container's network via `network_mode: service:wireguard`).
@@ -214,6 +215,7 @@ Internet-accessible services, isolated in the DMZ. Has GPU passthrough (`/dev/dr
 | Immich | Photo management; `/immich` from USB-HDD |
 | Radicale | CalDAV/CardDAV server |
 | ntfy | Push notification server (`10.0.40.24`); exposed at `ntfy.homelab.tarasa24.dev` |
+| Homepage | Public dashboard (`10.0.40.25`), exposed at `dash.homelab.tarasa24.dev`; gated behind Authelia forward-auth at nginx, same recipe as `cal.homelab.tarasa24.dev`. Bare apex `homelab.tarasa24.dev` redirects here. |
 | Promtail | Log shipper to Loki |
 | cAdvisor | Per-container metrics on `10.0.50.120:8081` (VLAN 50) |
 
@@ -549,6 +551,7 @@ Some containers (`lxc_dns`, `lxc_dmz_bitcoin_node`) trigger their Ansible playbo
 - **State lives on the container disk, never on USB mounts**: Docker service state (databases, app data, config) always uses named Docker volumes, which default to `/var/lib/docker/volumes/` on the container's own disk. Borgmatic then backs these up to the borg server over SSH. USB-mounted cold storage (`/mnt/USB-SSD`, `/mnt/USB-HDD`) is reserved exclusively for bulk data that cannot reasonably be backed up (media libraries, blockchain data, SSL certs). Never use bind mounts to cold storage paths for service state.
 - **Terraform `terraform.tfvars`**: sensitive Proxmox endpoint/credentials live in `secrets/terraform.tfvars` (git-crypt encrypted). The Proxmox provider SSH key is read from `~/.ssh/homelab_proxmox`.
 - **Domain naming**: `*.lan.tarasa24.dev` for internal LAN services (via Traefik), `*.homelab.tarasa24.dev` and `*.dormlab.tarasa24.dev` for DMZ/externally reachable services (via nginx on the DMZ router).
+- **New service checklist includes the dashboard**: adding a service means updating inventory (this doc's tables, `ansible/inventory.ini`) *and* adding a launcher tile to the matching Homepage instance's `services.yaml` — admin (`configs/private-docker-host/homepage/`) for LAN-only services, public (`configs/dmz_docker-host/homepage/`) only if it has real Authelia SSO (see that file's own comment for why the list stays short). Skipping this is how a service silently becomes undiscoverable.
 
 ---
 

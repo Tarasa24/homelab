@@ -1,0 +1,20 @@
+services:
+  homepage:
+    image: ghcr.io/gethomepage/homepage:latest
+    container_name: homepage_public
+    restart: unless-stopped
+    ports:
+      - "10.0.40.25:3000:3000"
+    volumes:
+      - ./homepage/config:/app/config
+      # No docker.sock: internet-reachable container, static services.yaml
+      # instead of label auto-discovery to avoid handing out Docker API access.
+    environment:
+      # IP:port too - Homepage 403s any Host header not on this list, and
+      # that's how it gets reached directly (bypassing nginx) for debugging.
+      HOMEPAGE_ALLOWED_HOSTS: "dash.homelab.tarasa24.dev,10.0.40.25:3000"
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:3000/api/healthcheck"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
