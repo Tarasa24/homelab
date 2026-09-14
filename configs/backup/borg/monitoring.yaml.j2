@@ -30,3 +30,22 @@ after_backup:
 on_error:
   - cd /root && docker compose start grafana
   - cd /root && docker compose start gatus
+
+loki:
+  url: http://10.0.50.4:3100/loki/api/v1/push
+  labels:
+    app: borgmatic
+    host: monitoring
+
+ntfy:
+  topic: homelab-critical
+  server: http://10.0.40.24:8080
+  username: alertmanager
+  password: "{{ ntfy_alertmanager_password }}"
+  fail:
+    title: "borgmatic backup failed on monitoring"
+    message: "Check borgmatic on monitoring - see /etc/borgmatic/config.yaml and journal/output for details"
+    tags: borgmatic,backup,warning
+    priority: high
+  states:
+    - fail

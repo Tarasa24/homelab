@@ -23,6 +23,20 @@ immich-media:
       - /immich/profile
       - /immich/backups # Just to be sure, keep the automatic backups as well
       - /immich/external
+    # Direct to ntfy, bypasses Alertmanager (and its mute window) entirely.
+    send-after-fail:
+      method: POST
+      url: http://10.0.40.24:8080/homelab-critical
+      headers:
+        - name: Authorization
+          value: "Basic {{ ('alertmanager:' + ntfy_alertmanager_password) | b64encode }}"
+        - name: Title
+          value: "resticprofile backup failed on backup (immich-media)"
+        - name: Tags
+          value: "resticprofile,backup,warning"
+        - name: Priority
+          value: high
+      body: "${ERROR}\n\n${ERROR_STDERR}"
 
   prune:
     schedule: "sun 4:30" # Weekly on Sunday at 4:30am

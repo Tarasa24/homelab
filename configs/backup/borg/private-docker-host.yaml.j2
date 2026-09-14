@@ -54,3 +54,22 @@ on_error:
   - cd /root && docker compose start unifi-db unifi-controller
   - cd /root && docker compose start ghostfolio_db ghostfolio_app ghostfolio_redis
   - cd /root && docker compose start kimai_db kimai_app
+
+loki:
+  url: http://10.0.50.4:3100/loki/api/v1/push
+  labels:
+    app: borgmatic
+    host: private-docker-host
+
+ntfy:
+  topic: homelab-critical
+  server: http://10.0.40.24:8080
+  username: alertmanager
+  password: "{{ ntfy_alertmanager_password }}"
+  fail:
+    title: "borgmatic backup failed on private-docker-host"
+    message: "Check borgmatic on private-docker-host - see /etc/borgmatic/config.yaml and journal/output for details"
+    tags: borgmatic,backup,warning
+    priority: high
+  states:
+    - fail

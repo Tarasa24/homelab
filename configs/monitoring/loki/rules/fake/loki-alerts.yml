@@ -219,3 +219,71 @@ groups:
         annotations:
           summary: "No logs received from monitoring for 2 hours"
           description: "Promtail on monitoring has stopped shipping to Loki - log-based alerting is blind for this host"
+
+      # Catches "job never ran at all" - the one case the ntfy hooks above miss.
+      - alert: BorgmaticJobMissing
+        expr: absent_over_time({app="borgmatic", host="dns"}[27h])
+        for: 10m
+        labels:
+          severity: critical
+          alerttype: infrastructure
+          host: dns
+        annotations:
+          summary: "No borgmatic backup logged on dns for 27 hours"
+          description: "borgmatic on dns has not shipped a loki log entry in 27 hours - the nightly cron job may not be running at all"
+
+      - alert: BorgmaticJobMissing
+        expr: absent_over_time({app="borgmatic", host="monitoring"}[27h])
+        for: 10m
+        labels:
+          severity: critical
+          alerttype: infrastructure
+          host: monitoring
+        annotations:
+          summary: "No borgmatic backup logged on monitoring for 27 hours"
+          description: "borgmatic on monitoring has not shipped a loki log entry in 27 hours - the nightly cron job may not be running at all"
+
+      - alert: BorgmaticJobMissing
+        expr: absent_over_time({app="borgmatic", host="dmz-proxy"}[27h])
+        for: 10m
+        labels:
+          severity: critical
+          alerttype: infrastructure
+          host: dmz-proxy
+        annotations:
+          summary: "No borgmatic backup logged on dmz-proxy for 27 hours"
+          description: "borgmatic on dmz-proxy has not shipped a loki log entry in 27 hours - the nightly cron job may not be running at all"
+
+      - alert: BorgmaticJobMissing
+        expr: absent_over_time({app="borgmatic", host="private-docker-host"}[27h])
+        for: 10m
+        labels:
+          severity: critical
+          alerttype: infrastructure
+          host: private-docker-host
+        annotations:
+          summary: "No borgmatic backup logged on private-docker-host for 27 hours"
+          description: "borgmatic on private-docker-host has not shipped a loki log entry in 27 hours - the nightly cron job may not be running at all"
+
+      # host: hyphenated, not ansible_hostname - see dmz_docker-host.yaml.j2.
+      - alert: BorgmaticJobMissing
+        expr: absent_over_time({app="borgmatic", host="dmz-docker-host"}[27h])
+        for: 10m
+        labels:
+          severity: critical
+          alerttype: infrastructure
+          host: dmz-docker-host
+        annotations:
+          summary: "No borgmatic backup logged on dmz-docker-host for 27 hours"
+          description: "borgmatic on dmz-docker-host has not shipped a loki log entry in 27 hours - the nightly cron job may not be running at all"
+
+      - alert: ResticprofileJobMissing
+        expr: absent_over_time({job="backup/resticprofile"}[27h])
+        for: 10m
+        labels:
+          severity: critical
+          alerttype: infrastructure
+          host: backup
+        annotations:
+          summary: "No resticprofile activity logged on backup for 27 hours"
+          description: "resticprofile on backup has not written to /var/log/resticprofile-scheduled.log in 27 hours - the scheduled offsite backup may not be running at all"

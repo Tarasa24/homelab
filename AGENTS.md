@@ -491,13 +491,42 @@ Two complementary backup tools run on all relevant containers:
 
 ### Borg (local + SSH)
 - **Server**: `lxc_backup` at `10.0.30.13`. Repositories stored at `/backup/repos/` (USB-SSD). Access is key-restricted via `authorized_keys` with `borg serve --restrict-to-path`.
-- **Clients**: Each service container has the `borgmatic` Ansible role applied. The role installs borgmatic, copies the SSH private key from `secrets/backup/ssh/id_ed25519`, copies the host-specific borgmatic config from `configs/backup/borg/<hostname>.yaml`, runs `borgmatic extract` to restore on first deploy, then schedules nightly backups via cron at 02:00.
+- **Clients**: Each service container has the `borgmatic` Ansible role applied. The role installs borgmatic, copies the SSH private key from `secrets/backup/ssh/id_ed25519`, templates the host-specific borgmatic config from `configs/backup/borg/<hostname>.yaml.j2` (Jinja, so the ntfy password can be injected at deploy time — not git-crypt encrypted, so it must never contain the literal secret), runs `borgmatic extract` to restore on first deploy, then schedules nightly backups via cron at 02:00.
 - **Trigger all**: `ansible-playbook playbooks/all/borg-backup-all.yml`
 
 ### Restic (remote Hetzner Storage Box)
 - **Client**: `lxc_backup` also runs resticprofile to back up to a Hetzner Storage Box over SFTP.
 - Profiles: `global`, `borg-to-hetzner-storagebox`, `immich-media-to-hetzner-storagebox`.
 - SSH key + host key come from `secrets/hetzner/`; the restic password comes from `secrets/backup/resticprofile/`.
+
+### Backup Failure/Non-Execution Monitoring
+
+Both backup mechanisms ran under `crond` (busybox on the borg clients,
+resticprofile's own `crond` scheduler on `lxc_backup`) with stdout/stderr
+captured nowhere — a 3am failure was invisible: no log, no metric, no alert.
+The fix is two-tier, split along a line neither half can cross on its own.
+Native tool hooks — borgmatic's `ntfy:` config block and resticprofile's
+`send-after-fail` HTTP hook — push straight to the `homelab-critical` ntfy
+topic the moment a job *runs and fails*, bypassing Prometheus, Loki and
+Alertmanager entirely. That bypass is deliberate, not incidental: a real
+backup failure must never be swallowed by the nightly-backup mute window
+(01:55–03:00 UTC, see the availability-monitoring section above), and since
+these hooks never touch Alertmanager, it structurally can't be — there's no
+route to add an exception to. What native hooks cannot see is a job that
+*never runs at all* (cron silently dead, host down before 02:00) — nothing
+executes, so nothing pushes. That gap is closed by `BorgmaticJobMissing` and
+`ResticprofileJobMissing` in `configs/monitoring/loki/rules/fake/loki-alerts.yml`,
+`absent_over_time()` rules on the `app="borgmatic"`/`job="backup/resticprofile"`
+streams that borgmatic's `loki:` block and a new promtail scrape of
+`/var/log/resticprofile-scheduled.log` now ship. These *do* go through the
+normal Alertmanager path, but a 27h window means they only fire well after
+03:00 regardless, so no mute-window route was added for them. Both borgmatic's
+`ntfy:` password and resticprofile's HTTP Basic auth header (constructed by
+hand via Jinja `b64encode` — resticprofile's hooks have no basic-auth block)
+draw on the same `secrets/monitoring/ntfy_alertmanager_password` Alertmanager
+already uses, injected via `ansible.builtin.template` rather than `copy` now
+that `configs/backup/borg/*.yaml.j2` carries a secret and isn't git-crypt
+encrypted.
 
 ---
 

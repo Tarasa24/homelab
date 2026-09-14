@@ -24,6 +24,20 @@
       - "borg check --verify-data --lock-wait 10 {{ repositories_dir }}/{{ repository_name }}"
     run-after:
       - "BORG_UNKNOWN_UNENCRYPTED_REPO_ACCESS_IS_OK=yes borg list {{ repositories_dir }}/{{ repository_name }}"
+    # Direct to ntfy, bypasses Alertmanager (and its mute window) entirely.
+    send-after-fail:
+      method: POST
+      url: http://10.0.40.24:8080/homelab-critical
+      headers:
+        - name: Authorization
+          value: "Basic {{ ('alertmanager:' + ntfy_alertmanager_password) | b64encode }}"
+        - name: Title
+          value: "resticprofile backup failed on backup ({{ repository_name }})"
+        - name: Tags
+          value: "resticprofile,backup,warning"
+        - name: Priority
+          value: high
+      body: "${ERROR}\n\n${ERROR_STDERR}"
 
   prune:
     schedule: "sun 3:30" # Weekly on Sunday at 3:30am

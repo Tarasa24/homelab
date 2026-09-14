@@ -38,3 +38,24 @@ on_error:
   - cd /root && docker compose start radicale
   - cd /root && docker compose start immich-database
   - cd /root && docker compose start ntfy
+
+# host label is "dmz-docker-host" (hyphen) to match every other scrape
+# target for this host -- not ansible_hostname (underscore).
+loki:
+  url: http://10.0.50.4:3100/loki/api/v1/push
+  labels:
+    app: borgmatic
+    host: dmz-docker-host
+
+ntfy:
+  topic: homelab-critical
+  server: http://10.0.40.24:8080
+  username: alertmanager
+  password: "{{ ntfy_alertmanager_password }}"
+  fail:
+    title: "borgmatic backup failed on dmz_docker-host"
+    message: "Check borgmatic on dmz_docker-host - see /etc/borgmatic/config.yaml and journal/output for details"
+    tags: borgmatic,backup,warning
+    priority: high
+  states:
+    - fail

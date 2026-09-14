@@ -28,3 +28,22 @@ after_backup:
   - rc-service technitium-dns start
 on_error:
   - rc-service technitium-dns start
+
+loki:
+  url: http://10.0.50.4:3100/loki/api/v1/push
+  labels:
+    app: borgmatic
+    host: dns
+
+ntfy:
+  topic: homelab-critical
+  server: http://10.0.40.24:8080
+  username: alertmanager
+  password: "{{ ntfy_alertmanager_password }}"
+  fail:
+    title: "borgmatic backup failed on dns"
+    message: "Check borgmatic on dns - see /etc/borgmatic/config.yaml and journal/output for details"
+    tags: borgmatic,backup,warning
+    priority: high
+  states:
+    - fail

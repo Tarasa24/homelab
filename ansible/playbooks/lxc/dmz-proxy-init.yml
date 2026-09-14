@@ -26,6 +26,7 @@
     certbot_version: "5.7.0"
     certbot_dns_hetzner_version: "4.0.0"
     hetzner_dns_api_token: "{{ lookup('file', '../../../secrets/hetzner/certbot_dns_api_token') | trim }}"
+    ntfy_alertmanager_password: "{{ lookup('file', '../../../secrets/monitoring/ntfy_alertmanager_password') }}"
   roles:
     - role: lxc_python3
     - role: borgmatic

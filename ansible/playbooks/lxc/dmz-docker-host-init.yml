@@ -17,6 +17,7 @@
       "10.0.40.29",
       "10.0.40.30"
     ]
+    ntfy_alertmanager_password: "{{ lookup('file', '../../../secrets/monitoring/ntfy_alertmanager_password') }}"
   roles:
     - role: lxc_python3
     - role: docker
