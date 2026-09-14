@@ -6,6 +6,7 @@ headerStyle: boxed
 iconStyle: gradient
 useEqualHeights: true
 cardBlur: xs
+statusStyle: dot
 disableUpdateCheck: true
 layout:
   Media & Downloads:

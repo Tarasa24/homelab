@@ -1,11 +1,12 @@
 title: Homelab
 instanceName: public
 theme: dark
-color: blue
+color: slate
 headerStyle: clean
 iconStyle: gradient
 useEqualHeights: true
 cardBlur: xs
+statusStyle: dot
 disableUpdateCheck: true
 hideVersion: true
 layout:

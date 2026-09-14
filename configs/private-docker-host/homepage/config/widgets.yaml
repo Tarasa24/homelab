@@ -1,5 +1,6 @@
-# Explicit empty override. Homepage ships a demo widgets.yaml (CPU/memory/
-# disk resource bar + search box) baked into the image and falls back to it
-# when this file is absent. Not needed for a launcher page - keeps it to just
-# the service tiles.
-[]
+# Homepage's bundled demo widgets.yaml (CPU/memory/disk bar + search box)
+# fills in silently when this is absent - see git history. A static greeting
+# is a nicer use of the same top bar than nothing at all.
+- greeting:
+    text_size: 3xl
+    text: Homelab

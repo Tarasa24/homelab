@@ -4,17 +4,25 @@
 # Deliberately minimal: only the two apps with real Authelia SSO (click
 # through, land in the app with no second login if you already have a portal
 # session from this dashboard). ntfy and Radicale are left off entirely -
-# they're infra/transport, not something worth a launcher tile, and every
-# entry here is a small map of "what exists" handed to anyone who reaches
-# this page. No resource/CPU widgets, no bookmarks - nothing beyond the two
-# links themselves.
+# they're infra/transport, not something worth a launcher tile.
+#
+# siteMonitor gives each tile a live up/down dot (statusStyle: dot in
+# settings.yaml) - same health check paths Gatus already probes
+# (configs/monitoring/gatus/config.yaml), so "is it actually healthy" means
+# the same thing in both places. Targets the internal DMZ IP, not the public
+# hostname: this container sits on the same host as Jellyfin/Immich, and
+# probing the public hostname from inside the DMZ hairpins back through the
+# UXG to its own WAN IP, which doesn't work - same gotcha already documented
+# for Jellyfin's OIDC redirect_uri (see its extra_hosts entry).
 
 - Media:
     - Jellyfin:
         icon: jellyfin.png
         href: https://jellyfin.homelab.tarasa24.dev/
+        siteMonitor: http://10.0.40.21:8096/health
         description: Movies & TV - SSO via Authelia
     - Immich:
         icon: immich.png
         href: https://immich.homelab.tarasa24.dev/
+        siteMonitor: http://10.0.40.23/api/server/ping
         description: Photos & videos - SSO via Authelia
