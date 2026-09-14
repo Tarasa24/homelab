@@ -47,6 +47,9 @@ scrape_configs:
       - targets: ['10.0.50.103:9100'] # DMZ bitcoin node
         labels:
           host: dmz-bitcoin-node
+      - targets: ['10.0.50.5:9100']   # UniFi OS Server VM
+        labels:
+          host: unifi-os
       # On the LAN, not VLAN 50: the host owns vmbr0 and has no address there.
       # Needs the cluster firewall rule in terraform/firewall_base.tf.
       - targets: ['10.0.30.2:9100']   # Proxmox host

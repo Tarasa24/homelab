@@ -172,7 +172,7 @@ groups:
       # legitimately inactive (apt-daily, e2scrub_all, ...) - 134 pending alerts
       # in practice. Cannot detect a unit removed entirely, only one not active.
       - alert: SystemdUnitDown
-        expr: node_systemd_unit_state{state="active", name=~"(bitcoind|electrs|pve-cluster|pvedaemon|pveproxy|pvestatd|pve-firewall)\\.service"} == 0
+        expr: node_systemd_unit_state{state="active", name=~"(bitcoind|electrs|pve-cluster|pvedaemon|pveproxy|pvestatd|pve-firewall|uosserver)\\.service"} == 0
         for: 5m
         labels:
           severity: critical
@@ -396,30 +396,6 @@ groups:
         annotations:
           summary: "Container vaultwarden has disappeared"
           description: "cAdvisor has not seen container vaultwarden on private-docker-host for 10 minutes"
-
-      - alert: ContainerDown
-        expr: absent_over_time(container_last_seen{name="unifi-controller"}[10m])
-        for: 5m
-        labels:
-          severity: critical
-          alerttype: service
-          host: private-docker-host
-          container: unifi-controller
-        annotations:
-          summary: "Container unifi-controller has disappeared"
-          description: "cAdvisor has not seen container unifi-controller on private-docker-host for 10 minutes"
-
-      - alert: ContainerDown
-        expr: absent_over_time(container_last_seen{name="unifi-db"}[10m])
-        for: 5m
-        labels:
-          severity: critical
-          alerttype: service
-          host: private-docker-host
-          container: unifi-db
-        annotations:
-          summary: "Container unifi-db has disappeared"
-          description: "cAdvisor has not seen container unifi-db on private-docker-host for 10 minutes"
 
       - alert: ContainerDown
         expr: absent_over_time(container_last_seen{name="ghostfolio"}[10m])

@@ -1,0 +1,83 @@
+---
+# Real VM (terraform/vm_unifi_os.tf), reached over network SSH -- no pct exec.
+- name: Configure UniFi OS Server
+  hosts: vm_unifi_os
+  gather_facts: false
+  # Connects as the cloud-init "ansible" user, not root.
+  become: true
+  vars:
+    ntfy_alertmanager_password: "{{ lookup('file', '../../../secrets/monitoring/ntfy_alertmanager_password') }}"
+    # Installer URL is versioned/signed and expires -- grab the current Linux
+    # x64 link from https://ui.com/download/software/unifi-os-server and pass
+    # it via -e unifi_os_installer_url=...
+    unifi_os_installer_url: "{{ unifi_os_installer_url | mandatory }}"
+  roles:
+    - role: node_exporter
+    - role: promtail
+      promtail_config_name: unifi-os
+    - role: borgmatic
+
+  tasks:
+    # podman/uidmap/slirp4netns per Ubiquiti's Linux install doc. The installer
+    # hard-codes /usr/bin/podman, so the apt package is required.
+    - name: Install podman and dependencies
+      ansible.builtin.apt:
+        pkg: [podman, uidmap, slirp4netns]
+        update_cache: true
+      retries: 3
+
+    - name: Check if UOS Server is already installed
+      ansible.builtin.stat:
+        path: /usr/local/bin/uosserver
+      register: uosserver_installed
+
+    - name: Install UOS Server
+      when: not uosserver_installed.stat.exists
+      block:
+        - name: Download UOS Server installer
+          ansible.builtin.get_url:
+            url: "{{ unifi_os_installer_url }}"
+            dest: /root/unifi-os-server.bin
+            mode: "0755"
+          register: uos_download
+          until: uos_download is succeeded
+          retries: 5
+          delay: 10
+
+        # `yes` auto-confirms the interactive prompt. `|| true`: the installer's
+        # own 60s "wait for healthy" can exit non-zero even when the container
+        # comes up fine; the verification task below is the real gate.
+        - name: Run UOS Server installer
+          ansible.builtin.shell: "set -o pipefail && yes | /root/unifi-os-server.bin || true"
+          args:
+            executable: /bin/bash
+          changed_when: true
+
+        - name: Remove installer binary
+          ansible.builtin.file:
+            path: /root/unifi-os-server.bin
+            state: absent
+
+    - name: Enable and start uosserver services
+      ansible.builtin.systemd:
+        name: "{{ item }}"
+        enabled: true
+        state: started
+      loop:
+        - uosserver.service
+        - uosserver-updater.service
+
+    # Direct podman health query, not `uosserver status`: the latter's full
+    # text report is slow and can lag the container's real state.
+    # chdir: / is required -- otherwise sudo -u uosserver fails to chdir into
+    # the connecting user's home and emits "cannot chdir" ahead of the value,
+    # breaking the exact-match `until` below.
+    - name: Verify uosserver actually came up
+      ansible.builtin.shell: sudo -u uosserver podman inspect --format '{{ "{{" }}.State.Health.Status{{ "}}" }}' uosserver
+      args:
+        chdir: /
+      register: uosserver_health
+      until: uosserver_health.stdout == "healthy"
+      retries: 120
+      delay: 10
+      changed_when: false

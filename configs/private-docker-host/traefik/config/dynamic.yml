@@ -65,6 +65,15 @@ http:
       service: homeassistant
       middlewares:
         - hsts
+    # UniFi OS Server is a separate VM now, so file provider not docker provider.
+    unifi:
+      rule: Host(`unifi.lan.tarasa24.dev`)
+      entrypoints:
+        - https
+      tls: true
+      service: unifi
+      middlewares:
+        - hsts
   services:
     prowlarr:
       loadBalancer:
@@ -90,3 +99,13 @@ http:
       loadBalancer:
         servers:
           - url: http://10.0.30.15:8123
+    unifi:
+      loadBalancer:
+        servers:
+          # :11443, not the old controller's :8443 -- UniFi OS Server maps 11443:443.
+          - url: https://10.0.30.16:11443
+        serversTransport: unifi-insecure
+  serversTransports:
+    # Unifi serves a self-signed cert on :11443.
+    unifi-insecure:
+      insecureSkipVerify: true

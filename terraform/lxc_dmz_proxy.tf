@@ -111,22 +111,15 @@ resource "proxmox_virtual_environment_firewall_rules" "lxc_dmz_proxy" {
   # established connections do not need their own rules. Management does not
   # need SSH here: Ansible reaches this container as `pct exec` from the PVE
   # host, not over the network.
+  # unifi inform/STUN rules are gone: port-forwarded straight into the UniFi
+  # OS Server VM (10.0.30.16) now, not relayed through this proxy.
   rule {
     type    = "in"
     action  = "ACCEPT"
-    comment = "Allow inbound HTTP/HTTPS, Electrum, bitcoind P2P and unifi inform"
+    comment = "Allow inbound HTTP/HTTPS, Electrum and bitcoind P2P"
     iface   = "net0"
-    dport   = "80,443,8080,8333,50002"
+    dport   = "80,443,8333,50002"
     proto   = "tcp"
-  }
-
-  rule {
-    type    = "in"
-    action  = "ACCEPT"
-    comment = "Allow inbound unifi STUN"
-    iface   = "net0"
-    dport   = "3478"
-    proto   = "udp"
   }
 
   # Each outbound protocol needs its own rule; certbot in particular breaks
@@ -187,26 +180,6 @@ resource "proxmox_virtual_environment_firewall_rules" "lxc_dmz_proxy" {
     dport   = "9091"
     proto   = "tcp"
     dest    = "10.0.30.21/32"
-  }
-
-  rule {
-    type    = "out"
-    action  = "ACCEPT"
-    comment = "Allow output traffic to unifi controller inform port"
-    iface   = "net0"
-    dport   = "8080"
-    proto   = "tcp"
-    dest    = "10.0.30.25/32"
-  }
-
-  rule {
-    type    = "out"
-    action  = "ACCEPT"
-    comment = "Allow output traffic to unifi controller stun port"
-    iface   = "net0"
-    dport   = "3478"
-    proto   = "udp"
-    dest    = "10.0.30.25/32"
   }
 
   # nginx proxy_passes to these DMZ-internal backends, but output_policy=DROP

@@ -1,0 +1,51 @@
+source_directories:
+  # /var/lib/uosserver holds the wrapper metadata (server.conf, UOS_UUID);
+  # /home/uosserver holds podman's rootless storage with the actual Network
+  # app database and device configs -- both are needed.
+  - /var/lib/uosserver
+  - /home/uosserver
+
+repositories:
+  - path: ssh://backup@10.0.30.13/backup/repos/unifi-os
+
+compression: zlib,6
+ssh_command: ssh -i /root/.ssh/id_ed25519 -o StrictHostKeyChecking=no
+unknown_unencrypted_repo_access_is_ok: true
+
+keep_daily: 7
+keep_weekly: 4
+keep_monthly: 6
+keep_yearly: 2
+archive_name_format: "{hostname}-{now}"
+match_archives: "{hostname}-*"
+
+checks:
+  - name: repository
+  - name: archives
+check_last: 3
+
+before_backup:
+  - systemctl stop uosserver-updater.service uosserver.service
+after_backup:
+  - systemctl start uosserver.service uosserver-updater.service
+on_error:
+  - systemctl start uosserver.service uosserver-updater.service
+
+loki:
+  url: http://10.0.50.4:3100/loki/api/v1/push
+  labels:
+    app: borgmatic
+    host: unifi-os
+
+ntfy:
+  topic: homelab-critical
+  server: http://10.0.40.24:8080
+  username: alertmanager
+  password: "{{ ntfy_alertmanager_password }}"
+  fail:
+    title: "borgmatic backup failed on unifi-os"
+    message: "Check borgmatic on unifi-os - see /etc/borgmatic/config.yaml and journal/output for details"
+    tags: borgmatic,backup,warning
+    priority: high
+  states:
+    - fail

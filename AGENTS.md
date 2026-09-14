@@ -100,6 +100,7 @@ Out-of-band monitoring network — all nodes with the `mon` NIC get a VLAN 50 in
 | `10.0.50.2` | dmz-proxy |
 | `10.0.50.3` | backup |
 | `10.0.50.4` | monitoring |
+| `10.0.50.5` | unifi-os |
 | `10.0.50.20` | private-docker-host |
 | `10.0.50.103` | dmz-bitcoin-node |
 | `10.0.50.120` | dmz-docker-host |
@@ -124,6 +125,7 @@ All containers use Alpine Linux unless noted. Templates are downloaded by Terraf
 | `lxc_monitoring` | 3014 | `lxc_monitoring.tf` | Alpine | Docker; Prometheus/Loki/Grafana/Alertmanager/Gatus; state in named Docker volumes |
 | `vm_homeassistant` | 3015 | `vm_homeassistant.tf` | HAOS (qcow2) | Full VM; 4 GB RAM; OVMF/UEFI; q35 machine type |
 | `lxc_private-docker-host` | 3020 | `lxc_private-docker-host.tf` | Alpine | Docker; internal services; SSL certs + media shares mounted |
+| `vm_unifi_os` | 3016 | `vm_unifi_os.tf` | Debian (genericcloud qcow2) | Full VM, not LXC; self-hosted UniFi OS Server. UniFi's own installer self-updates the running app via `uosserver-updater.service` in place, which is exactly the VM operating model (install once, keep running, never rebuilt) and the vendor's own actually-tested platform (bare metal/VM only, never LXC) |
 | `lxc_dmz_proxy` | 4010 | `lxc_dmz_proxy.tf` | Alpine | Single DMZ NIC + mon NIC; nginx + Certbot only (replaces `lxc_dmz_router`; no WireGuard/dnsmasq) |
 | `lxc_dmz_bitcoin_node` | 4013 | `lxc_dmz_bitcoin_node.tf` | Debian | Privileged; USB Bitcoin disk mounts; DMZ network only |
 | `lxc_dmz-docker-host` | 4020 | `lxc_dmz_docker-host.tf` | Alpine | Docker; DMZ network; GPU passthrough (`/dev/dri/renderD128`) |
@@ -171,9 +173,11 @@ runs WireGuard/dnsmasq — it's just:
 Firewall is managed by Proxmox (via Terraform): strict `DROP` in/out policy.
 Outbound needs an explicit `ACCEPT` rule per backend it proxies to — every
 nginx `proxy_pass`/stream target (jellyfin, ntfy, radicale, electrs, bitcoind,
-Gatus, Loki, Unifi, Authelia, backup) needs its own rule in
-`terraform/lxc_dmz_proxy.tf`; same-VLAN destinations are not exempt from this
-container's own firewall, only unscoped WAN rules (80/443/53, no `dest`) are.
+Gatus, Loki, Authelia, backup) needs its own rule in `terraform/lxc_dmz_proxy.tf`;
+same-VLAN destinations are not exempt from this container's own firewall,
+only unscoped WAN rules (80/443/53, no `dest`) are. UniFi inform/STUN used to
+be relayed through here too but are gone now that the UXG port-forwards
+straight into the UniFi OS Server VM instead.
 
 ---
 
@@ -191,7 +195,6 @@ Virtual NICs `eth0:0` through `eth0:9` (`10.0.30.21–30`) are assigned at boot 
 | `authelia/` | `10.0.30.21` | Authelia SSO/2FA |
 | `vaultwarden/` | `10.0.30.22` | Vaultwarden (Bitwarden-compatible password manager) |
 | `arr_stack/` | `10.0.30.23` | WireGuard + qBittorrent, Sonarr, Radarr, Prowlarr, Bazarr, FlareSolverr |
-| `unifi-controller/` | `10.0.30.25` | Unifi network controller |
 | (root compose) | `10.0.30.20` | Promtail (log shipper) |
 | `ghostfolio/` | `10.0.30.26` | Ghostfolio portfolio tracker (Postgres + Redis) |
 | `kimai/` | `10.0.30.27` | Kimai time tracking (MariaDB) |

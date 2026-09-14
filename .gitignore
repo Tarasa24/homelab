@@ -61,3 +61,7 @@ devenv.local.nix
 
 # pre-commit
 .pre-commit-config.yaml
+
+
+# Local image-build scratch/output (see feature/local-image-building-pipeline).
+dist/

@@ -1,8 +1,53 @@
 ---
-- name: Install borgmatic and dependencies
+# gather_facts is off in some plays using this role, so fetch ansible_distribution here.
+- name: Gather OS facts
+  ansible.builtin.setup:
+    filter: ansible_distribution*
+  changed_when: false
+
+- name: Determine init system
+  ansible.builtin.set_fact:
+    init_system: "{{ 'systemd' if ansible_distribution in ['Debian', 'Ubuntu'] else 'openrc' }}"
+
+- name: Install borgmatic and dependencies (Alpine)
   community.general.apk:
     name: [borgbackup, borgmatic, openssh, yq]
     state: present
+  when: init_system == "openrc"
+
+# Debian's "yq" package is kislyuk's jq wrapper, not mikefarah's -- the upstream
+# binary is installed separately below to match the Alpine yq this role expects.
+# cron is listed explicitly because minimal cloud images don't ship it and the
+# cron task below needs the `crontab` binary on PATH.
+- name: Install borgmatic and dependencies (Debian)
+  ansible.builtin.apt:
+    name: [borgbackup, borgmatic, openssh-client, cron]
+    state: present
+    update_cache: true
+  when: init_system == "systemd"
+
+- name: Enable and start cron (Debian)
+  ansible.builtin.systemd:
+    name: cron
+    enabled: true
+    state: started
+  when: init_system == "systemd"
+
+- name: Check installed yq version (Debian)
+  ansible.builtin.command: /usr/local/bin/yq --version
+  register: borgmatic_yq_installed
+  changed_when: false
+  failed_when: false
+  when: init_system == "systemd"
+
+- name: Install yq binary (Debian)
+  ansible.builtin.get_url:
+    url: "https://github.com/mikefarah/yq/releases/download/v{{ borgmatic_yq_version }}/yq_linux_amd64"
+    dest: /usr/local/bin/yq
+    mode: '0755'
+  when:
+    - init_system == "systemd"
+    - borgmatic_yq_installed.rc != 0 or borgmatic_yq_version not in (borgmatic_yq_installed.stdout | default(''))
 
 - name: Make sure .ssh directory exists
   ansible.builtin.file:

@@ -297,10 +297,11 @@ endpoints:
 
   - name: "Unifi Controller"
     group: "Internal"
-    url: "https://10.0.30.25:8443/"
+    # :11443, not the old controller's :8443 -- UniFi OS Server maps 11443:443.
+    url: "https://10.0.30.16:11443/"
     interval: 60s
     client:
-      # Unifi serves its own self-signed cert on :8443.
+      # Unifi serves its own self-signed cert on :11443.
       insecure: true
       timeout: 10s
     conditions:
@@ -312,7 +313,7 @@ endpoints:
       hide-conditions: true
       hide-errors: true
     extra-labels:
-      host: private-docker-host
+      host: unifi-os
       path: internal
 
   - name: "Sonarr"
