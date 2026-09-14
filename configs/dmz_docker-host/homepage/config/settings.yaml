@@ -1,4 +1,14 @@
 title: Homelab
 instanceName: public
+theme: dark
+color: blue
+headerStyle: clean
+iconStyle: gradient
+useEqualHeights: true
+cardBlur: xs
 disableUpdateCheck: true
 hideVersion: true
+layout:
+  Media:
+    style: row
+    columns: 2
