@@ -196,6 +196,7 @@ Virtual NICs `eth0:0` through `eth0:9` (`10.0.30.21–30`) are assigned at boot 
 | (root compose) | `10.0.30.20` | Promtail (log shipper) |
 | `ghostfolio/` | `10.0.30.26` | Ghostfolio portfolio tracker (Postgres + Redis) |
 | `kimai/` | `10.0.30.27` | Kimai time tracking (MariaDB) |
+| `homepage/` | `10.0.30.28` | Homepage admin dashboard (`dash.lan.tarasa24.dev`); full service inventory, no auth gate (LAN-trusted) |
 | `cadvisor/` | `10.0.50.20` | cAdvisor per-container metrics on `:8081` (VLAN 50) |
 
 The `arr_stack` services run inside a WireGuard network namespace (all share the `wireguard` container's network via `network_mode: service:wireguard`).
@@ -214,6 +215,7 @@ Internet-accessible services, isolated in the DMZ. Has GPU passthrough (`/dev/dr
 | Immich | Photo management; `/immich` from USB-HDD |
 | Radicale | CalDAV/CardDAV server |
 | ntfy | Push notification server (`10.0.40.24`); exposed at `ntfy.homelab.tarasa24.dev` |
+| Homepage | Public dashboard (`10.0.40.25`), exposed at `dash.homelab.tarasa24.dev`; gated behind Authelia forward-auth at nginx, same recipe as `cal.homelab.tarasa24.dev`. Bare apex `homelab.tarasa24.dev` redirects here. |
 | Promtail | Log shipper to Loki |
 | cAdvisor | Per-container metrics on `10.0.50.120:8081` (VLAN 50) |
 
