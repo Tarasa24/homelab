@@ -7,22 +7,16 @@ server:
   address: "tcp://:9091"
   endpoints:
     authz:
-      # For HTTP Basic clients (CalDAV/cal.homelab) - always 401 +
-      # WWW-Authenticate, never redirects, regardless of which nginx snippet
-      # calls it. Do not point browser-facing vhosts at this one.
+      # HTTP Basic clients (CalDAV/cal.homelab) - always 401+WWW-Authenticate.
       auth-request:
         implementation: "AuthRequest"
         authn_strategies:
           - name: "CookieSession"
           - name: "HeaderAuthorization"
-      # For browser-facing vhosts (dash.homelab). Also AuthRequest - nginx's
-      # auth_request module only ever accepts 200/401/403 from the subrequest,
-      # so ForwardAuth's real 302 gets rejected outright ("auth request
-      # unexpected status: 302"). Same implementation as auth-request above,
-      # but without the HeaderAuthorization/Basic strategy: that's what makes
-      # Authelia set WWW-Authenticate: Basic instead of a Location header on
-      # its 401. Drop it and the 401 carries Location instead, which nginx's
-      # error_page 401 = 302 $upstream_http_location can actually use.
+      # Browser vhosts (dash.homelab). nginx's auth_request only accepts
+      # 200/401/403, so ForwardAuth's real 302 gets rejected - must stay
+      # AuthRequest. Dropping HeaderAuthorization is what makes the 401 carry
+      # a Location header instead of WWW-Authenticate, which nginx redirects on.
       auth-request-browser:
         implementation: "AuthRequest"
         authn_strategies:

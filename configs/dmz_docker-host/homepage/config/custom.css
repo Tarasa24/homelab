@@ -1,8 +1,5 @@
-/* Public dashboard - blue/cyan accent, distinct from the admin dashboard's
- * indigo so the two are visually distinguishable at a glance. Only two
- * tiles here, so cards get more breathing room instead of tiling small.
- * Class names verified against the live rendered DOM (see admin
- * custom.css for the same note in full). */
+/* Cyan accent, distinct from admin's indigo. See admin custom.css for the
+ * note on why these selectors (not hashed Tailwind utilities). */
 
 body {
   background:

@@ -1,8 +1,5 @@
-/* Admin dashboard - indigo/purple accent. Class names below are Homepage's
- * actual semantic classes (.service-card, .service-group-name, etc, not
- * hashed Tailwind utilities), verified against the live rendered DOM so this
- * doesn't quietly break on the next Homepage image bump the way a
- * scraped-off-Reddit stylesheet targeting utility classes would. */
+/* Indigo accent. Selectors are Homepage's semantic classes (verified
+ * against the rendered DOM), not hashed Tailwind utilities. */
 
 body {
   background:

@@ -1,11 +1,7 @@
-# LAN-only, no auth gate in front - same trust model as every other
-# *.lan.tarasa24.dev app. Static list, mirrors AGENTS.md service tables.
+# LAN-only, no auth gate - same trust model as every other *.lan app.
 #
-# siteMonitor gives each tile a live up/down dot (statusStyle: dot in
-# settings.yaml) via Homepage's own lightweight HEAD/GET ping - independent
-# of Gatus/Prometheus, purely cosmetic, not wired into alerting. Proxmox and
-# Unifi are deliberately skipped: both serve self-signed certs, which would
-# just paint them permanently "down" and be worse than no dot at all.
+# siteMonitor dots are cosmetic only (not wired into alerting). Proxmox and
+# Unifi skip it - self-signed certs would paint them permanently "down".
 
 - Media & Downloads:
     - Sonarr:

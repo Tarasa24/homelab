@@ -7,9 +7,8 @@ services:
       - "10.0.30.28:3000:3000"
     volumes:
       - ./homepage/config:/app/config
-      # LAN-trusted host, same trust boundary Traefik's docker.sock mount
-      # already relies on - safe to enable label discovery here later if
-      # per-container status widgets are ever wanted.
+      # No docker.sock: static services.yaml is enough, keeps this in line
+      # with the public instance instead of a one-off exception.
     environment:
       HOMEPAGE_ALLOWED_HOSTS: "dash.lan.tarasa24.dev,10.0.30.28:3000"
     labels:

@@ -1,19 +1,9 @@
-# Static list, not Docker label auto-discovery - see docker-compose.yaml for
-# why (no docker.sock mount on a public-facing container).
+# Minimal on purpose: only the two apps with real Authelia SSO. ntfy/Radicale
+# omitted - infra/transport, not launcher-worthy.
 #
-# Deliberately minimal: only the two apps with real Authelia SSO (click
-# through, land in the app with no second login if you already have a portal
-# session from this dashboard). ntfy and Radicale are left off entirely -
-# they're infra/transport, not something worth a launcher tile.
-#
-# siteMonitor gives each tile a live up/down dot (statusStyle: dot in
-# settings.yaml) - same health check paths Gatus already probes
-# (configs/monitoring/gatus/config.yaml), so "is it actually healthy" means
-# the same thing in both places. Targets the internal DMZ IP, not the public
-# hostname: this container sits on the same host as Jellyfin/Immich, and
-# probing the public hostname from inside the DMZ hairpins back through the
-# UXG to its own WAN IP, which doesn't work - same gotcha already documented
-# for Jellyfin's OIDC redirect_uri (see its extra_hosts entry).
+# siteMonitor targets the internal DMZ IP, not the public hostname: from
+# inside the DMZ, the public hostname hairpins through the UXG back to its
+# own WAN IP and fails (same gotcha as Jellyfin's OIDC redirect_uri).
 
 - Media:
     - Jellyfin:

@@ -1,3 +1,2 @@
-# Explicit empty override - see widgets.yaml for why. Homepage's bundled
-# demo bookmarks.yaml (GitHub/Reddit/YouTube) otherwise leaks through.
+# Overrides Homepage's bundled demo bookmarks (GitHub/Reddit/YouTube).
 []

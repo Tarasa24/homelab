@@ -1,6 +1,4 @@
-# Homepage's bundled demo widgets.yaml (CPU/memory/disk bar + search box)
-# fills in silently when this is absent - see git history. Static text only,
-# no data/API behind it, nothing to leak.
+# Overrides Homepage's bundled demo widgets.yaml (CPU/mem/disk bar + search).
 - greeting:
     text_size: 3xl
     text: Homelab

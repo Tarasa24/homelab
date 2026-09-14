@@ -551,6 +551,7 @@ Some containers (`lxc_dns`, `lxc_dmz_bitcoin_node`) trigger their Ansible playbo
 - **State lives on the container disk, never on USB mounts**: Docker service state (databases, app data, config) always uses named Docker volumes, which default to `/var/lib/docker/volumes/` on the container's own disk. Borgmatic then backs these up to the borg server over SSH. USB-mounted cold storage (`/mnt/USB-SSD`, `/mnt/USB-HDD`) is reserved exclusively for bulk data that cannot reasonably be backed up (media libraries, blockchain data, SSL certs). Never use bind mounts to cold storage paths for service state.
 - **Terraform `terraform.tfvars`**: sensitive Proxmox endpoint/credentials live in `secrets/terraform.tfvars` (git-crypt encrypted). The Proxmox provider SSH key is read from `~/.ssh/homelab_proxmox`.
 - **Domain naming**: `*.lan.tarasa24.dev` for internal LAN services (via Traefik), `*.homelab.tarasa24.dev` and `*.dormlab.tarasa24.dev` for DMZ/externally reachable services (via nginx on the DMZ router).
+- **New service checklist includes the dashboard**: adding a service means updating inventory (this doc's tables, `ansible/inventory.ini`) *and* adding a launcher tile to the matching Homepage instance's `services.yaml` — admin (`configs/private-docker-host/homepage/`) for LAN-only services, public (`configs/dmz_docker-host/homepage/`) only if it has real Authelia SSO (see that file's own comment for why the list stays short). Skipping this is how a service silently becomes undiscoverable.
 
 ---
 

@@ -1,6 +1,4 @@
-# Homepage's bundled demo widgets.yaml (CPU/memory/disk bar + search box)
-# fills in silently when this is absent - see git history. A static greeting
-# is a nicer use of the same top bar than nothing at all.
+# Overrides Homepage's bundled demo widgets.yaml (CPU/mem/disk bar + search).
 - greeting:
     text_size: 3xl
     text: Homelab
