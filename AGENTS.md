@@ -153,7 +153,7 @@ PVE storage pools `USB-HDD` and `USB-SSD` are registered as Proxmox `dir` storag
 ## Host Memory Pressure
 
 The hypervisor is an Intel NUC DC3217IYE: i3-3217U, **12 GB DDR3 (4+8), two
-slots, 16 GB max**, against roughly 22 GB of guest commitments. Overcommit is
+slots, 16 GB max**, against roughly 24 GB of guest commitments. Overcommit is
 normal for LXC, but the margin is thin enough that a mis-sized guest surfaces as
 host-wide swap exhaustion rather than a local problem — on 2026-09-17 swap
 reached 8190/8191 MB, one megabyte short of the OOM killer.
