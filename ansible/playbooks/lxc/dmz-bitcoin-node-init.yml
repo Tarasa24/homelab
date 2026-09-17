@@ -56,6 +56,26 @@
         shell: /bin/bash
         home: /home/bitcoin
 
+    # Outside the install block below: that block is gated on a version
+    # mismatch, so while it held these tasks a config-only change was never
+    # deployed to an up-to-date node and the play still reported ok.
+    # `--tags config` ships one without re-checking apt and both source
+    # builds (the electrs rocksdb compile takes hours on this hardware).
+    - name: Create bitcoin config directory
+      ansible.builtin.file:
+        dest: /etc/bitcoin
+        state: directory
+        mode: "0710"
+      tags: [config]
+
+    - name: Copy over bitcoin config
+      ansible.builtin.template:
+        src: ../../../configs/dmz_bitcoin-node/bitcoin.conf.j2
+        dest: /etc/bitcoin/bitcoin.conf
+        mode: "0644"
+      notify: Restart bitcoind stack
+      tags: [config]
+
     - name: Set bitcoin version
       ansible.builtin.set_fact:
         bitcoin_version: "31.1"
@@ -151,15 +171,6 @@
           ansible.builtin.shell: "cp -r /tmp/bitcoin-{{ bitcoin_version }}/bin/{bitcoin-cli,bitcoind} /usr/bin/"
           args:
             executable: /bin/bash
-        - name: Create bitcoin config directory
-          ansible.builtin.file:
-            dest: /etc/bitcoin
-            state: directory
-            mode: "0710"
-        - name: Copy over bitcoin config
-          ansible.builtin.template:
-            src: ../../../configs/dmz_bitcoin-node/bitcoin.conf.j2
-            dest: /etc/bitcoin/bitcoin.conf
         # Started inside the block, not at the end of the play: if a later
         # task fails (e.g. the electrs build), bitcoind must not be left down.
         - name: Start bitcoin service after binary swap
@@ -227,3 +238,29 @@
         name: electrs
         enabled: yes
         state: started
+
+  # Same ordering constraint as the binary-swap block: electrs has
+  # Restart=on-failure and Wants=bitcoind.service, so restarting bitcoind
+  # alone lets electrs pull it back up mid-restart. Handlers run in
+  # definition order, giving stop -> restart -> start.
+  handlers:
+    - name: Stop electrs before restarting bitcoind
+      ansible.builtin.systemd:
+        name: electrs
+        state: stopped
+      listen: Restart bitcoind stack
+      tags: [config]
+
+    - name: Restart bitcoind
+      ansible.builtin.systemd:
+        name: bitcoind
+        state: restarted
+      listen: Restart bitcoind stack
+      tags: [config]
+
+    - name: Start electrs after bitcoind restart
+      ansible.builtin.systemd:
+        name: electrs
+        state: started
+      listen: Restart bitcoind stack
+      tags: [config]
