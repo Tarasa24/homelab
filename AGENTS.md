@@ -186,12 +186,23 @@ disables memory hotplug. Verify with `qm monitor <vmid>` → `info balloon`, not
 the config. Setting homeassistant's `floating` to 2560 returned ~2 GB of host
 swap within seconds.
 
-**Applications size themselves off guest RAM.** UniFi OS Server's JVM runs
-`-XX:MaxRAMPercentage=70.0` with no `-Xmx`, and its OS-core mongo has no
-WiredTiger cache cap. `bitcoind` had `dbcache=2560` inside a 2048 MB container,
-worth ~648k reclaim events on its own. Check application ceilings before
-adjusting container caps — caps are limits, not reservations, so lowering one
-frees nothing by itself.
+**Applications size themselves off guest RAM.** `bitcoind` had `dbcache=2560`
+inside a 2048 MB container, worth ~648k reclaim events on its own. Check
+application ceilings before adjusting container caps — caps are limits, not
+reservations, so lowering one frees nothing by itself.
+
+UniFi OS Server is the awkward case. `unifi.service` ships `-Xmx512M` inline,
+but `/etc/default/unifi` replaces `UNIFI_JVM_OPTS` with
+`-XX:MaxRAMPercentage=70.0`, so the heap ceiling tracks guest RAM rather than
+the workload. `unifi.xmx` in `system.properties` is **not** read — it is the
+obvious knob and it silently does nothing. The only override that works is
+`UNIFI_JVM_OPTS`, and the only place to set it that survives the vendor's
+in-place updates is `/var/lib/unifi/env-overrides` (loaded after
+`/etc/default/unifi`, and on the VM disk rather than the container image).
+Because it replaces the variable wholesale, re-check the flags in
+`/etc/default/unifi` after a major UOS upgrade. Its OS-core mongo still has no
+WiredTiger cache cap; that config is in the image, so capping it would not
+survive an update.
 
 ---
 
