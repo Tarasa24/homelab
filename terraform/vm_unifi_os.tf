@@ -11,9 +11,15 @@ resource "proxmox_virtual_environment_vm" "vm_unifi_os" {
   tags  = ["debian", "unifi"]
   name  = "unifi-os"
 
-  # Sized to the tested-install minimum (2 vCPU / 4GB / 25GB), with disk headroom.
+  # Deliberately below Ubiquiti's tested minimum of 4GB. The host is a 12 GB
+  # NUC and this guest measures ~1.9 GB in use once the JVM heap is pinned
+  # (see playbooks/vm/unifi-os-init.yml), exim4 is gone and zram is on.
+  # floating adds the balloon device this VM previously lacked entirely, so
+  # pvestatd can reclaim rather than the host swapping the guest out wholesale.
+  # Adding it needs a cold stop/start: numa is 0, so there is no memory hotplug.
   memory {
-    dedicated = 4096
+    dedicated = 3072
+    floating  = 2048
   }
 
   cpu {
