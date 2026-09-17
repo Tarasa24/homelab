@@ -186,6 +186,15 @@ disables memory hotplug. Verify with `qm monitor <vmid>` → `info balloon`, not
 the config. Setting homeassistant's `floating` to 2560 returned ~2 GB of host
 swap within seconds.
 
+**Changing VM memory via `terraform apply` reboots the guest.** The provider
+issues a `qmreboot` rather than adjusting the balloon in place, and it does so
+silently — the apply reports `1 changed` and the balloon answers immediately,
+so it looks live. Check `/var/run/qemu-server/<vmid>.pid` and the
+`major_page_faults` counter before and after, not just the balloon value. To
+change the balloon floor without downtime use `qm set <vmid> -balloon <mb>`
+(live, keeps the same qemu process) and then `terraform apply -refresh-only` to
+reconcile state. `dedicated` still needs a real stop/start.
+
 **Applications size themselves off guest RAM.** `bitcoind` had `dbcache=2560`
 inside a 2048 MB container, worth ~648k reclaim events on its own. Check
 application ceilings before adjusting container caps — caps are limits, not
