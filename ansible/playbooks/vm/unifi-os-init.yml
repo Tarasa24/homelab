@@ -15,6 +15,9 @@
     - role: node_exporter
     - role: promtail
       promtail_config_name: unifi-os
+      # 7th largest process in this VM at ~100 MB, on a host with no spare.
+      promtail_memory_high: 64M
+      tags: [memory]
     - role: borgmatic
 
   tasks:
@@ -81,3 +84,83 @@
       retries: 120
       delay: 10
       changed_when: false
+
+    # Memory trimming, tagged `memory` to run without re-checking the
+    # installer or the borgmatic restore. This VM is sized below Ubiquiti's
+    # tested minimum (see terraform/vm_unifi_os.tf), so the guest has to
+    # give back what it does not need.
+    - name: Remove the unused MTA
+      ansible.builtin.apt:
+        name: exim4*
+        state: absent
+        purge: true
+        autoremove: true
+      tags: [memory]
+
+    # The guest ships with no swap at all, so its only answer to pressure is
+    # the OOM killer -- and unifi's JVM runs -XX:+ExitOnOutOfMemoryError, so
+    # it hard-exits rather than degrades. zram gives idle vendor services
+    # (innerspace, identity, directory, rabbitmq) somewhere to go. This is
+    # the one place zram fits; the host uses zswap instead.
+    - name: Install systemd-zram-generator
+      ansible.builtin.apt:
+        name: systemd-zram-generator
+        state: present
+        update_cache: true
+      tags: [memory]
+
+    - name: Configure zram swap
+      ansible.builtin.copy:
+        dest: /etc/systemd/zram-generator.conf
+        content: |
+          [zram0]
+          zram-size = 512
+          compression-algorithm = zstd
+        mode: "0644"
+      register: unifi_os_zram_conf
+      tags: [memory]
+
+    - name: Start zram swap
+      ansible.builtin.systemd:
+        name: systemd-zram-setup@zram0.service
+        state: "{{ 'restarted' if unifi_os_zram_conf.changed else 'started' }}"
+        daemon_reload: true
+      tags: [memory]
+
+    # unifi.service ships -Xmx512M inline, but /etc/default/unifi replaces
+    # UNIFI_JVM_OPTS with -XX:MaxRAMPercentage=70.0, so the heap ceiling
+    # tracks guest RAM instead of the workload (3 small sites here) -- ~2.7 GB
+    # of a 4 GB VM. unifi.xmx in system.properties is NOT read by UOS Server;
+    # the only knob is this variable.
+    #
+    # env-overrides is loaded after /etc/default/unifi so it wins, and unlike
+    # /etc/default (overlay, i.e. image) /var/lib/unifi is on the VM disk and
+    # survives the vendor's in-place updates. The other flags are copied from
+    # /etc/default/unifi because this replaces the variable wholesale -- check
+    # them against the image after a major UOS upgrade.
+    - name: Pin the UniFi Network JVM heap
+      ansible.builtin.shell: |
+        set -eu
+        opts='UNIFI_JVM_OPTS="-Dunifi-os.server=true -Dorg.xerial.snappy.tempdir=/usr/lib/unifi/run -XX:+UseG1GC -Xmx1024M -Xss1024K -XX:-TieredCompilation"'
+        current=$(sudo -u uosserver podman exec uosserver cat /var/lib/unifi/env-overrides 2>/dev/null || true)
+        if [ "$current" = "$opts" ]; then
+          echo unchanged
+        else
+          printf '%s\n' "$opts" \
+            | sudo -u uosserver podman exec -i uosserver tee /var/lib/unifi/env-overrides >/dev/null
+          echo changed
+        fi
+      args:
+        chdir: /
+      register: unifi_os_xmx
+      changed_when: "'changed' in unifi_os_xmx.stdout"
+      notify: Restart UniFi Network
+      tags: [memory]
+
+  handlers:
+    - name: Restart UniFi Network
+      ansible.builtin.command: sudo -u uosserver podman exec uosserver systemctl restart unifi
+      args:
+        chdir: /
+      changed_when: true
+      tags: [memory]
