@@ -5,11 +5,16 @@
 # The `job` label is "<instance>/<service_name>"; selectors matching a bare
 # service name match nothing.
 #
-# Two traps guarded against below:
+# Three traps guarded against below:
 #   - Self-reference: the ruler logs its own query text and promtail ships it
 #     back, so broad rules must exclude monitoring/loki and monitoring/promtail.
 #   - Substring matches: a bare `error` matches Gatus's "errors=0" success
 #     output, hence the \b word boundaries.
+#   - Journald noise: pve, dmz-bitcoin-node and unifi-os scrape journald, and
+#     serial-getty@ttyS0 respawn-fails there because the cloud image's
+#     console=ttyS0 default enables it with no serial0 device actually
+#     attached in Proxmox. Broad job=~".+" rules must exclude */serial-getty*
+#     or this fires nightly on nothing actionable.
 #
 # These are log-CONTENT rules. A down service emits nothing, so they cannot
 # detect it - that is Gatus and cAdvisor's job. LogShippingStopped is the one
@@ -22,7 +27,7 @@ groups:
       - alert: ContainerErrors
         expr: |
           sum by (job) (
-            count_over_time({job=~".+", job!~"monitoring/(loki|promtail)"} |~ `(?i)\b(error|fatal|panic|exception)\b` [5m])
+            count_over_time({job=~".+", job!~"monitoring/(loki|promtail)", job!~".*/serial-getty.*"} |~ `(?i)\b(error|fatal|panic|exception)\b` [5m])
           ) > 25
         for: 5m
         labels:
@@ -35,7 +40,7 @@ groups:
       - alert: ContainerCrashLoop
         expr: |
           sum by (job) (
-            count_over_time({job=~".+", job!~"monitoring/(loki|promtail)"} |~ `(?i)\b(fatal|panic)\b` [5m])
+            count_over_time({job=~".+", job!~"monitoring/(loki|promtail)", job!~".*/serial-getty.*"} |~ `(?i)\b(fatal|panic)\b` [5m])
           ) > 50
         for: 2m
         labels:

@@ -390,18 +390,26 @@ Logs are collected from all Docker hosts via a Promtail agent running as a conta
 | `dns` | 3011 | `configs/promtail/dns.yaml` |
 | `pve` (hypervisor) | — | `configs/promtail/pve.yaml` |
 | `dmz-bitcoin-node` | 4013 | `configs/promtail/dmz-bitcoin-node.yaml` |
+| `unifi-os` | 3016 | `configs/promtail/unifi-os.yaml` |
 
 The three Docker hosts run Promtail as a container with Docker service
 discovery. `dmz-proxy`, `backup` and `dns` instead run it as a native Alpine
 package via the `promtail` role, tailing static file paths — there is no Docker
 daemon on those hosts.
 
-`pve` and `dmz-bitcoin-node` are Debian and run systemd, and Promtail is not
-packaged in bookworm, so the role installs the upstream release binary plus a
-systemd unit and scrapes **journald** rather than files. That is the only log
-source that matters on those two: kernel messages, LXC/VM start and stop and
-storage errors on the hypervisor, and `bitcoind`/`electrs` output on the Bitcoin
-node — which is where the "why" lives when `SystemdUnitDown` fires.
+`pve`, `dmz-bitcoin-node` and `unifi-os` are Debian and run systemd, and
+Promtail is not packaged in bookworm, so the role installs the upstream
+release binary plus a systemd unit and scrapes **journald** rather than files.
+That is the only log source that matters on these three: kernel messages,
+LXC/VM start and stop and storage errors on the hypervisor, `bitcoind`/`electrs`
+output on the Bitcoin node, and the UniFi OS Server app on the unifi-os VM —
+which is where the "why" lives when `SystemdUnitDown` fires. The cloud image's
+`console=ttyS0` default enables `serial-getty@ttyS0.service` on unifi-os even
+though no `serial0` device is attached in `vm_unifi_os.tf`, so it respawn-fails
+continuously; masked directly on the VM (`systemctl mask`) rather than via
+Terraform since it's a base-image quirk, not a resource this repo provisions.
+The Loki `ContainerErrors`/`ContainerCrashLoop` rules exclude `*/serial-getty*`
+jobs for the same reason.
 
 Journal scraping has a cardinality trap. Every login creates a fresh
 `session-<N>.scope`, and a per-unit stream label therefore grows without bound;
