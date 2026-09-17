@@ -18,6 +18,9 @@
       "10.0.30.30"
     ]
     ntfy_alertmanager_password: "{{ lookup('file', '../../../secrets/monitoring/ntfy_alertmanager_password') }}"
+    gitea_secret_key: "{{ lookup('file', '../../../secrets/private-docker-host/gitea/secret_key') }}"
+    gitea_internal_token: "{{ lookup('file', '../../../secrets/private-docker-host/gitea/internal_token') }}"
+    gitea_admin_password: "{{ lookup('file', '../../../secrets/private-docker-host/gitea/admin_password') }}"
   pre_tasks:
     - name: Safely stop and remove existing containers
       shell: docker compose down || true
@@ -60,6 +63,13 @@
         dest: "/root/"
         force: yes
 
+    # Rendered separately so secret values never land in the git tree.
+    - name: Render Gitea secrets env file
+      ansible.builtin.template:
+        src: templates/gitea.env.j2
+        dest: /root/gitea/gitea.env
+        mode: "0600"
+
     - name: Find each docker-compose.yaml in relation to /root
       find:
         paths: /root
@@ -84,6 +94,26 @@
       shell: docker-compose up -d
       args:
         chdir: /root
+
+    - name: Wait for Gitea to accept connections
+      ansible.builtin.wait_for:
+        host: "10.0.30.29"
+        port: 80
+        delay: 5
+        timeout: 120
+
+    # "already exists" is treated as success so reruns don't fail.
+    - name: Ensure Gitea admin user exists
+      shell: >-
+        docker exec -u git gitea gitea admin user create
+        --config /data/gitea/conf/app.ini
+        --admin --username gitea-admin --email admin@lan.tarasa24.dev
+        --password '{{ gitea_admin_password }}' --must-change-password=false
+      register: gitea_admin_create
+      changed_when: "'already exists' not in gitea_admin_create.stderr"
+      failed_when: >-
+        gitea_admin_create.rc != 0 and
+        'already exists' not in gitea_admin_create.stderr
 
     # Traefik only reloads a TLS cert when dynamic.yml's own mtime changes,
     # not when the cert file itself changes -- this is what tells it to look.

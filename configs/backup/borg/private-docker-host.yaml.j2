@@ -9,6 +9,7 @@ source_directories:
   - /var/lib/docker/volumes/root_kimai_db/_data
   - /var/lib/docker/volumes/root_kimai_data/_data
   - /var/lib/docker/volumes/root_kimai_plugins/_data
+  - /var/lib/docker/volumes/root_gitea-data/_data
 
 repositories:
   - path: ssh://backup@10.0.30.13/backup/repos/private-docker-host
@@ -34,16 +35,19 @@ before_backup:
   - cd /root && docker compose stop prowlarr sonarr radarr bazarr qbittorrent
   - cd /root && docker compose stop ghostfolio_db ghostfolio_app ghostfolio_redis
   - cd /root && docker compose stop kimai_db kimai_app
+  - cd /root && docker compose stop gitea
 after_backup:
   - cd /root && docker compose start vaultwarden
   - cd /root && docker compose start prowlarr sonarr radarr bazarr qbittorrent
   - cd /root && docker compose start ghostfolio_db ghostfolio_app ghostfolio_redis
   - cd /root && docker compose start kimai_db kimai_app
+  - cd /root && docker compose start gitea
 on_error:
   - cd /root && docker compose start vaultwarden
   - cd /root && docker compose start prowlarr sonarr radarr bazarr qbittorrent
   - cd /root && docker compose start ghostfolio_db ghostfolio_app ghostfolio_redis
   - cd /root && docker compose start kimai_db kimai_app
+  - cd /root && docker compose start gitea
 
 loki:
   url: http://10.0.50.4:3100/loki/api/v1/push

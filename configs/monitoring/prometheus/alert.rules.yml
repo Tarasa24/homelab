@@ -457,6 +457,42 @@ groups:
           summary: "Container homepage_admin has disappeared"
           description: "cAdvisor has not seen container homepage_admin on private-docker-host for 10 minutes"
 
+      - alert: ContainerDown
+        expr: absent_over_time(container_last_seen{name="gitea"}[10m])
+        for: 5m
+        labels:
+          severity: critical
+          alerttype: service
+          host: private-docker-host
+          container: gitea
+        annotations:
+          summary: "Container gitea has disappeared"
+          description: "cAdvisor has not seen container gitea on private-docker-host for 10 minutes"
+
+      - alert: ContainerDown
+        expr: absent_over_time(container_last_seen{name="gitea-runner"}[10m])
+        for: 5m
+        labels:
+          severity: warning
+          alerttype: service
+          host: gitea-runner
+          container: gitea-runner
+        annotations:
+          summary: "Container gitea-runner has disappeared"
+          description: "cAdvisor has not seen container gitea-runner on gitea-runner for 10 minutes"
+
+      - alert: ContainerDown
+        expr: absent_over_time(container_last_seen{name="gitea-runner-dind"}[10m])
+        for: 5m
+        labels:
+          severity: warning
+          alerttype: service
+          host: gitea-runner
+          container: gitea-runner-dind
+        annotations:
+          summary: "Container gitea-runner-dind has disappeared"
+          description: "cAdvisor has not seen container gitea-runner-dind on gitea-runner for 10 minutes"
+
       - alert: ContainerRestartLoop
         expr: changes(container_start_time_seconds{name!=""}[15m]) > 2
         for: 5m

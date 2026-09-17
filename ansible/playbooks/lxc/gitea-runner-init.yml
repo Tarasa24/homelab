@@ -1,0 +1,65 @@
+---
+# No borgmatic role: nothing here is worth backing up (disposable caches).
+- name: Configure Gitea Actions runner
+  hosts: lxc_gitea_runner
+  gather_facts: false
+  vars:
+    ansible_host: "{{ hostvars[inventory_hostname].ansible_host }}"
+    lxc_host: "{{ hostvars[inventory_hostname].lxc_host }}"
+    gitea_runner_registration_token: "{{ lookup('file', '../../../secrets/gitea-runner/registration_token') }}"
+  pre_tasks:
+    - name: Safely stop and remove existing containers
+      shell: docker compose down || true
+      ignore_errors: yes
+  roles:
+    - role: lxc_python3
+    - role: docker
+    - role: node_exporter
+    # No promtail role: logs ship via the promtail container in
+    # configs/gitea-runner/ instead (same as the other docker hosts).
+
+  tasks:
+    - name: Stop and remove existing containers
+      shell: docker compose down || true
+
+    - name: Remove old configs
+      shell: rm -rf /root/*
+
+    - name: Copy over configs
+      copy:
+        src: "../../../configs/gitea-runner/"
+        dest: "/root/"
+        force: yes
+
+    # Requires secrets/gitea-runner/registration_token to hold a real token
+    # (generated from Gitea) before this runs.
+    - name: Render act_runner registration token env file
+      ansible.builtin.template:
+        src: templates/runner.env.j2
+        dest: /root/act_runner/runner.env
+        mode: "0600"
+
+    - name: Find each docker-compose.yaml in relation to /root
+      find:
+        paths: /root
+        patterns: "docker-compose.yaml"
+        recurse: yes
+      register: docker_compose_files
+    - name: Create .env file which contains COMPOSE_FILE=... for each docker-compose.yaml
+      copy:
+        content: "COMPOSE_FILE={{ compose_files }}"
+        dest: "/root/.env"
+      vars:
+        compose_files: "{{ docker_compose_files.files | map(attribute='path') | join(':') }}"
+
+    - name: Pull images
+      shell: docker-compose pull -q
+      args:
+        chdir: /root
+      timeout: 1200
+      retries: 3
+
+    - name: Start containers
+      shell: docker-compose up -d
+      args:
+        chdir: /root

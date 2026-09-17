@@ -50,6 +50,9 @@ scrape_configs:
       - targets: ['10.0.50.5:9100']   # UniFi OS Server VM
         labels:
           host: unifi-os
+      - targets: ['10.0.50.6:9100']   # Gitea Actions runner
+        labels:
+          host: gitea-runner
       # On the LAN, not VLAN 50: the host owns vmbr0 and has no address there.
       # Needs the cluster firewall rule in terraform/firewall_base.tf.
       - targets: ['10.0.30.2:9100']   # Proxmox host
@@ -66,6 +69,9 @@ scrape_configs:
       - targets: ['10.0.50.120:9323']  # DMZ docker-host
         labels:
           host: dmz-docker-host
+      - targets: ['10.0.50.6:9323']    # Gitea Actions runner
+        labels:
+          host: gitea-runner
     metrics_path: /metrics
 
 # cAdvisor: per-container metrics from docker hosts
@@ -78,6 +84,9 @@ scrape_configs:
       - targets: ['10.0.50.120:8081']  # DMZ docker-host
         labels:
           host: dmz-docker-host
+      - targets: ['10.0.50.6:8081']    # Gitea Actions runner
+        labels:
+          host: gitea-runner
 
 # Gatus: synthetic probing / availability metrics
   - job_name: 'gatus'
