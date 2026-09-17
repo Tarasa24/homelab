@@ -5,3 +5,8 @@ promtail_config_name: "{{ ansible_hostname | mandatory }}"
 
 # Debian only; kept close to the Loki server version.
 promtail_version: "2.9.4"
+
+# Optional systemd MemoryHigh for the Debian unit. Unset means no limit.
+# MemoryHigh throttles and reclaims rather than killing, so a busy shipper
+# degrades instead of tripping LogShippingStopped the way MemoryMax would.
+promtail_memory_high: ""

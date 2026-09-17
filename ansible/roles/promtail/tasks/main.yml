@@ -88,6 +88,7 @@
       Restart=always
       RestartSec=10
       User=root
+      {{ ('MemoryHigh=' + promtail_memory_high) if promtail_memory_high else '' }}
 
       [Install]
       WantedBy=multi-user.target
