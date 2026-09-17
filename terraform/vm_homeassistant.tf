@@ -11,9 +11,13 @@ resource "proxmox_virtual_environment_vm" "vm_homeassistant" {
   bios    = "ovmf"
   machine = "q35"
 
+  # floating is the balloon floor pvestatd may shrink to once the host passes
+  # 80% usage. It used to equal dedicated, which pins the balloon and makes
+  # nothing reclaimable: this guest held 2.4 GB of host swap while reporting
+  # 123 MB free. 2560 is a conservative first step -- lower once it holds.
   memory {
     dedicated = 4096
-    floating  = 4096
+    floating  = 2560
   }
 
   cpu {
