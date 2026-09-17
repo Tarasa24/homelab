@@ -153,7 +153,9 @@
       args:
         chdir: /
       register: unifi_os_xmx
-      changed_when: "'changed' in unifi_os_xmx.stdout"
+      # Equality, not `in`: "unchanged" contains "changed", so a substring
+      # test reports changed on every run and restarts the app each time.
+      changed_when: unifi_os_xmx.stdout == "changed"
       notify: Restart UniFi Network
       tags: [memory]
 
