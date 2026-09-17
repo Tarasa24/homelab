@@ -1,0 +1,39 @@
+# gitea.env (SECRET_KEY, INTERNAL_TOKEN) is rendered by
+# private-docker-host-init.yml, not committed.
+services:
+  gitea:
+    image: gitea/gitea:1.22
+    container_name: gitea
+    restart: unless-stopped
+    env_file:
+      - ./gitea/gitea.env
+    environment:
+      USER_UID: 1000
+      USER_GID: 1000
+      GITEA__server__DOMAIN: gitea.lan.tarasa24.dev
+      GITEA__server__ROOT_URL: https://gitea.lan.tarasa24.dev/
+      GITEA__server__SSH_DOMAIN: gitea.lan.tarasa24.dev
+      GITEA__server__SSH_PORT: 2222
+      GITEA__server__DISABLE_SSH: "false"
+      GITEA__database__DB_TYPE: sqlite3
+      GITEA__service__DISABLE_REGISTRATION: "true"
+      GITEA__actions__ENABLED: "true"
+      GITEA__security__INSTALL_LOCK: "true"
+    ports:
+      - 10.0.30.29:80:3000
+      - 10.0.30.29:2222:22
+    volumes:
+      - gitea-data:/data
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.gitea.rule=Host(`gitea.lan.tarasa24.dev`)"
+      - "traefik.http.routers.gitea.entrypoints=https"
+      - "traefik.http.routers.gitea.tls=true"
+      - "traefik.http.routers.gitea.middlewares=hsts@file"
+      # Container exposes both :3000 (http) and :22 (git-ssh); without this,
+      # Traefik's port auto-detection picked :22 and routed HTTP traffic to SSH.
+      - "traefik.http.services.gitea.loadbalancer.server.port=3000"
+volumes:
+  gitea-data:
+    external: true
+    name: root_gitea-data

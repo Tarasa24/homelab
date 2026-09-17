@@ -1,0 +1,43 @@
+# dind sidecar, not the host's Docker socket. dind is privileged, so a
+# breakout still lands in this LXC - containment is the firewall
+# (output_policy=DROP in lxc_gitea_runner.tf), not this sidecar.
+# runner.env is rendered by gitea-runner-init.yml, not committed.
+services:
+  dind:
+    image: docker:27-dind
+    container_name: gitea-runner-dind
+    restart: unless-stopped
+    privileged: true
+    environment:
+      DOCKER_TLS_CERTDIR: ""
+    volumes:
+      - dind-storage:/var/lib/docker
+    networks:
+      - runner
+
+  runner:
+    image: gitea/act_runner:0.2.11
+    container_name: gitea-runner
+    restart: unless-stopped
+    depends_on:
+      - dind
+    env_file:
+      - ./act_runner/runner.env
+    environment:
+      DOCKER_HOST: tcp://dind:2375
+      GITEA_INSTANCE_URL: http://10.0.30.29:80
+      GITEA_RUNNER_NAME: gitea-runner-01
+      GITEA_RUNNER_LABELS: docker:docker://node:20-bullseye,ubuntu-latest:docker://node:20-bullseye
+    volumes:
+      - runner-data:/data
+    networks:
+      - runner
+
+networks:
+  runner:
+    driver: bridge
+
+# Not external: no borgmatic role here to pre-create them.
+volumes:
+  dind-storage:
+  runner-data:

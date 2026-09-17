@@ -212,6 +212,24 @@ endpoints:
       host: private-docker-host
       path: internal
 
+  - name: "Gitea"
+    group: "Internal"
+    url: "http://10.0.30.29:80/api/healthz"
+    interval: 60s
+    client:
+      timeout: 10s
+    conditions:
+      - "[STATUS] == 200"
+    ui:
+      hide-url: true
+      hide-hostname: true
+      hide-port: true
+      hide-conditions: true
+      hide-errors: true
+    extra-labels:
+      host: private-docker-host
+      path: internal
+
   # Queries a public name so the check covers recursion, not just liveness.
   - name: "DNS"
     group: "Internal"

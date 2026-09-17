@@ -31,6 +31,11 @@
         description: Torrent client (behind WireGuard netns)
 
 - Apps:
+    - Gitea:
+        icon: gitea.png
+        href: https://gitea.lan.tarasa24.dev/
+        siteMonitor: https://gitea.lan.tarasa24.dev/
+        description: Self-hosted git server
     - Vaultwarden:
         icon: vaultwarden.png
         href: https://vaultwarden.lan.tarasa24.dev/

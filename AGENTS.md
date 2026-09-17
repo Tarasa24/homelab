@@ -80,6 +80,7 @@ Gateway and DHCP for Lab and DMZ are both the UXG (`10.0.30.1` / `10.0.40.1`). N
 | `10.0.30.15` | 3015 | Home Assistant VM |
 | `10.0.30.20` | 3020 | Private docker-host (internal services) |
 | `10.0.30.21–30` | — | Virtual NICs on the private docker-host, see table below |
+| `10.0.30.12` | 3012 | Gitea Actions runner (standalone; see below) |
 
 ### DMZ subnet (`10.0.40.x`)
 | IP | VMID | Role |
@@ -104,6 +105,7 @@ Out-of-band monitoring network — all nodes with the `mon` NIC get a VLAN 50 in
 | `10.0.50.20` | private-docker-host |
 | `10.0.50.103` | dmz-bitcoin-node |
 | `10.0.50.120` | dmz-docker-host |
+| `10.0.50.6` | gitea-runner |
 
 The Proxmox host itself is the exception: it owns `vmbr0` and has no address on
 VLAN 50, so it is scraped on the Lab VLAN at `10.0.30.2:9100`. That needs an explicit
@@ -129,6 +131,7 @@ All containers use Alpine Linux unless noted. Templates are downloaded by Terraf
 | `lxc_dmz_proxy` | 4010 | `lxc_dmz_proxy.tf` | Alpine | Single DMZ NIC + mon NIC; nginx + Certbot only (replaces `lxc_dmz_router`; no WireGuard/dnsmasq) |
 | `lxc_dmz_bitcoin_node` | 4013 | `lxc_dmz_bitcoin_node.tf` | Debian | Privileged; USB Bitcoin disk mounts; DMZ network only |
 | `lxc_dmz-docker-host` | 4020 | `lxc_dmz_docker-host.tf` | Alpine | Docker; DMZ network; GPU passthrough (`/dev/dri/renderD128`) |
+| `lxc_gitea_runner` | 3012 | `lxc_gitea_runner.tf` | Alpine | Docker; standalone Gitea Actions runner, isolated from private-docker-host (see below) |
 
 Removed as part of the network overhaul (VLAN restructure, dnsmasq no longer needed since the UXG is now DHCP/gateway for both VLANs): `lxc_dmz_router`, `lxc_homelab_tailscale_connector`, `lxc_dmz_tailscale_connector`, `lxc_tailscale_connector_template`, `lxc_nixos_template`.
 
@@ -156,7 +159,8 @@ Secrets are consumed by Ansible playbooks via `lookup('file', '../../../secrets/
 - `secrets/backup/ssh/` — SSH keypair used by borgmatic clients to authenticate to the borg server
 - `secrets/backup/resticprofile/` — Restic repository password (repository is a Hetzner Storage Box over SFTP, authenticated via `secrets/hetzner/`)
 - `secrets/hetzner/` — Hetzner Storage Box SSH key + host key, and the Certbot DNS-01 API token
-- `secrets/private-docker-host/` — Application-level secrets for internal services
+- `secrets/private-docker-host/` — Application-level secrets for internal services (includes `gitea/` — SECRET_KEY, INTERNAL_TOKEN, admin bootstrap password)
+- `secrets/gitea-runner/` — act_runner registration token (obtained from Gitea after it's deployed, not generated ahead of time)
 - `secrets/terraform.tfvars` — Proxmox API credentials (`proxmox_config` map)
 - `secrets/dmz_router/` — DMZ router specific secrets
 
@@ -199,11 +203,55 @@ Virtual NICs `eth0:0` through `eth0:9` (`10.0.30.21–30`) are assigned at boot 
 | `ghostfolio/` | `10.0.30.26` | Ghostfolio portfolio tracker (Postgres + Redis) |
 | `kimai/` | `10.0.30.27` | Kimai time tracking (MariaDB) |
 | `homepage/` | `10.0.30.28` | Homepage admin dashboard (`dash.lan.tarasa24.dev`); full service inventory, no auth gate (LAN-trusted) |
+| `gitea/` | `10.0.30.29` | Gitea git server (`gitea.lan.tarasa24.dev`); LAN-only, SQLite backend |
 | `cadvisor/` | `10.0.50.20` | cAdvisor per-container metrics on `:8081` (VLAN 50) |
 
 The `arr_stack` services run inside a WireGuard network namespace (all share the `wireguard` container's network via `network_mode: service:wireguard`).
 
 Traefik reads TLS certificates from the shared Certbot mount (`/etc/letsencrypt/live/*.lan.tarasa24.dev`).
+
+---
+
+## Gitea Actions Runner (`10.0.30.12`)
+
+Standalone LXC (`terraform/lxc_gitea_runner.tf`, VMID 3012), deliberately not
+folded into `private-docker-host` alongside Gitea itself. The stated goal is
+that a future workflow's job could be "deploy homelab changes" (Terraform/
+Ansible against this repo) — running that on the same host as every other
+LAN service, or worse on Gitea's own host, means a buggy or malicious job has
+a direct path to the infrastructure hosting it. Splitting it out is the
+mitigation, enforced two ways:
+
+1. **Network isolation.** Unlike `private-docker-host` (no per-VM firewall
+   override, traffic flows freely), this container gets its own
+   `firewall_options`/`firewall_rules` with `output_policy = "DROP"` — the
+   same pattern as `lxc_dmz_proxy.tf`. Only DNS, HTTP/HTTPS (package/image
+   pulls), and outbound to Gitea's own port are allow-listed. Outbound to the
+   Proxmox API (`10.0.30.2:8006`) or SSH is deliberately absent — there is
+   currently no network path from this container to the hypervisor at all.
+2. **Deferred, scoped credentials.** When a homelab-deploy workflow is
+   actually wired up, the plan is a dedicated Proxmox API token whose role
+   excludes this container's own `vm_id` (3012) — not broader network
+   reachability. Network isolation alone doesn't stop a job with valid
+   destroy-capable credentials; the credential scope has to carry that
+   weight, and doesn't exist yet by design.
+
+Runs the Docker executor: `gitea/act_runner` talks to its own `docker:dind`
+sidecar (`configs/gitea-runner/act_runner/`), not the host's Docker socket.
+That sidecar runs `privileged: true`, so a job breakout lands in this LXC's
+own Docker engine, not a sandboxed dind container — the actual containment
+is the firewall (`output_policy = "DROP"`, no route to the Proxmox API or
+SSH), not the dind sidecar. cAdvisor
+(`configs/gitea-runner/cadvisor/`) gives the same per-container down-detection
+here as the two docker-hosts get. No borgmatic role: nothing here is
+stateful enough to be worth a cold backup (job/image caches are disposable;
+the registration token is already git-crypt-encrypted in
+`secrets/gitea-runner/`).
+
+The registration token can't be generated ahead of time — it comes from
+Gitea itself (`docker exec gitea gitea actions generate-runner-token` on
+`private-docker-host`, once Gitea is up), so `gitea-runner-init.yml` must run
+after the first `private-docker-host-init.yml` deploy, not before.
 
 ---
 
