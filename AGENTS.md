@@ -150,6 +150,71 @@ PVE storage pools `USB-HDD` and `USB-SSD` are registered as Proxmox `dir` storag
 
 ---
 
+## Host Memory Pressure
+
+The hypervisor is an Intel NUC DC3217IYE: i3-3217U, **12 GB DDR3 (4+8), two
+slots, 16 GB max**, against roughly 24 GB of guest commitments. Overcommit is
+normal for LXC, but the margin is thin enough that a mis-sized guest surfaces as
+host-wide swap exhaustion rather than a local problem — on 2026-09-17 swap
+reached 8190/8191 MB, one megabyte short of the OOM killer.
+
+**Read `memory.high`, not `free`.** Per-container reclaim pressure is counted in
+`/sys/fs/cgroup/lxc/<vmid>/memory.events`; a container pinned at its cap shows
+millions of `high` breaches while the host merely looks busy. Containers with
+`swap: 0` (`backup`, `dmz-proxy`) cannot relieve pressure at all and spin in
+reclaim.
+
+**zswap, not zram, and not more swap.** Enabled with `zstd`/`max_pool_percent=20`
+from `pve_init.yml --tags memory`, compressing in front of the existing 8 GB
+`pve-swap` LV at ~3:1. zram was rejected: a second swap device that permanently
+reserves RAM and still spills to disk once full. Growing `pve-swap` was rejected
+too — PSI showed cold pages, not thrashing, so more swap only delays OOM, and
+`swapoff` is impossible while usage is high. If it is ever resized, extend the
+existing LV at a maintenance window; the thinpool is >85% full and the USB disks
+are the wrong latency class for a swapfile.
+
+**ksmtuned needs `KSM_THRES_COEF=40` here.** It stops KSM while
+`committed + thres < total AND free > thres`, where `committed` counts *qemu PSS
+only* and so misses the LXCs using most of this host's RAM. At the default 20
+both conjuncts hold and KSM idles at `run=0` with 200 MB free; 40 breaks the
+second.
+
+**Ballooning must be explicitly enabled.** `floating` equal to `dedicated`
+(homeassistant) pins the balloon; `floating` absent (unifi-os) means no balloon
+device exists at all, and adding one needs a cold stop/start since `numa: 0`
+disables memory hotplug. Verify with `qm monitor <vmid>` → `info balloon`, not
+the config. Setting homeassistant's `floating` to 2560 returned ~2 GB of host
+swap within seconds.
+
+**Changing VM memory via `terraform apply` reboots the guest.** The provider
+issues a `qmreboot` rather than adjusting the balloon in place, and it does so
+silently — the apply reports `1 changed` and the balloon answers immediately,
+so it looks live. Check `/var/run/qemu-server/<vmid>.pid` and the
+`major_page_faults` counter before and after, not just the balloon value. To
+change the balloon floor without downtime use `qm set <vmid> -balloon <mb>`
+(live, keeps the same qemu process) and then `terraform apply -refresh-only` to
+reconcile state. `dedicated` still needs a real stop/start.
+
+**Applications size themselves off guest RAM.** `bitcoind` had `dbcache=2560`
+inside a 2048 MB container, worth ~648k reclaim events on its own. Check
+application ceilings before adjusting container caps — caps are limits, not
+reservations, so lowering one frees nothing by itself.
+
+UniFi OS Server is the awkward case. `unifi.service` ships `-Xmx512M` inline,
+but `/etc/default/unifi` replaces `UNIFI_JVM_OPTS` with
+`-XX:MaxRAMPercentage=70.0`, so the heap ceiling tracks guest RAM rather than
+the workload. `unifi.xmx` in `system.properties` is **not** read — it is the
+obvious knob and it silently does nothing. The only override that works is
+`UNIFI_JVM_OPTS`, and the only place to set it that survives the vendor's
+in-place updates is `/var/lib/unifi/env-overrides` (loaded after
+`/etc/default/unifi`, and on the VM disk rather than the container image).
+Because it replaces the variable wholesale, re-check the flags in
+`/etc/default/unifi` after a major UOS upgrade. Its OS-core mongo still has no
+WiredTiger cache cap; that config is in the image, so capping it would not
+survive an update.
+
+---
+
 ## Secrets Management
 
 Secrets live under `secrets/` and are encrypted with **git-crypt** (key file `crypt.key`, excluded from git via `.gitignore`). The `.gitattributes` file applies the `git-crypt` filter to all files under `secrets/**`.

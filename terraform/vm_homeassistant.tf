@@ -11,9 +11,18 @@ resource "proxmox_virtual_environment_vm" "vm_homeassistant" {
   bios    = "ovmf"
   machine = "q35"
 
+  # floating is the balloon floor pvestatd may shrink to once the host passes
+  # 80% usage. It used to equal dedicated, which pins the balloon and makes
+  # nothing reclaimable: this guest held 2.4 GB of host swap while reporting
+  # 123 MB free.
+  #
+  # Changing this via terraform apply reboots the guest -- the provider issues
+  # a qmreboot rather than adjusting the balloon in place. `qm set <id>
+  # -balloon <mb>` applies the same change live; follow it with
+  # `terraform apply -refresh-only` to reconcile state.
   memory {
     dedicated = 4096
-    floating  = 4096
+    floating  = 2048
   }
 
   cpu {

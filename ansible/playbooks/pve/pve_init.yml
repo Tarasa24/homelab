@@ -110,6 +110,55 @@
         path: /etc/network/interfaces.d/vmbr1.cfg
         state: absent
 
+    # Memory tuning. Must stay ahead of the vmbr0 assert below, which fails
+    # by design until the flat-LAN failsafe is removed. Run on its own with
+    # `--tags memory`; a full run drops and re-adds the USB storages.
+
+    - name: "Enable zswap at runtime"
+      # sysfs rejects copy/lineinfile's atomic rename, so write directly.
+      # compressor before enabled, so the pool is created with zstd.
+      ansible.builtin.shell: |
+        set -eu
+        changed=0
+        apply() {
+          if [ "$(cat "$1")" != "$2" ]; then
+            echo "$2" > "$1"
+            changed=1
+          fi
+        }
+        apply /sys/module/zswap/parameters/compressor zstd
+        apply /sys/module/zswap/parameters/max_pool_percent 20
+        apply /sys/module/zswap/parameters/enabled Y
+        echo "changed=${changed}"
+      register: pve_zswap_runtime
+      changed_when: "'changed=1' in pve_zswap_runtime.stdout"
+      tags: [memory]
+
+    - name: "Persist zswap on the kernel command line"
+      # The sysfs writes above cover the running host; this survives a reboot.
+      ansible.builtin.lineinfile:
+        path: /etc/default/grub
+        regexp: '^GRUB_CMDLINE_LINUX_DEFAULT='
+        line: >-
+          GRUB_CMDLINE_LINUX_DEFAULT="quiet zswap.enabled=1
+          zswap.compressor=zstd zswap.max_pool_percent=20"
+        mode: "0644"
+      notify: update grub
+      tags: [memory]
+
+    # ksmtuned counts only qemu PSS as committed, so it cannot see the LXCs
+    # using most of this host's RAM. It stops KSM while
+    # `committed + thres < total AND free > thres`; at the default coef of 20
+    # both hold and KSM idles at run=0 with 200 MB free. 40 breaks the second.
+    - name: "Make ksmtuned account for non-qemu memory pressure"
+      ansible.builtin.lineinfile:
+        path: /etc/ksmtuned.conf
+        regexp: '^#?\s*KSM_THRES_COEF='
+        line: "KSM_THRES_COEF=40"
+        mode: "0644"
+      notify: restart ksmtuned
+      tags: [memory]
+
     # The management address moves off vmbr0 itself and onto a VLAN 30
     # subinterface. Leaving the old address in place would give the host two
     # default routes, so refuse to run rather than half-apply it. This is the
@@ -158,3 +207,14 @@
     - name: reload systemd
       ansible.builtin.systemd:
         daemon_reload: true
+
+    - name: update grub
+      ansible.builtin.command: update-grub
+      changed_when: true
+      tags: [memory]
+
+    - name: restart ksmtuned
+      ansible.builtin.systemd:
+        name: ksmtuned
+        state: restarted
+      tags: [memory]
