@@ -243,6 +243,17 @@ groups:
           summary: "No logs received from monitoring for 2 hours"
           description: "Promtail on monitoring has stopped shipping to Loki - log-based alerting is blind for this host"
 
+      - alert: LogShippingStopped
+        expr: absent_over_time({instance="pve"}[2h])
+        for: 10m
+        labels:
+          severity: warning
+          alerttype: infrastructure
+          host: pve
+        annotations:
+          summary: "No logs received from pve for 2 hours"
+          description: "Promtail on pve has stopped shipping to Loki - log-based alerting is blind for this host"
+
       # Catches "job never ran at all" - the one case the ntfy hooks above miss.
       - alert: BorgmaticJobMissing
         expr: absent_over_time({app="borgmatic", host="dns"}[27h])
