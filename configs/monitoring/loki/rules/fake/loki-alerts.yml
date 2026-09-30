@@ -89,6 +89,24 @@ groups:
           summary: "OOM kill detected in {{ $labels.job }}"
           description: "An out-of-memory kill appeared in the logs of {{ $labels.job }} - check container memory limits"
 
+      # The host is offline while the NIC is hung, so nothing can alert on the
+      # hang itself; this fires once net-watchdog has reset the NIC and the
+      # buffered log line reaches Loki. Any match means the TSO/GSO-off udev
+      # rule was not enough on its own.
+      - alert: NicTxHangReset
+        expr: |
+          sum by (job) (
+            count_over_time({job="pve/kernel"} |= `net-watchdog: eno1 TX hang detected` [1h])
+          ) > 0
+        for: 0m
+        labels:
+          severity: warning
+          alerttype: infrastructure
+          host: pve
+        annotations:
+          summary: "net-watchdog reset the e1000e NIC on pve"
+          description: "The onboard NIC hung and was reset by net-watchdog despite segmentation offload being off - check the pve kernel log for 'Detected Hardware Unit Hang' and consider a replacement NIC"
+
       - alert: TLSCertExpiryWarningInLogs
         expr: |
           sum by (job) (
