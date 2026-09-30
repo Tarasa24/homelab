@@ -215,6 +215,35 @@ survive an update.
 
 ---
 
+## Host NIC (e1000e TX hang)
+
+The onboard Intel 82579V (`eno1`, e1000e) hangs its TX ring under TCP
+segmentation offload. The kernel logs `Detected Hardware Unit Hang` every 2s
+and the driver never recovers on its own: the host drops off the network while
+every guest keeps running, until the link physically flaps. It happened five
+times between 2026-07-01 and 2026-09-30, the longest lasting ~45h.
+
+**Fix: TSO/GSO off.** `configs/pve/81-e1000e-hang.rules` runs `ethtool -K
+eno1 tso off gso off` at boot. It is a udev rule because PVE regenerates
+`/etc/network/interfaces`, and it is numbered 81 so it runs after
+`80-net-setup-link.rules` has named the interface. `e1000e EEE=0` in
+modprobe.d does nothing (not a parameter of this driver), and EEE is inactive
+on this link anyway.
+
+**Fallback: `net-watchdog.sh`** (cron, every minute) takes `eno1` down and up
+when the kernel reports a hang, the software equivalent of replugging the
+cable. It bounces the bridge port, never `vmbr0`, which would drop the default
+route. Its earlier gateway-ping/`ifreload -a` form never ended an outage and
+was removed. A reset writes to the kernel log, which fires the Loki alert
+`NicTxHangReset` once the host is back online. It is temporary: if no hang is
+logged by 2027-01-01, delete the script, its cron entry and the alert. If
+hangs keep happening even with offload off, replace the NIC.
+
+Deploy with `ansible-playbook playbooks/pve/pve_init.yml --tags nic`. The tag
+skips the cutover assert and the storage tasks.
+
+---
+
 ## Secrets Management
 
 Secrets live under `secrets/` and are encrypted with **git-crypt** (key file `crypt.key`, excluded from git via `.gitignore`). The `.gitattributes` file applies the `git-crypt` filter to all files under `secrets/**`.

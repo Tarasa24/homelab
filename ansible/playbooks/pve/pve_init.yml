@@ -42,9 +42,26 @@
     - role: promtail
 
   tasks:
-    # Guards the host's default route. Was an untracked script on the host that
-    # bounced vmbr0 with `ip link`, dropping the ifupdown-configured gateway
-    # permanently; see configs/pve/net-watchdog.sh.
+    # e1000e TX hang mitigation; see AGENTS.md "Host NIC".
+    - name: Disable segmentation offload on the e1000e NIC at boot
+      ansible.builtin.copy:
+        src: "../../../configs/pve/81-e1000e-hang.rules"
+        dest: /etc/udev/rules.d/81-e1000e-hang.rules
+        mode: '0644'
+      tags: [nic]
+
+    - name: Disable segmentation offload on the e1000e NIC now
+      ansible.builtin.command: ethtool -K eno1 tso off gso off
+      changed_when: false
+      tags: [nic]
+
+    - name: Drop the ineffective EEE option for e1000e
+      ansible.builtin.copy:
+        content: "options e1000e SmartPowerDownEnable=0\n"
+        dest: /etc/modprobe.d/e1000e.conf
+        mode: '0644'
+      tags: [nic]
+
     - name: Deploy net-watchdog script
       ansible.builtin.copy:
         src: "../../../configs/pve/net-watchdog.sh"
@@ -52,11 +69,13 @@
         owner: root
         group: root
         mode: '0755'
+      tags: [nic]
 
     - name: Remove any unmanaged net-watchdog crontab entry
       ansible.builtin.shell: |
         crontab -l 2>/dev/null | grep -v 'net-watchdog' | crontab - || true
       changed_when: false
+      tags: [nic]
 
     - name: Schedule net-watchdog
       ansible.builtin.cron:
@@ -64,6 +83,13 @@
         job: /usr/local/bin/net-watchdog.sh
         minute: "*"
         state: present
+      tags: [nic]
+
+    - name: Remove the obsolete net-watchdog metric file
+      ansible.builtin.file:
+        path: /var/lib/node_exporter/textfile_collector/net_watchdog.prom
+        state: absent
+      tags: [nic]
 
     - name: Create mount points
       ansible.builtin.file:

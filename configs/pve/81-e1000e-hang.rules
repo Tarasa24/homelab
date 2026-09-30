@@ -1,0 +1,2 @@
+# e1000e hangs its TX ring under TSO; see AGENTS.md "Host NIC".
+ACTION=="add", SUBSYSTEM=="net", DRIVERS=="e1000e", RUN+="/usr/sbin/ethtool -K $name tso off gso off"

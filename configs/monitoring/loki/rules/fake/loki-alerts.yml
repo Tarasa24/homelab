@@ -89,6 +89,21 @@ groups:
           summary: "OOM kill detected in {{ $labels.job }}"
           description: "An out-of-memory kill appeared in the logs of {{ $labels.job }} - check container memory limits"
 
+      # Fires after net-watchdog reset the NIC, i.e. TSO/GSO off was not enough.
+      - alert: NicTxHangReset
+        expr: |
+          sum by (job) (
+            count_over_time({job="pve/kernel"} |= `net-watchdog: eno1 TX hang detected` [1h])
+          ) > 0
+        for: 0m
+        labels:
+          severity: warning
+          alerttype: infrastructure
+          host: pve
+        annotations:
+          summary: "net-watchdog reset the e1000e NIC on pve"
+          description: "The onboard NIC hung and was reset by net-watchdog despite segmentation offload being off - check the pve kernel log for 'Detected Hardware Unit Hang' and consider a replacement NIC"
+
       - alert: TLSCertExpiryWarningInLogs
         expr: |
           sum by (job) (
@@ -224,6 +239,17 @@ groups:
         annotations:
           summary: "No logs received from monitoring for 2 hours"
           description: "Promtail on monitoring has stopped shipping to Loki - log-based alerting is blind for this host"
+
+      - alert: LogShippingStopped
+        expr: absent_over_time({instance="pve"}[2h])
+        for: 10m
+        labels:
+          severity: warning
+          alerttype: infrastructure
+          host: pve
+        annotations:
+          summary: "No logs received from pve for 2 hours"
+          description: "Promtail on pve has stopped shipping to Loki - log-based alerting is blind for this host"
 
       # Catches "job never ran at all" - the one case the ntfy hooks above miss.
       - alert: BorgmaticJobMissing
