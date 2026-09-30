@@ -89,10 +89,7 @@ groups:
           summary: "OOM kill detected in {{ $labels.job }}"
           description: "An out-of-memory kill appeared in the logs of {{ $labels.job }} - check container memory limits"
 
-      # The host is offline while the NIC is hung, so nothing can alert on the
-      # hang itself; this fires once net-watchdog has reset the NIC and the
-      # buffered log line reaches Loki. Any match means the TSO/GSO-off udev
-      # rule was not enough on its own.
+      # Fires after net-watchdog reset the NIC, i.e. TSO/GSO off was not enough.
       - alert: NicTxHangReset
         expr: |
           sum by (job) (

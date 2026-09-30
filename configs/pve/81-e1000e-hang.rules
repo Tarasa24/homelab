@@ -1,5 +1,2 @@
-# The onboard 82579V (e1000e) wedges its TX ring under TCP segmentation
-# offload ("Detected Hardware Unit Hang"), and the driver never recovers on its
-# own: the host drops off the network until the link is physically flapped.
-# Five such outages between 2026-07-01 and 2026-09-30, up to ~45h long.
+# e1000e hangs its TX ring under TSO; see AGENTS.md "Host NIC".
 ACTION=="add", SUBSYSTEM=="net", DRIVERS=="e1000e", RUN+="/usr/sbin/ethtool -K $name tso off gso off"
