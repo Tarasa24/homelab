@@ -38,6 +38,9 @@
       command="/usr/bin/node_exporter"
       command_args="--web.listen-address=\":9100\" --collector.textfile.directory=/var/lib/node_exporter/textfile_collector"
       command_user="nobody"
+      # Without this node_exporter runs in the foreground, `start` never returns
+      # and every service ordered after it (local, sshd, ...) is never started.
+      command_background="yes"
       pidfile="/run/${RC_SVCNAME}.pid"
       
       depend() {
