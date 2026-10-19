@@ -31,6 +31,8 @@ resource "proxmox_virtual_environment_vm" "vm_unifi_os" {
     file_id      = proxmox_virtual_environment_download_file.debian_unifi_os_cloud_image.id
     interface    = "scsi0"
     size         = 32
+    discard      = "on"
+    ssd          = true
   }
 
   # file_id is create-only and absent from imported state; without this it

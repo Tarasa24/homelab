@@ -54,6 +54,29 @@ groups:
           summary: "Critical disk space on {{ $labels.instance }} {{ $labels.mountpoint }}"
           description: "Only {{ $value | printf \"%.1f\" }}% free on {{ $labels.instance }}:{{ $labels.mountpoint }}"
 
+      # local-lvm is overcommitted. At 100% the pool goes to error-IO mode and
+      # every guest with a write needing a fresh block gets EIO (2026-10-17).
+      # DiskSpace* cannot see it: guest filesystems still report free space.
+      - alert: ThinPoolUsageHigh
+        expr: pve_thinpool_data_percent > 85 or pve_thinpool_metadata_percent > 85
+        for: 5m
+        labels:
+          severity: warning
+          alerttype: storage
+        annotations:
+          summary: "Thin pool {{ $labels.pool }} on {{ $labels.instance }} is filling up"
+          description: "{{ $labels.pool }} is at {{ $value | printf \"%.1f\" }}%. Run `pct fstrim` on the containers; extend the pool if that is not enough"
+
+      - alert: ThinPoolUsageCritical
+        expr: pve_thinpool_data_percent > 95 or pve_thinpool_metadata_percent > 95
+        for: 2m
+        labels:
+          severity: critical
+          alerttype: storage
+        annotations:
+          summary: "Thin pool {{ $labels.pool }} on {{ $labels.instance }} is almost full"
+          description: "{{ $labels.pool }} is at {{ $value | printf \"%.1f\" }}%. At 100% all guests start returning I/O errors"
+
       - alert: DiskReadingErrors
         expr: rate(node_disk_read_errors_total[15m]) > 0
         for: 5m
