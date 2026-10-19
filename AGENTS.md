@@ -244,6 +244,54 @@ skips the cutover assert and the storage tasks.
 
 ---
 
+## Thin pool (`local-lvm`)
+
+`pve/data` is a ~156 GB LVM thin pool backing every guest rootfs and both VM
+disks, with ~247 GB of virtual size promised against it. When it reaches 100%
+the kernel switches it to `out-of-data-space (error IO)` and every guest write
+needing a fresh block fails with EIO, while the guests' own `df` still shows
+free space. That happened 2026-10-17 17:50 and went unnoticed for two days.
+
+**Allocation is not usage.** Freed blocks in a guest stay allocated in the pool
+until trimmed. Containers held ~100 GB of pool space against ~41 GB of real
+data; `pct fstrim` brought the pool from 100% to 58%. `fstrim.timer` on the
+host only trims host filesystems, so `pve_init.yml --tags storage` adds a weekly
+`pct fstrim` over every container.
+
+**The VMs need `discard=on`** (`vm_homeassistant.tf`, `vm_unifi_os.tf`);
+with `discard=ignore` the pool can never get their freed blocks back. The change
+only applies after a VM stop/start, and the guest then needs `fstrim -av`.
+
+**Autoextend is deliberately not configured**: the VG has ~1 GB free, so
+`thin_pool_autoextend_*` would have nothing to extend into. Recovery from a full
+pool is `pct fstrim <vmid>` per container first, `lvextend` only if the VG has
+room.
+
+`ThinPoolUsageHigh`/`ThinPoolUsageCritical` alert on `pve_thinpool_*_percent`,
+written every minute by `configs/pve/thinpool-metrics.sh` to the textfile
+collector. If the script stops, the file goes stale rather than disappearing.
+
+**After an outage, expect silent corruption.** Writes made while the pool was
+full left zero-filled files that only fail at the next restart. On 2026-10-19
+that was `/etc/inittab` on `dns` (container booted with no init) and Technitium's
+`auth.config` (service crashed on start); both were fixed from a healthy peer and
+a pre-outage borg archive. Borg archives taken after the outage contain the
+corrupt copy, so restore from before it.
+
+---
+
+## Alpine boot ordering
+
+OpenRC starts the default runlevel serially, so one init script whose `start`
+never returns stalls everything ordered after it. The `node_exporter` script
+lacked `command_background="yes"`, ran in the foreground, and sat at `starting`
+forever; `local` (which runs `assign-ips.start` on the docker hosts) and `sshd`
+(on `backup`) never started, so services bound to `10.0.30.21–30` /
+`10.0.40.21–30` failed after every container restart. A service that is `running`
+but shown as `starting` in `rc-status` is this failure.
+
+---
+
 ## Secrets Management
 
 Secrets live under `secrets/` and are encrypted with **git-crypt** (key file `crypt.key`, excluded from git via `.gitignore`). The `.gitattributes` file applies the `git-crypt` filter to all files under `secrets/**`.

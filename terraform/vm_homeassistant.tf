@@ -34,6 +34,8 @@ resource "proxmox_virtual_environment_vm" "vm_homeassistant" {
     file_id      = proxmox_virtual_environment_download_file.homeassistant_qcow2_template.id
     interface    = "scsi0"
     size         = 32
+    discard      = "on"
+    ssd          = true
   }
 
   # file_id is create-only and absent from imported state; without this it

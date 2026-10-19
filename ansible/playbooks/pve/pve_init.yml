@@ -185,6 +185,38 @@
       notify: restart ksmtuned
       tags: [memory]
 
+    # local-lvm is overcommitted; see AGENTS.md "Thin pool". Run on its own with
+    # `--tags storage`.
+
+    - name: "Deploy thin pool metrics exporter"
+      ansible.builtin.copy:
+        src: "../../../configs/pve/thinpool-metrics.sh"
+        dest: /usr/local/bin/thinpool-metrics.sh
+        owner: root
+        group: root
+        mode: '0755'
+      tags: [storage]
+
+    - name: "Export thin pool usage to node_exporter"
+      ansible.builtin.cron:
+        name: thinpool-metrics
+        job: /usr/local/bin/thinpool-metrics.sh
+        minute: "*"
+        state: present
+      tags: [storage]
+
+    # LXC rootfs volumes are not trimmed by fstrim.timer (host filesystems only),
+    # so freed guest blocks stay allocated in the pool until this runs.
+    - name: "Trim every container's rootfs weekly"
+      ansible.builtin.cron:
+        name: pct-fstrim
+        job: "pct list | awk 'NR>1 {print $1}' | xargs -n1 pct fstrim 2>&1 | logger -t pct-fstrim"
+        weekday: "0"
+        hour: "4"
+        minute: "0"
+        state: present
+      tags: [storage]
+
     # The management address moves off vmbr0 itself and onto a VLAN 30
     # subinterface. Leaving the old address in place would give the host two
     # default routes, so refuse to run rather than half-apply it. This is the
