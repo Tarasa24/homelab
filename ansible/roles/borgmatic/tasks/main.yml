@@ -33,6 +33,21 @@
     state: started
   when: init_system == "systemd"
 
+# The Debian package ships its own borgmatic.timer (OnCalendar=daily,
+# RandomizedDelaySec=3h), enabled by default. Left alone it runs concurrently
+# with the cron job above - both target the same repository and borg's
+# locking means one run fails every night with a lock-contention error, on a
+# randomized schedule the nightly-backup mute window (01:55-03:00 UTC) isn't
+# guaranteed to cover. One scheduler per host: cron, matching every other
+# (openrc) host in the fleet.
+- name: Disable and mask the packaged borgmatic.timer (Debian)
+  ansible.builtin.systemd:
+    name: borgmatic.timer
+    enabled: false
+    state: stopped
+    masked: true
+  when: init_system == "systemd"
+
 - name: Check installed yq version (Debian)
   ansible.builtin.command: /usr/local/bin/yq --version
   register: borgmatic_yq_installed
